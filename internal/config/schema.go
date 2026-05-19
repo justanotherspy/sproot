@@ -1,0 +1,194 @@
+package config
+
+import (
+	"fmt"
+
+	"go.yaml.in/yaml/v3"
+)
+
+// SprootConfig is the top-level struct for sproot.yaml, found in the config repo.
+type SprootConfig struct {
+	SchemaVersion int           `yaml:"schema_version"`
+	Identity      Identity      `yaml:"identity"`
+	Phases        []PhaseConfig `yaml:"phases"`
+}
+
+// Identity holds user identity fields referenced by multiple modules.
+type Identity struct {
+	GitUserName      string `yaml:"git_user_name"`
+	GitUserEmail     string `yaml:"git_user_email"`
+	GitDefaultBranch string `yaml:"git_default_branch"`
+	GHUsername       string `yaml:"gh_username"`
+}
+
+// HostConfig is the struct for ~/.sproot/config, the per-machine host file.
+type HostConfig struct {
+	ConfigRepo string `yaml:"config_repo"`
+	ConfigRef  string `yaml:"config_ref"`
+	PrivateKey string `yaml:"private_key"`
+	DefaultOrg string `yaml:"default_org"`
+}
+
+// PhaseConfig represents one entry in the phases list. Type is always set.
+// Exactly one typed config pointer is non-nil after unmarshaling.
+type PhaseConfig struct {
+	Type           string                `yaml:"type"`
+	Apt            *AptConfig            `yaml:"-"`
+	UVTool         *UVToolConfig         `yaml:"-"`
+	BinaryRelease  *BinaryReleaseConfig  `yaml:"-"`
+	Corepack       *CorepackConfig       `yaml:"-"`
+	RustComponents *RustComponentsConfig `yaml:"-"`
+	Docker         *DockerConfig         `yaml:"-"`
+	SpriteService  *SpriteServiceConfig  `yaml:"-"`
+	GitIdentity    *GitIdentityConfig    `yaml:"-"`
+	SSHSetup       *SSHSetupConfig       `yaml:"-"`
+	GHToken        *GHTokenConfig        `yaml:"-"`
+	FileTemplate   *FileTemplateConfig   `yaml:"-"`
+	RCBlock        *RCBlockConfig        `yaml:"-"`
+	RepoClone      *RepoCloneConfig      `yaml:"-"`
+	ClaudeSettings *ClaudeSettingsConfig `yaml:"-"`
+	Cmd            *CmdConfig            `yaml:"-"`
+}
+
+// UnmarshalYAML decodes a phase entry using a two-pass approach: first reads
+// the type field, then decodes the full node into the appropriate concrete struct.
+func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
+	var raw struct {
+		Type string `yaml:"type"`
+	}
+	if err := value.Decode(&raw); err != nil {
+		return err
+	}
+	p.Type = raw.Type
+
+	switch raw.Type {
+	case "apt":
+		p.Apt = &AptConfig{}
+		return value.Decode(p.Apt)
+	case "uv_tool":
+		p.UVTool = &UVToolConfig{}
+		return value.Decode(p.UVTool)
+	case "binary_release":
+		p.BinaryRelease = &BinaryReleaseConfig{}
+		return value.Decode(p.BinaryRelease)
+	case "corepack":
+		p.Corepack = &CorepackConfig{}
+		return nil
+	case "rust_components":
+		p.RustComponents = &RustComponentsConfig{}
+		return nil
+	case "docker":
+		p.Docker = &DockerConfig{}
+		return nil
+	case "sprite_service":
+		p.SpriteService = &SpriteServiceConfig{}
+		return value.Decode(p.SpriteService)
+	case "git_identity":
+		p.GitIdentity = &GitIdentityConfig{}
+		return nil
+	case "ssh_setup":
+		p.SSHSetup = &SSHSetupConfig{}
+		return nil
+	case "gh_token":
+		p.GHToken = &GHTokenConfig{}
+		return nil
+	case "file_template":
+		p.FileTemplate = &FileTemplateConfig{}
+		return value.Decode(p.FileTemplate)
+	case "rc_block":
+		p.RCBlock = &RCBlockConfig{}
+		return value.Decode(p.RCBlock)
+	case "repo_clone":
+		p.RepoClone = &RepoCloneConfig{}
+		return value.Decode(p.RepoClone)
+	case "claude_settings":
+		p.ClaudeSettings = &ClaudeSettingsConfig{}
+		return value.Decode(p.ClaudeSettings)
+	case "cmd":
+		p.Cmd = &CmdConfig{}
+		return value.Decode(p.Cmd)
+	default:
+		return fmt.Errorf("unknown phase type %q", raw.Type)
+	}
+}
+
+// AptConfig installs apt packages.
+type AptConfig struct {
+	Packages []string `yaml:"packages"`
+}
+
+// UVTool installs a single tool via uv.
+type UVTool struct {
+	Name string `yaml:"name"`
+}
+
+// UVToolConfig installs tools via uv tool install.
+type UVToolConfig struct {
+	Tools []UVTool `yaml:"tools"`
+}
+
+// BinaryReleaseConfig downloads and installs a GitHub release asset.
+// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch}.
+// Install methods: dpkg, tar+install, raw.
+type BinaryReleaseConfig struct {
+	Name    string `yaml:"name"`
+	Repo    string `yaml:"repo"`
+	Asset   string `yaml:"asset"`
+	Install string `yaml:"install"`
+}
+
+// CorepackConfig enables corepack and pre-activates pnpm and yarn.
+type CorepackConfig struct{}
+
+// RustComponentsConfig pins stable and installs clippy, rustfmt, rust-analyzer.
+type RustComponentsConfig struct{}
+
+// DockerConfig installs docker-ce and writes /etc/docker/daemon.json.
+type DockerConfig struct{}
+
+// SpriteServiceConfig registers a sprite-env managed service.
+type SpriteServiceConfig struct {
+	Service string `yaml:"service"`
+}
+
+// GitIdentityConfig applies git user.name, user.email, default branch, and signing config.
+// It uses the top-level Identity fields; no per-phase YAML fields are needed.
+type GitIdentityConfig struct{}
+
+// SSHSetupConfig configures the injected SSH key and known_hosts.
+type SSHSetupConfig struct{}
+
+// GHTokenConfig exports GH_TOKEN from the sprite-attached app token.
+type GHTokenConfig struct{}
+
+// FileTemplateConfig copies a file from the config repo to a destination path.
+// Mode is an optional octal string (e.g. "0755").
+type FileTemplateConfig struct {
+	Src  string `yaml:"src"`
+	Dest string `yaml:"dest"`
+	Mode string `yaml:"mode"`
+}
+
+// RCBlockConfig writes a sentinel-delimited block to .bashrc and .zshrc.
+type RCBlockConfig struct {
+	Src string `yaml:"src"`
+}
+
+// RepoCloneConfig clones a list of GitHub repos into a base directory.
+// Repos are specified as "owner/repo" (SSH clone from github.com is assumed).
+type RepoCloneConfig struct {
+	BaseDir string   `yaml:"base_dir"`
+	Repos   []string `yaml:"repos"`
+}
+
+// ClaudeSettingsConfig deep-merges a JSON object into ~/.claude/settings.json.
+type ClaudeSettingsConfig struct {
+	Settings map[string]any `yaml:"settings"`
+}
+
+// CmdConfig runs an arbitrary command with an optional idempotency check.
+// Check is a command that exits 0 if the work is already done (skips Run).
+type CmdConfig struct {
+	Run   string `yaml:"run"`
+	Check string `yaml:"check"`
+}

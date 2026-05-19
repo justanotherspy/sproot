@@ -25,6 +25,7 @@ schema_version: 1
 identity:
   git_user_name: "Your Name"
   git_user_email: "you@example.com"
+  git_default_branch: main
   gh_username: yourname
 
 phases:
@@ -50,9 +51,18 @@ See [docs/modules.md](docs/modules.md) for all module types.
 
 ```
 ~/.sproot/
-├── config           # YAML: config_repo, private_key_path
+├── config           # YAML: config_repo, config_ref, private_key
 └── private/
     └── id_ed25519   # SSH key loaded into each sprite
+```
+
+`~/.sproot/config` format:
+
+```yaml
+config_repo: git@github.com:yourname/sprite.git
+config_ref: main
+private_key: ~/.sproot/private/id_ed25519
+default_org: ""
 ```
 
 Initialize with:

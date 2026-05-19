@@ -51,7 +51,7 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | Phase | Description |
 |-------|-------------|
 | 0 | Scaffold: module, cobra wiring, CI (done) |
-| 1 | Config schema: sproot.yaml and ~/.sproot/config structs + loaders |
+| 1 | Config schema: sproot.yaml and ~/.sproot/config structs + loaders (done) |
 | 2 | Phase engine: runner, state file, registry |
 | 3 | Module implementations (apt, uv_tool, file_template, etc.) |
 | 4 | `sproot setup` (in-sprite command) |

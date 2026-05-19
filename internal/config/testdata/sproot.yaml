@@ -1,0 +1,45 @@
+schema_version: 1
+
+identity:
+  git_user_name: "Daniel Schwartz"
+  git_user_email: "danielschwar@gmail.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+phases:
+  - type: apt
+    packages: [shellcheck, jq]
+  - type: uv_tool
+    tools:
+      - name: ruff
+      - name: pre-commit
+  - type: binary_release
+    name: cosign
+    repo: sigstore/cosign
+    asset: "cosign_{version}_{arch}.deb"
+    install: dpkg
+  - type: file_template
+    src: files/statusline.py
+    dest: ~/.claude/statusline.py
+    mode: "0755"
+  - type: rc_block
+    src: files/rc_additions.sh
+  - type: repo_clone
+    base_dir: ~/repos
+    repos:
+      - justanotherspy/garlic
+      - justanotherspy/poker
+  - type: corepack
+  - type: rust_components
+  - type: docker
+  - type: sprite_service
+    service: dockerd
+  - type: git_identity
+  - type: ssh_setup
+  - type: gh_token
+  - type: claude_settings
+    settings:
+      theme: dark
+  - type: cmd
+    run: "echo hello"
+    check: "true"

@@ -1,0 +1,4 @@
+config_repo: git@github.com:justanotherspy/sprite.git
+config_ref: main
+private_key: ~/.sproot/private/id_ed25519
+default_org: ""
