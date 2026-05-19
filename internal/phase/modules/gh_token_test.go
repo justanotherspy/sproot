@@ -1,15 +1,14 @@
 package modules
 
 import (
-	"os"
 	"testing"
 )
 
 func TestGHToken_RunFailsWithoutToken(t *testing.T) {
-	_ = os.Unsetenv("SPRITE_GH_TOKEN")
+	t.Setenv("GH_TOKEN", "")
 	p := &ghTokenPhase{}
 	if err := p.Run(testCtx(t)); err == nil {
-		t.Error("expected error when SPRITE_GH_TOKEN not set")
+		t.Error("expected error when GH_TOKEN not set")
 	}
 }
 
@@ -37,3 +36,4 @@ func TestGHToken_ShouldRunWhenGHNotAuth(t *testing.T) {
 		t.Error("expected ShouldRun=true when gh not authenticated")
 	}
 }
+

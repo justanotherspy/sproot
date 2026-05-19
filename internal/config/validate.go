@@ -50,6 +50,15 @@ func ValidateSprootConfig(cfg *SprootConfig) error {
 		errs = append(errs, errors.New("identity.gh_username is required"))
 	}
 
+	for i, ev := range cfg.Env {
+		if ev.From == "" {
+			errs = append(errs, fmt.Errorf("env[%d].from is required", i))
+		}
+		if ev.As == "" {
+			errs = append(errs, fmt.Errorf("env[%d].as is required", i))
+		}
+	}
+
 	if len(cfg.Phases) == 0 {
 		errs = append(errs, errors.New("phases must not be empty"))
 	}

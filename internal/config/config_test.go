@@ -40,6 +40,26 @@ func TestLoadSprootConfig_HappyPath(t *testing.T) {
 	}
 }
 
+func TestSprootConfig_EnvBlock(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Env) != 1 {
+		t.Fatalf("env: got %d entries, want 1", len(cfg.Env))
+	}
+	ev := cfg.Env[0]
+	if ev.From != "MY_GH_TOKEN" {
+		t.Errorf("env[0].from: got %q", ev.From)
+	}
+	if ev.As != "GH_TOKEN" {
+		t.Errorf("env[0].as: got %q", ev.As)
+	}
+	if !ev.Required {
+		t.Error("env[0].required: got false, want true")
+	}
+}
+
 func TestPhaseConfig_AptFields(t *testing.T) {
 	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
 	if err != nil {
@@ -405,6 +425,16 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 		mutate  func(*SprootConfig)
 		wantErr string
 	}{
+		{
+			"env_missing_from",
+			func(c *SprootConfig) { c.Env = []EnvVar{{As: "GH_TOKEN", Required: true}} },
+			"env[0].from is required",
+		},
+		{
+			"env_missing_as",
+			func(c *SprootConfig) { c.Env = []EnvVar{{From: "MY_GH_TOKEN"}} },
+			"env[0].as is required",
+		},
 		{
 			"missing_schema_version",
 			func(c *SprootConfig) { c.SchemaVersion = 0 },

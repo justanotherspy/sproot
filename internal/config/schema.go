@@ -6,10 +6,20 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// EnvVar maps a host environment variable into the sprite under a given name.
+// From is the variable name on the host; As is the name it gets in the sprite.
+// Required causes sproot new to fail if the host variable is unset or empty.
+type EnvVar struct {
+	From     string `yaml:"from"`
+	As       string `yaml:"as"`
+	Required bool   `yaml:"required"`
+}
+
 // SprootConfig is the top-level struct for sproot.yaml, found in the config repo.
 type SprootConfig struct {
 	SchemaVersion int           `yaml:"schema_version"`
 	Identity      Identity      `yaml:"identity"`
+	Env           []EnvVar      `yaml:"env"`
 	Phases        []PhaseConfig `yaml:"phases"`
 }
 

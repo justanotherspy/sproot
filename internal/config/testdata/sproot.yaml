@@ -6,6 +6,11 @@ identity:
   git_default_branch: main
   gh_username: justanotherspy
 
+env:
+  - from: MY_GH_TOKEN
+    as: GH_TOKEN
+    required: true
+
 phases:
   - type: apt
     packages: [shellcheck, jq]

@@ -1,14 +1,9 @@
 package modules
 
-// gh_token authenticates the gh CLI using a GitHub PAT injected by the host CLI.
-// The token is read from the SPRITE_GH_TOKEN environment variable, passed to
-// gh auth login, and immediately unset -- it is never written to disk.
-//
-// The host CLI (sproot new, Phase 5) must supply SPRITE_GH_TOKEN before running
-// sproot setup. Required scopes: admin:public_key, admin:ssh_signing_key.
-//
-// TODO(phase-5): SPRITE_GH_TOKEN must be injected by the host CLI via
-// sprite.Command(...).Env("SPRITE_GH_TOKEN", token) before this module runs.
+// gh_token authenticates the gh CLI using GH_TOKEN from the sprite environment.
+// The token is expected to be present (injected via the env block in sproot.yaml)
+// and is piped to gh auth login so that credentials persist in
+// ~/.config/gh/hosts.yml for all future sessions without needing GH_TOKEN set.
 //
 //	- type: gh_token
 
@@ -51,18 +46,16 @@ func (p *ghTokenPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 }
 
 func (p *ghTokenPhase) Run(ctx *phase.Context) error {
-	token := os.Getenv("SPRITE_GH_TOKEN")
+	token := os.Getenv("GH_TOKEN")
 	if token == "" {
-		return fmt.Errorf("gh_token: SPRITE_GH_TOKEN is not set; " +
-			"pass it via sproot new or export it manually before running setup")
+		return fmt.Errorf("gh_token: GH_TOKEN is not set; " +
+			"add it to the env block in sproot.yaml or export it before running setup")
 	}
 
-	// Feed token via stdin to avoid it appearing in process args.
 	cmd := ghLoginCmd(token)
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("gh_token: gh auth login: %w", err)
 	}
-	_ = os.Unsetenv("SPRITE_GH_TOKEN")
 	ctx.Log.Info("gh authenticated")
 	return nil
 }

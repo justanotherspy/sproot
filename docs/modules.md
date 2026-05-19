@@ -4,6 +4,26 @@ Each phase in `sproot.yaml` is driven by a module type. This document describes 
 
 ---
 
+## env block (top-level)
+
+The optional `env` block at the top of `sproot.yaml` declares host environment variables to forward into the sprite before `sproot setup` runs. Each entry maps a host variable name to a name inside the sprite.
+
+```yaml
+env:
+  - from: MY_GH_TOKEN   # variable name on the host
+    as: GH_TOKEN        # variable name inside the sprite
+    required: true      # fail sproot new if unset on host
+```
+
+**Fields:**
+- `from`: the environment variable name to read from the host (required)
+- `as`: the environment variable name to set in the sprite (required)
+- `required`: if `true`, `sproot new` fails early when the host variable is unset or empty (default `false`)
+
+The canonical use is forwarding a GitHub PAT so that `ssh_setup` and `gh_token` can register the sprite's SSH key and authenticate `gh` without embedding tokens in the config repo.
+
+---
+
 ## apt
 
 Installs system packages via `apt-get`.
@@ -233,38 +253,37 @@ When `~/.ssh/id_ed25519.pub` exists, also sets SSH commit signing (`gpg.format`,
 
 ## ssh_setup
 
-Configures the SSH key injected by the host CLI.
+Generates a fresh ed25519 keypair and registers it with GitHub.
 
 ```yaml
 - type: ssh_setup
-  ssh_setup: {}
 ```
 
-- Sets permissions on `~/.ssh/id_ed25519` (0600)
+- Generates `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub` if absent
+- Sets permissions on the private key (0600)
+- Registers the public key with GitHub as both an authentication key and a signing key using `GH_TOKEN` (set via the `env` block)
 - Runs `ssh-keyscan -H github.com` and appends to `~/.ssh/known_hosts`
-- Derives `~/.ssh/id_ed25519.pub` via `ssh-keygen -y`
 - Appends the user's key to `~/.ssh/allowed_signers` with the `namespaces="git"` constraint
 
-**Idempotency:** checks that `~/.ssh/known_hosts` contains the github.com host key.
+The GitHub key IDs are logged for use by `sproot destroy` when cleaning up the sprite account (Phase 5). If `GH_TOKEN` is not set, key generation and local setup proceed but GitHub registration is skipped with a warning.
 
-**Note:** sproot does not generate SSH keys. The host CLI injects `~/.ssh/id_ed25519` before `sproot setup` runs.
+**Idempotency:** checks that `~/.ssh/id_ed25519` exists and `~/.ssh/known_hosts` contains the github.com host key.
 
 ---
 
 ## gh_token
 
-Authenticates `gh` (GitHub CLI) using a one-shot token.
+Authenticates `gh` (GitHub CLI) by persisting credentials from `GH_TOKEN`.
 
 ```yaml
 - type: gh_token
-  gh_token: {}
 ```
 
-Reads `SPRITE_GH_TOKEN` from the environment, pipes it to `gh auth login --with-token`, then unsets the variable. The token is never written to disk.
+Reads `GH_TOKEN` from the environment (injected via the `env` block in `sproot.yaml`) and pipes it to `gh auth login --with-token --git-protocol ssh`. After this runs, `gh` works from stored credentials in `~/.config/gh/hosts.yml` without needing `GH_TOKEN` set in future sessions.
 
 **Idempotency:** checks `gh auth status -h github.com` exits 0 and the logged-in user matches `identity.gh_username`.
 
-**Platform:** sprite-env only. `SPRITE_GH_TOKEN` must be injected by the host CLI (`sproot new`).
+**Requires:** `GH_TOKEN` set in the sprite environment via the `env` block. Required scopes: `admin:public_key`, `admin:ssh_signing_key`.
 
 ---
 
