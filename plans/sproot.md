@@ -12,7 +12,7 @@ Replaces the current bash-based `sprite` repo with a generic, reusable tool.
 
 ```
 ~/.sproot/
-├── config           # YAML: config_repo_url, private_key_path, defaults
+├── config           # YAML: token, config_repo_url, private_key_path, defaults
 └── private/
     └── id_ed25519   # user's sprite SSH key (loaded from password manager)
 ```
@@ -22,9 +22,10 @@ Replaces the current bash-based `sprite` repo with a generic, reusable tool.
 ```
 sproot new my-sprite
   ├─ reads ~/.sproot/config
-  ├─ sprite create my-sprite --skip-console
-  ├─ sprite exec --file <key>:.ssh/id_ed25519 --file ./sproot:/usr/local/bin/sproot \
-  │     sproot setup --config-repo <url>
+  ├─ sprites.New(token).CreateSprite(ctx, "my-sprite", nil)
+  ├─ sprite.Filesystem().WriteFile(".ssh/id_ed25519", keyBytes, 0600)
+  ├─ sprite.Filesystem().WriteFile("/usr/local/bin/sproot", binaryBytes, 0755)
+  ├─ sprite.Command("sproot", "setup", "--config-repo", url).Run()   // streams output
   └─ in-sprite: clone config repo, read sproot.yaml, run phases, verify
 ```
 
@@ -34,32 +35,24 @@ Each phase is a discrete deliverable. Phases are roughly in dependency order. Te
 
 ---
 
-### Phase 0: Scaffold `justanotherspy/sproot`
+### Phase 0: Scaffold `justanotherspy/sproot` (DONE)
 
-Create the new repo with Go module setup and CI.
-
-**Deliverables:**
-- `go.mod` (Go 1.23+), cobra for command routing
-- Layout:
-  ```
-  cmd/sproot/main.go
-  internal/config/        # yaml schema + loader
-  internal/phase/         # phase interface + state + runner
-  internal/phase/modules/ # one file per module type
-  internal/host/          # host-side command implementations
-  internal/sprite/        # in-sprite command implementations
-  pkg/log/                # +/-/!/x logging conventions
-  ```
-- `.github/workflows/ci.yml`: build + test + golangci-lint on push
-- Minimal `cmd/sproot/main.go` that wires up cobra and prints help
-
-**Acceptance:** `go build ./...` and `go test ./...` succeed. CI passes on first push.
+**What was built:**
+- `go.mod` (Go 1.23), cobra for command routing, Makefile with build/test/check/lint/tidy targets
+- Full directory layout: `cmd/sproot/`, `internal/config/`, `internal/phase/`, `internal/phase/modules/`, `internal/host/`, `internal/sprite/`, `pkg/log/`
+- `.github/workflows/ci.yml`: build-and-test + lint jobs on every push
+- `cmd/sproot/main.go` wired to cobra; `internal/host/` and `internal/sprite/` are empty stubs
 
 ---
 
-### Phase 1: Config schema
+### Phase 1: Config schema (DONE)
 
-Define `sproot.yaml` (in the config repo) and `~/.sproot/config` (on the host).
+**What was built:**
+- `internal/config/schema.go`: `SprootConfig`, `HostConfig`, `Identity`, `PhaseConfig` and all typed phase config structs with `yaml:""` tags. `PhaseConfig` uses a two-pass custom unmarshaler: first reads `type`, then decodes into the matching concrete struct pointer.
+- `internal/config/load.go`: `LoadSprootConfig` and `LoadHostConfig` with `~` expansion
+- `internal/config/validate.go`: `ValidateSprootConfig` and `ValidateHostConfig` with field-named error messages; detects unknown module types
+- `internal/config/testdata/sproot.yaml` + `testdata/host_config.yaml`
+- 35 unit tests covering happy path and every validation failure
 
 **`sproot.yaml`** shape:
 ```yaml
@@ -81,6 +74,10 @@ phases:
     repo: sigstore/cosign
     asset: "cosign_{version}_{arch}.deb"
     install: dpkg
+  - type: go_install
+    tools: [{pkg: "github.com/owner/tool", version: latest}]
+  - type: cargo_install
+    tools: [{name: ripgrep}]
   - type: file_template
     src: files/statusline.py
     dest: ~/.claude/statusline.py
@@ -96,59 +93,41 @@ phases:
 
 **`~/.sproot/config`** shape:
 ```yaml
+token: <sprite.dev API token>
 config_repo: git@github.com:justanotherspy/sprite.git
 config_ref: main
 private_key: ~/.sproot/private/id_ed25519
 default_org: ""
 ```
 
-**Deliverables:**
-- `internal/config/schema.go`: Go structs with `yaml:""` tags
-- `internal/config/load.go`: loaders for both files
-- `internal/config/validate.go`: required-field checks, type checks, unknown-module-type detection
-- `testdata/sproot.yaml` + `testdata/host_config.yaml`
-- Unit tests covering happy path + each validation failure
-
-**Acceptance:** sample YAMLs parse, invalid ones fail with clear errors that name the offending field.
+Note: `token` was not in the original schema. It must be added before Phase 5 work begins (update `HostConfig` in `schema.go` and `validate.go`).
 
 ---
 
-### Phase 2: Phase engine
+### Phase 2: Phase engine (DONE)
 
-The runtime that executes phases listed in `sproot.yaml`.
-
-**Deliverables:**
-- `internal/phase/phase.go`:
-  ```go
-  type Phase interface {
-      Type() string
-      Name() string                          // human label for logs
-      ShouldRun(ctx *Context) (bool, error)  // idempotency check
-      Run(ctx *Context) error
-      Verify(ctx *Context) error             // post-run validation
-  }
-  ```
-- `internal/phase/context.go`: shared state (config repo path, identity, logger, dry-run, force flags)
-- `internal/phase/runner.go`: orchestrates the phase list, tracks did-work / skipped / failed buckets, supports `--only` and `--force`
-- `internal/phase/state.go`: reads/writes `~/.config/sproot/state.json`
-- `internal/phase/registry.go`: module type registration via `init()`
-- `pkg/log/`: structured logger matching the current `+`/`-`/`!`/`x` visual conventions
-- Tests for runner with dummy phases (one passes, one fails, one skips, one is forced)
-
-**Acceptance:** dummy phases run end-to-end. State file gets written. `--only` runs a single phase. `--force` overrides idempotency.
+**What was built:**
+- `internal/phase/phase.go`: `Phase` interface (`Type`, `Name`, `ShouldRun`, `Run`, `Verify`) and `Context` struct (config repo path, identity, logger, dry-run, force flags)
+- `internal/phase/runner.go`: orchestrates the phase list; tracks did-work / skipped / failed buckets; supports `--only` (by name or index) and `--force`
+- `internal/phase/state.go`: reads/writes `~/.config/sproot/state.json`; records per-phase run time, status, and error
+- `internal/phase/registry.go`: `Register` + `Build` with `init()`-based module registration
+- `pkg/log/log.go`: `+`/`-`/`!`/`x` visual conventions with color support
+- Full test coverage: runner tests with dummy phases (pass, fail, skip, force), state round-trip tests, registry tests
 
 ---
 
 ### Phase 3: Phase module implementations
 
-Every module type the current `setup.sh` needs. Each module lives in one file under `internal/phase/modules/`, registered via `init()`.
+Every module type the current `setup.sh` needs plus package-manager ecosystems. Each module lives in one file under `internal/phase/modules/`, registered via `init()`.
 
 **Module list:**
 - `apt` — install apt packages
 - `uv_tool` — install via `uv tool install`
+- `go_install` — install Go tools via `go install pkg@version`. Supports `version: latest`. Idempotency check: `go version -m $(which <binary>)` to verify installed version.
+- `cargo_install` — install Rust crates via `cargo install`. Supports optional `version`, `features`, and `locked` flag. Idempotency check: `cargo install --list` to see if crate+version is already present.
 - `binary_release` — download from `github.com/<repo>/releases/latest`. Supports asset templating (`{version}`, `{arch}`, `{goos}`, `{dpkg_arch}`) and install methods (`dpkg`, `tar+install`, `raw`)
 - `corepack` — enable + pre-activate pnpm and yarn
-- `rust_components` — pin stable, install clippy/rustfmt/rust-analyzer
+- `rust_components` — pin stable, install clippy/rustfmt/rust-analyzer via `rustup`
 - `docker` — docker-ce install + `/etc/docker/daemon.json`
 - `sprite_service` — register a `sprite-env` service (dockerd today, anything else later)
 - `git_identity` — user.name, user.email, default branch, aliases, signing config
@@ -159,6 +138,23 @@ Every module type the current `setup.sh` needs. Each module lives in one file un
 - `repo_clone` — clone a list of `git@github.com:owner/repo` into a base dir
 - `claude_settings` — deep-merge a JSON object into `~/.claude/settings.json`
 - `cmd` — escape hatch. Run an arbitrary command, with an optional idempotency-check command. For things that don't deserve a module.
+
+**YAML schemas for new modules:**
+```yaml
+- type: go_install
+  tools:
+    - pkg: github.com/owner/repo/cmd/tool
+      version: latest          # or a full semver like v1.2.3
+    - pkg: golang.org/x/tools/cmd/goimports
+      version: latest
+
+- type: cargo_install
+  tools:
+    - name: ripgrep
+    - name: cargo-nextest
+      version: "0.9.72"        # optional; omit for latest
+      locked: true             # optional; passes --locked
+```
 
 **Deliverables:**
 - One Go file per module, plus unit tests
@@ -187,21 +183,32 @@ The command that runs inside the sprite.
 
 ### Phase 5: Host CLI commands
 
-The commands the user runs on their laptop.
+The commands the user runs on their laptop. All sprite interaction uses the `github.com/superfly/sprites-go` SDK directly, not the `sprite` CLI.
+
+**sprites-go integration:**
+- `sprites.New(token)` constructs the client from `~/.sproot/config`'s `token` field
+- `client.CreateSprite(ctx, name, *SpriteConfig)` for sprite creation (config allows optional `ram_mb`, `cpus`, `region`)
+- `sprite.Filesystem().WriteFile(path, data, perm)` injects the SSH key and sproot binary before running setup
+- `sprite.Command("sproot", "setup", ...).Run()` streams setup output with `Stdout`/`Stderr` wired to `os.Stdout`/`os.Stderr`
+- `client.DestroySprite(ctx, name)` for destroy
+- `client.GetSprite(ctx, name)` for status queries
 
 **Deliverables:**
+- `internal/host/`: add `token` field to `HostConfig` (and update `schema.go` + `validate.go`)
 - `sproot new <name>`:
   - Reads `~/.sproot/config`
-  - Runs `sprite create <name> --skip-console`
-  - Runs `sprite exec --file <key>:.ssh/id_ed25519 --file <binary>:/usr/local/bin/sproot -s <name> sproot setup --config-repo <url>`
-  - Streams output, returns the sprite's exit code
-- `sproot destroy <name>` — calls `sprite destroy <name>`. No GitHub-side cleanup needed under the one-key model.
-- `sproot status <name>` — `sprite exec`s `sproot setup --status` remotely, prints the table
+  - Creates sprite via `client.CreateSprite`
+  - Reads `private_key` from disk; injects it at `.ssh/id_ed25519` via `sprite.Filesystem().WriteFile`
+  - Reads the running sproot binary (`os.Executable()`); injects it at `/usr/local/bin/sproot`
+  - Runs `sproot setup --config-repo <url>` via `sprite.Command`, streaming output live
+  - Returns the sprite's exit code
+- `sproot destroy <name>` — calls `client.DestroySprite`. No GitHub-side cleanup needed under the one-key model.
+- `sproot status <name>` — runs `sproot setup --status` via `sprite.Command`, prints the table
 - `sproot config init` — writes a skeleton `~/.sproot/config`
 - `sproot config validate` — validates `~/.sproot/config` and optionally fetches and validates the config repo's `sproot.yaml`
-- Mode routing: single binary detects host vs in-sprite by command name (`new` vs `setup`). No separate binary.
+- Optional `sproot new` flags: `--ram-mb`, `--cpus`, `--region` forwarded into `SpriteConfig`
 
-**Acceptance:** `sproot new my-sprite` produces a working sprite end-to-end against `justanotherspy/sprite` as the config repo. `sprite console -s my-sprite` lands in a usable shell.
+**Acceptance:** `sproot new my-sprite` produces a working sprite end-to-end against `justanotherspy/sprite` as the config repo. Opening a console on the sprite lands in a usable shell.
 
 ---
 
@@ -263,6 +270,7 @@ Final user-facing docs across both repos.
 - **No emdashes anywhere** in code comments, error messages, logs, or docs. Use parens or commas.
 - **Single binary.** `sproot` routes by subcommand. No separate host/sprite binaries.
 - **Embedding strategy.** Files referenced in `sproot.yaml` live in the config repo, not embedded in the sproot binary. The binary embeds only its own help text, version, and default schemas.
+- **Host sprite interaction uses sprites-go SDK.** Never shell out to the `sprite` CLI from Go code. Use `github.com/superfly/sprites-go` for all sprite lifecycle and exec operations.
 - **Bracket phases (pre/post sprite-env checkpoints) are a CLI concern, not a module type.** They wrap the whole setup run and never abort it.
 - **The current `pre.sh` is reference only.** Don't port it; the built-in verify phase covers the same ground.
 - **Idempotency is per-phase, not driven by the state file.** State file is for `--status` and forensics.
