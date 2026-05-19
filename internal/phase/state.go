@@ -31,9 +31,9 @@ type PhaseRecord struct {
 	VerifyError string    `json:"verify_error,omitempty"`
 }
 
-// defaultStatePath returns the path to the sproot state file using the XDG
+// DefaultStatePath returns the path to the sproot state file using the XDG
 // config directory (typically ~/.config/sproot/state.json on Linux).
-func defaultStatePath() (string, error) {
+func DefaultStatePath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {
 		return "", fmt.Errorf("could not determine config dir: %w", err)
