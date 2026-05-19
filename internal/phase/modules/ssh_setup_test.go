@@ -48,13 +48,13 @@ func TestSSHSetup_RunAndVerify(t *testing.T) {
 		t.Fatalf("Run: %v", err)
 	}
 
-	// known_hosts must contain github.com.
-	kh, err := os.ReadFile(filepath.Join(sshDir, "known_hosts"))
-	if err != nil {
+	// known_hosts must contain github.com (possibly hashed by ssh-keyscan -H).
+	khPath := filepath.Join(sshDir, "known_hosts")
+	if _, err := os.Stat(khPath); err != nil {
 		t.Fatal("known_hosts not written")
 	}
-	if !strings.Contains(string(kh), "github.com") {
-		t.Error("known_hosts does not contain github.com")
+	if !checkCmd("ssh-keygen", "-F", "github.com", "-f", khPath) {
+		t.Error("github.com not found in known_hosts")
 	}
 
 	// pub key must exist.
