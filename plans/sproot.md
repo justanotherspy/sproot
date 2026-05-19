@@ -116,52 +116,31 @@ Note: `token` was not in the original schema. It must be added before Phase 5 wo
 
 ---
 
-### Phase 3: Phase module implementations
+### Phase 3: Phase module implementations (DONE)
 
-Every module type the current `setup.sh` needs plus package-manager ecosystems. Each module lives in one file under `internal/phase/modules/`, registered via `init()`.
-
-**Module list:**
-- `apt` — install apt packages
-- `uv_tool` — install via `uv tool install`
-- `go_install` — install Go tools via `go install pkg@version`. Supports `version: latest`. Idempotency check: `go version -m $(which <binary>)` to verify installed version.
-- `cargo_install` — install Rust crates via `cargo install`. Supports optional `version`, `features`, and `locked` flag. Idempotency check: `cargo install --list` to see if crate+version is already present.
-- `binary_release` — download from `github.com/<repo>/releases/latest`. Supports asset templating (`{version}`, `{arch}`, `{goos}`, `{dpkg_arch}`) and install methods (`dpkg`, `tar+install`, `raw`)
-- `corepack` — enable + pre-activate pnpm and yarn
-- `rust_components` — pin stable, install clippy/rustfmt/rust-analyzer via `rustup`
-- `docker` — docker-ce install + `/etc/docker/daemon.json`
-- `sprite_service` — register a `sprite-env` service (dockerd today, anything else later)
-- `git_identity` — user.name, user.email, default branch, aliases, signing config
-- `ssh_setup` — chmod the injected key, populate known_hosts, derive pubkey via `ssh-keygen -y -f`, write `allowed_signers`
-- `gh_token` — export `GH_TOKEN` from the sprite-attached app token; verify `gh auth status`
-- `file_template` — copy a file from the config repo to a dest path, with optional Go-template execution against the identity struct
-- `rc_block` — write a sentinel-delimited block to `.bashrc` and `.zshrc` from a source file. Strips legacy blocks.
-- `repo_clone` — clone a list of `git@github.com:owner/repo` into a base dir
-- `claude_settings` — deep-merge a JSON object into `~/.claude/settings.json`
-- `cmd` — escape hatch. Run an arbitrary command, with an optional idempotency-check command. For things that don't deserve a module.
-
-**YAML schemas for new modules:**
-```yaml
-- type: go_install
-  tools:
-    - pkg: github.com/owner/repo/cmd/tool
-      version: latest          # or a full semver like v1.2.3
-    - pkg: golang.org/x/tools/cmd/goimports
-      version: latest
-
-- type: cargo_install
-  tools:
-    - name: ripgrep
-    - name: cargo-nextest
-      version: "0.9.72"        # optional; omit for latest
-      locked: true             # optional; passes --locked
-```
-
-**Deliverables:**
-- One Go file per module, plus unit tests
-- Each module documents its YAML schema in a doc comment at the top
-- `docs/modules.md` reference
-
-**Acceptance:** unit tests for each module pass. An integration test constructs a small YAML using each module type and runs it under `--dry-run`.
+**What was built:**
+- All 17 module files in `internal/phase/modules/`, each registered via `init()`:
+  - `apt` — install apt packages
+  - `uv_tool` — install via `uv tool install`
+  - `go_install` — `go install pkg@version`; idempotency via `go version -m $(which <binary>)`
+  - `cargo_install` — `cargo install`; supports optional `version`, `features`, `locked`; idempotency via `cargo install --list`
+  - `binary_release` — GitHub releases with asset templating (`{version}`, `{arch}`, `{goos}`, `{dpkg_arch}`) and install methods (`dpkg`, `tar+install`, `raw`)
+  - `corepack` — enable + pre-activate pnpm and yarn
+  - `rust_components` — pin stable, install clippy/rustfmt/rust-analyzer via `rustup`
+  - `docker` — docker-ce install + `/etc/docker/daemon.json`
+  - `sprite_service` — register a `sprite-env` service (dockerd today, extensible)
+  - `git_identity` — user.name, user.email, default branch, aliases, signing config
+  - `ssh_setup` — chmod key, populate known_hosts, derive pubkey via `ssh-keygen -y -f`, write `allowed_signers`
+  - `gh_token` — export `GH_TOKEN` from sprite app token; verify `gh auth status`
+  - `file_template` — copy file from config repo to dest, with optional Go-template execution against identity
+  - `rc_block` — write sentinel-delimited block to `.bashrc` and `.zshrc`; strips legacy blocks
+  - `repo_clone` — clone a list of `git@github.com:owner/repo` repos into a base dir
+  - `claude_settings` — deep-merge a JSON object into `~/.claude/settings.json`
+  - `cmd` — escape hatch: arbitrary command with optional idempotency-check command
+- `exec.go` — shared `runCmd` helper that streams stdout+stderr line-by-line via `pkg/log`
+- `modules.go` — blank-import of all module packages to trigger `init()` registration
+- Unit tests for each module, plus `integration_test.go` covering all 17 types under `--dry-run`
+- `docs/modules.md` — full module reference with YAML examples
 
 ---
 
