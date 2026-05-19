@@ -1,0 +1,379 @@
+# Module Reference
+
+Each phase in `sproot.yaml` is driven by a module type. This document describes all 17 types.
+
+---
+
+## apt
+
+Installs system packages via `apt-get`.
+
+```yaml
+- type: apt
+  apt:
+    packages:
+      - git
+      - curl
+      - vim
+```
+
+**Idempotency:** checks `dpkg -s <pkg>` for each package; skips the phase if all are already installed.
+
+**Platform:** Linux with apt.
+
+---
+
+## uv_tool
+
+Installs Python tools via `uv tool install`.
+
+```yaml
+- type: uv_tool
+  uv_tool:
+    tools:
+      - name: ruff
+      - name: pyright
+      - name: black
+```
+
+**Idempotency:** checks that each tool binary is on PATH.
+
+**Requires:** `uv` on PATH.
+
+---
+
+## go_install
+
+Installs Go tools via `go install`.
+
+```yaml
+- type: go_install
+  go_install:
+    tools:
+      - pkg: golang.org/x/tools/cmd/goimports
+        version: latest
+      - pkg: github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+        version: v2.1.6
+```
+
+**Fields:**
+- `pkg`: full Go module path for the tool
+- `version`: `latest` or a full semver like `v1.2.3`
+
+**Idempotency:** for semver versions, checks that the binary is on PATH and `go version -m` reports the expected module path. `latest` always re-runs.
+
+**Requires:** `go` on PATH.
+
+---
+
+## cargo_install
+
+Installs Rust tools via `cargo install`.
+
+```yaml
+- type: cargo_install
+  cargo_install:
+    tools:
+      - name: ripgrep
+      - name: cargo-edit
+        version: "0.12.2"
+        locked: true
+      - name: sccache
+        features:
+          - dist-client
+```
+
+**Fields:**
+- `name`: crate name
+- `version`: optional; omit for latest
+- `locked`: optional; passes `--locked`
+- `features`: optional list of Cargo features to enable
+
+**Idempotency:** checks `cargo install --list` for `<name> v<version>`.
+
+**Requires:** `cargo` on PATH.
+
+---
+
+## binary_release
+
+Downloads and installs a binary from a GitHub release.
+
+```yaml
+- type: binary_release
+  binary_release:
+    name: cosign
+    repo: sigstore/cosign
+    asset: "cosign_{version}_{arch}.deb"
+    install: dpkg
+```
+
+**Fields:**
+- `name`: tool name (used for PATH check or dpkg package name)
+- `repo`: `owner/repo` on GitHub
+- `asset`: asset filename template (see template variables below)
+- `install`: one of `dpkg`, `tar+install`, or `raw`
+
+**Asset template variables:**
+- `{version}`: latest release tag (e.g. `v2.4.1`)
+- `{arch}`: `amd64` or `arm64`
+- `{goos}`: `linux` or `darwin`
+- `{dpkg_arch}`: Debian arch name (`amd64`, `arm64`)
+
+**Install methods:**
+- `dpkg`: runs `dpkg -i <file>`; idempotency via `dpkg -s <name>`
+- `tar+install`: extracts tarball, copies the single executable to `/usr/local/bin/<name>`
+- `raw`: marks the downloaded file executable and copies to `/usr/local/bin/<name>`
+
+**Idempotency:** for `dpkg` checks `dpkg -s <name>`; for others checks binary on PATH.
+
+---
+
+## corepack
+
+Enables corepack and prepares pnpm and yarn.
+
+```yaml
+- type: corepack
+  corepack: {}
+```
+
+**Idempotency:** checks that `pnpm` and `yarn` are on PATH.
+
+**Requires:** `corepack` on PATH (ships with Node.js 16+).
+
+---
+
+## rust_components
+
+Installs the standard Rust toolchain components.
+
+```yaml
+- type: rust_components
+  rust_components: {}
+```
+
+Installs: `clippy`, `rustfmt`, `rust-analyzer` via `rustup component add`.
+Also sets `rustup default stable`.
+
+**Idempotency:** checks `rustup component list --installed` for each component.
+
+**Requires:** `rustup` on PATH.
+
+---
+
+## docker
+
+Installs Docker via the official install script.
+
+```yaml
+- type: docker
+  docker: {}
+```
+
+Downloads and runs `https://get.docker.com`. Writes a default `/etc/docker/daemon.json`.
+
+**Idempotency:** checks `docker --version` exits 0.
+
+**Platform:** Linux. Requires root or sudo.
+
+---
+
+## sprite_service
+
+Registers a long-running service with the sprite-env daemon.
+
+```yaml
+- type: sprite_service
+  sprite_service:
+    service: dockerd
+    cmd: /usr/bin/dockerd
+    args:
+      - --host=unix:///var/run/docker.sock
+```
+
+**Fields:**
+- `service`: service name (used as path key in the API)
+- `cmd`: executable path
+- `args`: optional command arguments
+
+**Idempotency:** checks `sprite-env curl /v1/services/<name>` exits 0.
+
+**Platform:** sprite-env only (sprite.dev sprites).
+
+---
+
+## git_identity
+
+Configures global git identity and preferences.
+
+```yaml
+- type: git_identity
+  git_identity: {}
+```
+
+Sets from `identity` in `~/.sproot/config`:
+- `user.name`, `user.email`, `init.defaultBranch`
+- `pull.rebase true`, `push.autoSetupRemote true`, `rerere.enabled true`
+- `color.ui auto`, `core.editor vim`, `fetch.prune true`
+- Aliases: `lg`, `last`, `amend`, `unstage`, `cleanb`
+- SSH signing config (`gpg.format ssh`, `user.signingkey`, `commit.gpgsign`, `tag.gpgsign`, `gpg.ssh.allowedSignersFile`) when `~/.ssh/id_ed25519.pub` exists
+
+**Idempotency:** checks that all target git config values are already set. Treats the sprite placeholder email `noreply@sprites.dev` as "not configured."
+
+---
+
+## ssh_setup
+
+Configures the SSH key injected by the host CLI.
+
+```yaml
+- type: ssh_setup
+  ssh_setup: {}
+```
+
+- Sets permissions on `~/.ssh/id_ed25519` (0600)
+- Runs `ssh-keyscan -H github.com` and appends to `~/.ssh/known_hosts`
+- Derives `~/.ssh/id_ed25519.pub` via `ssh-keygen -y`
+- Appends the user's key to `~/.ssh/allowed_signers` with the `namespaces="git"` constraint
+
+**Idempotency:** checks that `~/.ssh/known_hosts` contains the github.com host key.
+
+**Note:** sproot does not generate SSH keys. The host CLI injects `~/.ssh/id_ed25519` before `sproot setup` runs.
+
+---
+
+## gh_token
+
+Authenticates `gh` (GitHub CLI) using a one-shot token.
+
+```yaml
+- type: gh_token
+  gh_token: {}
+```
+
+Reads `SPRITE_GH_TOKEN` from the environment, pipes it to `gh auth login --with-token`, then unsets the variable. The token is never written to disk.
+
+**Idempotency:** checks `gh auth status -h github.com` exits 0 and the logged-in user matches `identity.gh_username`.
+
+**Platform:** sprite-env only. `SPRITE_GH_TOKEN` must be injected by the host CLI (`sproot new`).
+
+---
+
+## file_template
+
+Copies or renders a file from the config repo to a destination path.
+
+```yaml
+- type: file_template
+  file_template:
+    src: files/gitconfig
+    dest: ~/.gitconfig
+    mode: "0644"
+    template: true
+```
+
+**Fields:**
+- `src`: path relative to the config repo root
+- `dest`: destination path (`~` is expanded)
+- `mode`: optional file permissions (default: `0644`)
+- `template`: optional; if true, executes `src` as a Go template with `ctx.Identity` as data
+
+**Template data fields:** `GitUserName`, `GitUserEmail`, `GitDefaultBranch`, `GHUsername`
+
+**Idempotency:** checks that destination content matches the rendered source.
+
+---
+
+## rc_block
+
+Injects a managed shell block into `.bashrc` and `.zshrc`.
+
+```yaml
+- type: rc_block
+  rc_block:
+    src: rc.sh
+```
+
+**Fields:**
+- `src`: path relative to the config repo root
+
+Wraps the source content in sentinel comments:
+```
+# BEGIN SPROOT MANAGED BLOCK
+<contents of src>
+# END SPROOT MANAGED BLOCK
+```
+
+Both `.bashrc` and `.zshrc` are updated. On re-run, the existing block is replaced (not duplicated).
+
+**Idempotency:** checks that the sentinel block is present and the content hash matches the source file.
+
+---
+
+## repo_clone
+
+Clones GitHub repositories into a base directory.
+
+```yaml
+- type: repo_clone
+  repo_clone:
+    base_dir: ~/repos
+    repos:
+      - justanotherspy/sproot
+      - justanotherspy/sprite
+```
+
+**Fields:**
+- `base_dir`: directory to clone into (`~` is expanded)
+- `repos`: list of `owner/repo` strings
+
+Clones via SSH: `git@github.com:owner/repo.git`. Each repo lands at `<base_dir>/<repo>`.
+
+**Idempotency:** skips repos where `<base_dir>/<repo>/.git` already exists.
+
+---
+
+## claude_settings
+
+Deep-merges settings into `~/.claude/settings.json`.
+
+```yaml
+- type: claude_settings
+  claude_settings:
+    settings:
+      theme: dark
+      autoApprove: true
+      env:
+        ANTHROPIC_SMALL_FAST_MODEL: claude-haiku-4-5-20251001
+```
+
+**Fields:**
+- `settings`: arbitrary map of keys and values to merge into the settings file
+
+Existing keys not listed in `settings` are preserved. Nested maps are merged recursively.
+
+**Idempotency:** checks that all specified keys already match target values.
+
+---
+
+## cmd
+
+Runs an arbitrary shell command.
+
+```yaml
+- type: cmd
+  cmd:
+    run: "curl -fsSL https://example.com/install.sh | sh"
+    check: "which mytool"
+    name: "Install mytool"
+```
+
+**Fields:**
+- `run`: shell command to execute (passed to `sh -c`)
+- `check`: optional shell command; if it exits 0, the phase is skipped
+- `name`: optional display name
+
+**Idempotency:** if `check` is provided, skips when it exits 0. Without `check`, always runs.
+
+Use this as an escape hatch for one-off operations not covered by other module types.

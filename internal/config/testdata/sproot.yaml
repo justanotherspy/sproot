@@ -32,8 +32,19 @@ phases:
   - type: corepack
   - type: rust_components
   - type: docker
+  - type: go_install
+    tools:
+      - pkg: golang.org/x/tools/cmd/goimports
+        version: latest
+  - type: cargo_install
+    tools:
+      - name: ripgrep
+      - name: cargo-nextest
+        version: "0.9.72"
+        locked: true
   - type: sprite_service
     service: dockerd
+    cmd: /usr/bin/dockerd
   - type: git_identity
   - type: ssh_setup
   - type: gh_token

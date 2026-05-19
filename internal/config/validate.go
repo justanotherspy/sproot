@@ -9,6 +9,8 @@ import (
 var knownPhaseTypes = map[string]bool{
 	"apt":             true,
 	"uv_tool":         true,
+	"go_install":      true,
+	"cargo_install":   true,
 	"binary_release":  true,
 	"corepack":        true,
 	"rust_components": true,
@@ -62,6 +64,18 @@ func ValidateSprootConfig(cfg *SprootConfig) error {
 			continue
 		}
 		switch phase.Type {
+		case "go_install":
+			if gi := phase.GoInstall; gi != nil && len(gi.Tools) == 0 {
+				errs = append(errs, fmt.Errorf("phases[%d] (go_install): tools must not be empty", i))
+			}
+		case "cargo_install":
+			if ci := phase.CargoInstall; ci != nil && len(ci.Tools) == 0 {
+				errs = append(errs, fmt.Errorf("phases[%d] (cargo_install): tools must not be empty", i))
+			}
+		case "sprite_service":
+			if ss := phase.SpriteService; ss != nil && ss.Cmd == "" {
+				errs = append(errs, fmt.Errorf("phases[%d] (sprite_service): cmd is required", i))
+			}
 		case "binary_release":
 			if br := phase.BinaryRelease; br != nil {
 				if br.Name == "" {

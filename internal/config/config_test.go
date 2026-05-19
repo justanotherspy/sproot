@@ -32,8 +32,8 @@ func TestLoadSprootConfig_HappyPath(t *testing.T) {
 	if cfg.Identity.GHUsername != "justanotherspy" {
 		t.Errorf("gh_username: got %q", cfg.Identity.GHUsername)
 	}
-	if len(cfg.Phases) != 15 {
-		t.Fatalf("phases: got %d, want 15", len(cfg.Phases))
+	if len(cfg.Phases) != 17 {
+		t.Fatalf("phases: got %d, want 17", len(cfg.Phases))
 	}
 	if cfg.Phases[0].Type != "apt" {
 		t.Errorf("phases[0].type: got %q, want apt", cfg.Phases[0].Type)
@@ -160,12 +160,58 @@ func TestPhaseConfig_RepoCloneFields(t *testing.T) {
 	}
 }
 
+func TestPhaseConfig_GoInstallFields(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Phases[9]
+	if p.GoInstall == nil {
+		t.Fatal("GoInstall is nil")
+	}
+	if len(p.GoInstall.Tools) != 1 {
+		t.Fatalf("tools: got %d, want 1", len(p.GoInstall.Tools))
+	}
+	if p.GoInstall.Tools[0].Pkg != "golang.org/x/tools/cmd/goimports" {
+		t.Errorf("pkg: got %q", p.GoInstall.Tools[0].Pkg)
+	}
+	if p.GoInstall.Tools[0].Version != "latest" {
+		t.Errorf("version: got %q", p.GoInstall.Tools[0].Version)
+	}
+}
+
+func TestPhaseConfig_CargoInstallFields(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Phases[10]
+	if p.CargoInstall == nil {
+		t.Fatal("CargoInstall is nil")
+	}
+	if len(p.CargoInstall.Tools) != 2 {
+		t.Fatalf("tools: got %d, want 2", len(p.CargoInstall.Tools))
+	}
+	if p.CargoInstall.Tools[0].Name != "ripgrep" {
+		t.Errorf("tools[0].name: got %q", p.CargoInstall.Tools[0].Name)
+	}
+	if p.CargoInstall.Tools[1].Name != "cargo-nextest" {
+		t.Errorf("tools[1].name: got %q", p.CargoInstall.Tools[1].Name)
+	}
+	if p.CargoInstall.Tools[1].Version != "0.9.72" {
+		t.Errorf("tools[1].version: got %q", p.CargoInstall.Tools[1].Version)
+	}
+	if !p.CargoInstall.Tools[1].Locked {
+		t.Error("tools[1].locked: got false, want true")
+	}
+}
+
 func TestPhaseConfig_CmdFields(t *testing.T) {
 	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	p := cfg.Phases[14]
+	p := cfg.Phases[16]
 	if p.Cmd == nil {
 		t.Fatal("Cmd is nil")
 	}
@@ -190,9 +236,9 @@ func TestPhaseConfig_EmptyStructTypes(t *testing.T) {
 		{6, "corepack", func(p PhaseConfig) bool { return p.Corepack != nil }},
 		{7, "rust_components", func(p PhaseConfig) bool { return p.RustComponents != nil }},
 		{8, "docker", func(p PhaseConfig) bool { return p.Docker != nil }},
-		{10, "git_identity", func(p PhaseConfig) bool { return p.GitIdentity != nil }},
-		{11, "ssh_setup", func(p PhaseConfig) bool { return p.SSHSetup != nil }},
-		{12, "gh_token", func(p PhaseConfig) bool { return p.GHToken != nil }},
+		{12, "git_identity", func(p PhaseConfig) bool { return p.GitIdentity != nil }},
+		{13, "ssh_setup", func(p PhaseConfig) bool { return p.SSHSetup != nil }},
+		{14, "gh_token", func(p PhaseConfig) bool { return p.GHToken != nil }},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -411,6 +457,27 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 				c.Phases = []PhaseConfig{{Type: "repo_clone", RepoClone: &RepoCloneConfig{BaseDir: "~/repos"}}}
 			},
 			"phases[0] (repo_clone): repos must not be empty",
+		},
+		{
+			"go_install_empty_tools",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "go_install", GoInstall: &GoInstallConfig{}}}
+			},
+			"phases[0] (go_install): tools must not be empty",
+		},
+		{
+			"cargo_install_empty_tools",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "cargo_install", CargoInstall: &CargoInstallConfig{}}}
+			},
+			"phases[0] (cargo_install): tools must not be empty",
+		},
+		{
+			"sprite_service_missing_cmd",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "sprite_service", SpriteService: &SpriteServiceConfig{Service: "dockerd"}}}
+			},
+			"phases[0] (sprite_service): cmd is required",
 		},
 		{
 			"cmd_missing_run",

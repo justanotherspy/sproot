@@ -35,6 +35,8 @@ type PhaseConfig struct {
 	Type           string                `yaml:"type"`
 	Apt            *AptConfig            `yaml:"-"`
 	UVTool         *UVToolConfig         `yaml:"-"`
+	GoInstall      *GoInstallConfig      `yaml:"-"`
+	CargoInstall   *CargoInstallConfig   `yaml:"-"`
 	BinaryRelease  *BinaryReleaseConfig  `yaml:"-"`
 	Corepack       *CorepackConfig       `yaml:"-"`
 	RustComponents *RustComponentsConfig `yaml:"-"`
@@ -68,6 +70,12 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "uv_tool":
 		p.UVTool = &UVToolConfig{}
 		return value.Decode(p.UVTool)
+	case "go_install":
+		p.GoInstall = &GoInstallConfig{}
+		return value.Decode(p.GoInstall)
+	case "cargo_install":
+		p.CargoInstall = &CargoInstallConfig{}
+		return value.Decode(p.CargoInstall)
 	case "binary_release":
 		p.BinaryRelease = &BinaryReleaseConfig{}
 		return value.Decode(p.BinaryRelease)
@@ -146,9 +154,12 @@ type RustComponentsConfig struct{}
 // DockerConfig installs docker-ce and writes /etc/docker/daemon.json.
 type DockerConfig struct{}
 
-// SpriteServiceConfig registers a sprite-env managed service.
+// SpriteServiceConfig registers a sprite-env managed service via the internal API socket.
+// Cmd is the executable path (e.g. /usr/bin/dockerd). Args are optional.
 type SpriteServiceConfig struct {
-	Service string `yaml:"service"`
+	Service string   `yaml:"service"`
+	Cmd     string   `yaml:"cmd"`
+	Args    []string `yaml:"args"`
 }
 
 // GitIdentityConfig applies git user.name, user.email, default branch, and signing config.
@@ -191,4 +202,28 @@ type ClaudeSettingsConfig struct {
 type CmdConfig struct {
 	Run   string `yaml:"run"`
 	Check string `yaml:"check"`
+}
+
+// GoTool is one entry in a go_install phase.
+type GoTool struct {
+	Pkg     string `yaml:"pkg"`
+	Version string `yaml:"version"` // "latest" or a full semver like v1.2.3
+}
+
+// GoInstallConfig installs Go tools via go install pkg@version.
+type GoInstallConfig struct {
+	Tools []GoTool `yaml:"tools"`
+}
+
+// CargoTool is one entry in a cargo_install phase.
+type CargoTool struct {
+	Name     string   `yaml:"name"`
+	Version  string   `yaml:"version"`  // optional; omit for latest
+	Locked   bool     `yaml:"locked"`   // optional; passes --locked
+	Features []string `yaml:"features"` // optional
+}
+
+// CargoInstallConfig installs Rust crates via cargo install.
+type CargoInstallConfig struct {
+	Tools []CargoTool `yaml:"tools"`
 }
