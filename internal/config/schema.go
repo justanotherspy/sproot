@@ -81,10 +81,10 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 		return value.Decode(p.BinaryRelease)
 	case "corepack":
 		p.Corepack = &CorepackConfig{}
-		return nil
+		return value.Decode(p.Corepack)
 	case "rust_components":
 		p.RustComponents = &RustComponentsConfig{}
-		return nil
+		return value.Decode(p.RustComponents)
 	case "docker":
 		p.Docker = &DockerConfig{}
 		return nil
@@ -93,7 +93,7 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 		return value.Decode(p.SpriteService)
 	case "git_identity":
 		p.GitIdentity = &GitIdentityConfig{}
-		return nil
+		return value.Decode(p.GitIdentity)
 	case "ssh_setup":
 		p.SSHSetup = &SSHSetupConfig{}
 		return nil
@@ -145,13 +145,17 @@ type BinaryReleaseConfig struct {
 	Install string `yaml:"install"`
 }
 
-// CorepackConfig enables corepack and pre-activates pnpm and yarn.
-type CorepackConfig struct{}
+// CorepackConfig enables corepack and pre-activates the listed package managers.
+type CorepackConfig struct {
+	Managers []string `yaml:"managers"`
+}
 
-// RustComponentsConfig pins stable and installs clippy, rustfmt, rust-analyzer.
-type RustComponentsConfig struct{}
+// RustComponentsConfig pins stable and installs the listed rustup components.
+type RustComponentsConfig struct {
+	Components []string `yaml:"components"`
+}
 
-// DockerConfig installs docker-ce and writes /etc/docker/daemon.json.
+// DockerConfig installs docker-ce via the official install script.
 type DockerConfig struct{}
 
 // SpriteServiceConfig registers a sprite-env managed service via the internal API socket.
@@ -162,9 +166,12 @@ type SpriteServiceConfig struct {
 	Args    []string `yaml:"args"`
 }
 
-// GitIdentityConfig applies git user.name, user.email, default branch, and signing config.
-// It uses the top-level Identity fields; no per-phase YAML fields are needed.
-type GitIdentityConfig struct{}
+// GitIdentityConfig applies git user.name, user.email, and init.defaultBranch from
+// the top-level identity block. Config is an optional map of additional git config
+// key-value pairs to set (e.g. pull.rebase, core.editor).
+type GitIdentityConfig struct {
+	Config map[string]string `yaml:"config"`
+}
 
 // SSHSetupConfig configures the injected SSH key and known_hosts.
 type SSHSetupConfig struct{}

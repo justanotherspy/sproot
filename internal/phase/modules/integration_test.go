@@ -35,8 +35,8 @@ func TestDryRunAllModules(t *testing.T) {
 		{Type: "binary_release", BinaryRelease: &config.BinaryReleaseConfig{
 			Name: "cosign", Repo: "sigstore/cosign", Asset: "cosign_{version}_{arch}.deb", Install: "dpkg",
 		}},
-		{Type: "corepack", Corepack: &config.CorepackConfig{}},
-		{Type: "rust_components", RustComponents: &config.RustComponentsConfig{}},
+		{Type: "corepack", Corepack: &config.CorepackConfig{Managers: []string{"pnpm", "yarn"}}},
+		{Type: "rust_components", RustComponents: &config.RustComponentsConfig{Components: []string{"clippy", "rustfmt"}}},
 		{Type: "docker", Docker: &config.DockerConfig{}},
 		{Type: "sprite_service", SpriteService: &config.SpriteServiceConfig{
 			Service: "dockerd", Cmd: "/usr/bin/dockerd",

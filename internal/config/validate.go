@@ -64,6 +64,14 @@ func ValidateSprootConfig(cfg *SprootConfig) error {
 			continue
 		}
 		switch phase.Type {
+		case "corepack":
+			if c := phase.Corepack; c != nil && len(c.Managers) == 0 {
+				errs = append(errs, fmt.Errorf("phases[%d] (corepack): managers must not be empty", i))
+			}
+		case "rust_components":
+			if r := phase.RustComponents; r != nil && len(r.Components) == 0 {
+				errs = append(errs, fmt.Errorf("phases[%d] (rust_components): components must not be empty", i))
+			}
 		case "go_install":
 			if gi := phase.GoInstall; gi != nil && len(gi.Tools) == 0 {
 				errs = append(errs, fmt.Errorf("phases[%d] (go_install): tools must not be empty", i))

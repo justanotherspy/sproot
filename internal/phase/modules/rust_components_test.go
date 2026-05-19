@@ -4,12 +4,17 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+
+	"github.com/justanotherspy/sproot/internal/config"
 )
+
+func newRustComponentsPhase(components []string) *rustComponentsPhase {
+	return &rustComponentsPhase{cfg: &config.RustComponentsConfig{Components: components}}
+}
 
 func TestRustComponents_ShouldRunWhenRustupMissing(t *testing.T) {
 	if _, err := exec.LookPath("rustup"); err != nil {
-		// No rustup: ShouldRun should return true (needs installation).
-		p := &rustComponentsPhase{}
+		p := newRustComponentsPhase([]string{"clippy", "rustfmt"})
 		should, err := p.ShouldRun(testCtx(t))
 		if err != nil {
 			t.Fatal(err)
@@ -26,22 +31,18 @@ func TestRustComponents_ShouldRunFalseWhenComponentsInstalled(t *testing.T) {
 	if _, err := exec.LookPath("rustup"); err != nil {
 		t.Skip("rustup not on PATH")
 	}
+	components := []string{"clippy", "rustfmt", "rust-analyzer"}
 	installed, err := outputOf("rustup", "component", "list", "--installed")
 	if err != nil {
 		t.Skip("rustup component list failed")
 	}
-	allPresent := true
-	for _, c := range requiredComponents {
+	for _, c := range components {
 		if !strings.Contains(installed, c) {
-			allPresent = false
-			break
+			t.Skipf("component %q not installed; skipping already-done check", c)
 		}
 	}
-	if !allPresent {
-		t.Skip("not all required components installed; skipping already-done check")
-	}
 
-	p := &rustComponentsPhase{}
+	p := newRustComponentsPhase(components)
 	should, err := p.ShouldRun(testCtx(t))
 	if err != nil {
 		t.Fatal(err)
@@ -52,7 +53,7 @@ func TestRustComponents_ShouldRunFalseWhenComponentsInstalled(t *testing.T) {
 }
 
 func TestRustComponents_TypeAndName(t *testing.T) {
-	p := &rustComponentsPhase{}
+	p := newRustComponentsPhase(nil)
 	if p.Type() != "rust_components" {
 		t.Errorf("Type: got %q", p.Type())
 	}

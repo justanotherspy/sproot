@@ -1,9 +1,14 @@
 package modules
 
-// git_identity configures git user identity, global settings, aliases, and SSH commit signing.
-// It reads identity fields from ctx.Identity; no per-phase YAML fields are needed.
+// git_identity configures git user.name, user.email, init.defaultBranch, and SSH
+// commit signing from the top-level identity block. An optional config map allows
+// the config repo to set arbitrary git config keys without hardcoding them here.
 //
 //	- type: git_identity
+//	  git_identity:
+//	    config:
+//	      pull.rebase: "true"
+//	      core.editor: vim
 
 import (
 	"fmt"
@@ -16,11 +21,13 @@ import (
 
 func init() {
 	phase.Register("git_identity", func(cfg config.PhaseConfig) (phase.Phase, error) {
-		return &gitIdentityPhase{}, nil
+		return &gitIdentityPhase{cfg: cfg.GitIdentity}, nil
 	})
 }
 
-type gitIdentityPhase struct{}
+type gitIdentityPhase struct {
+	cfg *config.GitIdentityConfig
+}
 
 func (p *gitIdentityPhase) Type() string { return "git_identity" }
 func (p *gitIdentityPhase) Name() string { return "git_identity" }
@@ -30,7 +37,6 @@ func (p *gitIdentityPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 	name, _ := outputOf("git", "config", "--global", "user.name")
 	email, _ := outputOf("git", "config", "--global", "user.email")
 	branch, _ := outputOf("git", "config", "--global", "init.defaultBranch")
-	gpgFmt, _ := outputOf("git", "config", "--global", "gpg.format")
 
 	if email == "noreply@sprites.dev" {
 		return true, nil
@@ -38,8 +44,24 @@ func (p *gitIdentityPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 	if name != id.GitUserName || email != id.GitUserEmail || branch != id.GitDefaultBranch {
 		return true, nil
 	}
-	if gpgFmt != "ssh" {
+
+	for k, want := range p.cfg.Config {
+		got, _ := outputOf("git", "config", "--global", k)
+		if got != want {
+			return true, nil
+		}
+	}
+
+	home, err := os.UserHomeDir()
+	if err != nil {
 		return true, nil
+	}
+	pub := filepath.Join(home, ".ssh", "id_ed25519.pub")
+	if _, err := os.Stat(pub); err == nil {
+		gpgFmt, _ := outputOf("git", "config", "--global", "gpg.format")
+		if gpgFmt != "ssh" {
+			return true, nil
+		}
 	}
 	return false, nil
 }
@@ -50,17 +72,9 @@ func (p *gitIdentityPhase) Run(ctx *phase.Context) error {
 		{"user.name", id.GitUserName},
 		{"user.email", id.GitUserEmail},
 		{"init.defaultBranch", id.GitDefaultBranch},
-		{"pull.rebase", "true"},
-		{"push.autoSetupRemote", "true"},
-		{"rerere.enabled", "true"},
-		{"color.ui", "auto"},
-		{"core.editor", "vim"},
-		{"fetch.prune", "true"},
-		{"alias.lg", "log --oneline --graph --decorate --all"},
-		{"alias.last", "log -1 HEAD"},
-		{"alias.amend", "commit --amend --no-edit"},
-		{"alias.unstage", "reset HEAD --"},
-		{"alias.cleanb", "!git branch --merged | grep -vE '^\\*|^.\\s*(main|master|develop)$' | xargs -r git branch -d"},
+	}
+	for k, v := range p.cfg.Config {
+		settings = append(settings, []string{k, v})
 	}
 	for _, kv := range settings {
 		if err := runCmd(ctx.Log, "git", "config", "--global", kv[0], kv[1]); err != nil {

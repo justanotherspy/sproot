@@ -30,7 +30,9 @@ phases:
       - justanotherspy/garlic
       - justanotherspy/poker
   - type: corepack
+    managers: [pnpm, yarn]
   - type: rust_components
+    components: [clippy, rustfmt, rust-analyzer]
   - type: docker
   - type: go_install
     tools:

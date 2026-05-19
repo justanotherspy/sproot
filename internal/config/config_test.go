@@ -223,6 +223,46 @@ func TestPhaseConfig_CmdFields(t *testing.T) {
 	}
 }
 
+func TestPhaseConfig_CorepackFields(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Phases[6]
+	if p.Corepack == nil {
+		t.Fatal("Corepack is nil")
+	}
+	want := []string{"pnpm", "yarn"}
+	if len(p.Corepack.Managers) != len(want) {
+		t.Fatalf("managers: got %v, want %v", p.Corepack.Managers, want)
+	}
+	for i, m := range want {
+		if p.Corepack.Managers[i] != m {
+			t.Errorf("managers[%d]: got %q, want %q", i, p.Corepack.Managers[i], m)
+		}
+	}
+}
+
+func TestPhaseConfig_RustComponentsFields(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Phases[7]
+	if p.RustComponents == nil {
+		t.Fatal("RustComponents is nil")
+	}
+	want := []string{"clippy", "rustfmt", "rust-analyzer"}
+	if len(p.RustComponents.Components) != len(want) {
+		t.Fatalf("components: got %v, want %v", p.RustComponents.Components, want)
+	}
+	for i, c := range want {
+		if p.RustComponents.Components[i] != c {
+			t.Errorf("components[%d]: got %q, want %q", i, p.RustComponents.Components[i], c)
+		}
+	}
+}
+
 func TestPhaseConfig_EmptyStructTypes(t *testing.T) {
 	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
 	if err != nil {
@@ -233,8 +273,6 @@ func TestPhaseConfig_EmptyStructTypes(t *testing.T) {
 		name string
 		fn   func(PhaseConfig) bool
 	}{
-		{6, "corepack", func(p PhaseConfig) bool { return p.Corepack != nil }},
-		{7, "rust_components", func(p PhaseConfig) bool { return p.RustComponents != nil }},
 		{8, "docker", func(p PhaseConfig) bool { return p.Docker != nil }},
 		{12, "git_identity", func(p PhaseConfig) bool { return p.GitIdentity != nil }},
 		{13, "ssh_setup", func(p PhaseConfig) bool { return p.SSHSetup != nil }},
@@ -457,6 +495,20 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 				c.Phases = []PhaseConfig{{Type: "repo_clone", RepoClone: &RepoCloneConfig{BaseDir: "~/repos"}}}
 			},
 			"phases[0] (repo_clone): repos must not be empty",
+		},
+		{
+			"corepack_empty_managers",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "corepack", Corepack: &CorepackConfig{}}}
+			},
+			"phases[0] (corepack): managers must not be empty",
+		},
+		{
+			"rust_components_empty_components",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "rust_components", RustComponents: &RustComponentsConfig{}}}
+			},
+			"phases[0] (rust_components): components must not be empty",
 		},
 		{
 			"go_install_empty_tools",

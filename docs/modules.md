@@ -131,14 +131,18 @@ Downloads and installs a binary from a GitHub release.
 
 ## corepack
 
-Enables corepack and prepares pnpm and yarn.
+Enables corepack and pre-activates the listed package managers.
 
 ```yaml
 - type: corepack
-  corepack: {}
+  corepack:
+    managers: [pnpm, yarn]
 ```
 
-**Idempotency:** checks that `pnpm` and `yarn` are on PATH.
+**Fields:**
+- `managers`: list of package manager names to prepare (e.g. `pnpm`, `yarn`)
+
+**Idempotency:** checks that each listed manager binary is on PATH.
 
 **Requires:** `corepack` on PATH (ships with Node.js 16+).
 
@@ -146,14 +150,17 @@ Enables corepack and prepares pnpm and yarn.
 
 ## rust_components
 
-Installs the standard Rust toolchain components.
+Pins the stable Rust toolchain and installs the listed components.
 
 ```yaml
 - type: rust_components
-  rust_components: {}
+  rust_components:
+    components: [clippy, rustfmt, rust-analyzer]
 ```
 
-Installs: `clippy`, `rustfmt`, `rust-analyzer` via `rustup component add`.
+**Fields:**
+- `components`: list of rustup component names to install
+
 Also sets `rustup default stable`.
 
 **Idempotency:** checks `rustup component list --installed` for each component.
@@ -171,7 +178,7 @@ Installs Docker via the official install script.
   docker: {}
 ```
 
-Downloads and runs `https://get.docker.com`. Writes a default `/etc/docker/daemon.json`.
+Downloads and runs `https://get.docker.com`. Use `file_template` to manage `/etc/docker/daemon.json` if needed.
 
 **Idempotency:** checks `docker --version` exits 0.
 
@@ -205,21 +212,22 @@ Registers a long-running service with the sprite-env daemon.
 
 ## git_identity
 
-Configures global git identity and preferences.
+Configures global git identity and optional additional git settings.
 
 ```yaml
 - type: git_identity
-  git_identity: {}
+  git_identity:
+    config:
+      pull.rebase: "true"
+      push.autoSetupRemote: "true"
+      core.editor: vim
 ```
 
-Sets from `identity` in `~/.sproot/config`:
-- `user.name`, `user.email`, `init.defaultBranch`
-- `pull.rebase true`, `push.autoSetupRemote true`, `rerere.enabled true`
-- `color.ui auto`, `core.editor vim`, `fetch.prune true`
-- Aliases: `lg`, `last`, `amend`, `unstage`, `cleanb`
-- SSH signing config (`gpg.format ssh`, `user.signingkey`, `commit.gpgsign`, `tag.gpgsign`, `gpg.ssh.allowedSignersFile`) when `~/.ssh/id_ed25519.pub` exists
+Always sets `user.name`, `user.email`, and `init.defaultBranch` from the top-level `identity` block. The optional `config` map lets the config repo apply any additional git settings without sproot prescribing them.
 
-**Idempotency:** checks that all target git config values are already set. Treats the sprite placeholder email `noreply@sprites.dev` as "not configured."
+When `~/.ssh/id_ed25519.pub` exists, also sets SSH commit signing (`gpg.format`, `user.signingkey`, `commit.gpgsign`, `tag.gpgsign`, `gpg.ssh.allowedSignersFile`).
+
+**Idempotency:** checks identity fields, each key in `config`, and (when the pub key exists) `gpg.format`. Treats the sprite placeholder email `noreply@sprites.dev` as "not configured."
 
 ---
 

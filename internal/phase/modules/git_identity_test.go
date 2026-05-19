@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/justanotherspy/sproot/internal/config"
 )
 
 // setGlobalGitConfig points git to a temp config file for the duration of the test.
@@ -14,10 +16,14 @@ func setGlobalGitConfig(t *testing.T) string {
 	return tmp
 }
 
+func newGitIdentityPhase(extra map[string]string) *gitIdentityPhase {
+	return &gitIdentityPhase{cfg: &config.GitIdentityConfig{Config: extra}}
+}
+
 func TestGitIdentity_ShouldRunWhenNotConfigured(t *testing.T) {
 	setGlobalGitConfig(t)
 
-	p := &gitIdentityPhase{}
+	p := newGitIdentityPhase(nil)
 	should, err := p.ShouldRun(testCtx(t))
 	if err != nil {
 		t.Fatal(err)
@@ -29,12 +35,11 @@ func TestGitIdentity_ShouldRunWhenNotConfigured(t *testing.T) {
 
 func TestGitIdentity_RunAndVerify(t *testing.T) {
 	setGlobalGitConfig(t)
-	// ssh key not present, so signing config will be skipped.
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	ctx := testCtx(t)
-	p := &gitIdentityPhase{}
+	p := newGitIdentityPhase(nil)
 
 	if err := p.Run(ctx); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -54,13 +59,39 @@ func TestGitIdentity_RunAndVerify(t *testing.T) {
 	}
 }
 
+func TestGitIdentity_ExtraConfigApplied(t *testing.T) {
+	setGlobalGitConfig(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ctx := testCtx(t)
+	p := newGitIdentityPhase(map[string]string{"pull.rebase": "true"})
+
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got, _ := outputOf("git", "config", "--global", "pull.rebase")
+	if got != "true" {
+		t.Errorf("pull.rebase: got %q, want %q", got, "true")
+	}
+
+	should, err := p.ShouldRun(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if should {
+		t.Error("expected ShouldRun=false after config applied")
+	}
+}
+
 func TestGitIdentity_ShouldRunFalseAfterRun(t *testing.T) {
 	setGlobalGitConfig(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
 	ctx := testCtx(t)
-	p := &gitIdentityPhase{}
+	p := newGitIdentityPhase(nil)
 	if err := p.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -86,10 +117,9 @@ func TestGitIdentity_ShouldRunFalseAfterRun(t *testing.T) {
 
 func TestGitIdentity_HandlesSpritePlaceholder(t *testing.T) {
 	cfgPath := setGlobalGitConfig(t)
-	// Pre-populate with the sprite placeholder identity.
 	_ = os.WriteFile(cfgPath, []byte("[user]\n\tname = Sprite\n\temail = noreply@sprites.dev\n"), 0o644)
 
-	p := &gitIdentityPhase{}
+	p := newGitIdentityPhase(nil)
 	should, err := p.ShouldRun(testCtx(t))
 	if err != nil {
 		t.Fatal(err)
