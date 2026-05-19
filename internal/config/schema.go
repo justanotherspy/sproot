@@ -6,10 +6,20 @@ import (
 	"go.yaml.in/yaml/v3"
 )
 
+// EnvVar maps a host environment variable into the sprite under a given name.
+// From is the variable name on the host; As is the name it gets in the sprite.
+// Required causes sproot new to fail if the host variable is unset or empty.
+type EnvVar struct {
+	From     string `yaml:"from"`
+	As       string `yaml:"as"`
+	Required bool   `yaml:"required"`
+}
+
 // SprootConfig is the top-level struct for sproot.yaml, found in the config repo.
 type SprootConfig struct {
 	SchemaVersion int           `yaml:"schema_version"`
 	Identity      Identity      `yaml:"identity"`
+	Env           []EnvVar      `yaml:"env"`
 	Phases        []PhaseConfig `yaml:"phases"`
 }
 
@@ -35,6 +45,8 @@ type PhaseConfig struct {
 	Type           string                `yaml:"type"`
 	Apt            *AptConfig            `yaml:"-"`
 	UVTool         *UVToolConfig         `yaml:"-"`
+	GoInstall      *GoInstallConfig      `yaml:"-"`
+	CargoInstall   *CargoInstallConfig   `yaml:"-"`
 	BinaryRelease  *BinaryReleaseConfig  `yaml:"-"`
 	Corepack       *CorepackConfig       `yaml:"-"`
 	RustComponents *RustComponentsConfig `yaml:"-"`
@@ -68,15 +80,21 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "uv_tool":
 		p.UVTool = &UVToolConfig{}
 		return value.Decode(p.UVTool)
+	case "go_install":
+		p.GoInstall = &GoInstallConfig{}
+		return value.Decode(p.GoInstall)
+	case "cargo_install":
+		p.CargoInstall = &CargoInstallConfig{}
+		return value.Decode(p.CargoInstall)
 	case "binary_release":
 		p.BinaryRelease = &BinaryReleaseConfig{}
 		return value.Decode(p.BinaryRelease)
 	case "corepack":
 		p.Corepack = &CorepackConfig{}
-		return nil
+		return value.Decode(p.Corepack)
 	case "rust_components":
 		p.RustComponents = &RustComponentsConfig{}
-		return nil
+		return value.Decode(p.RustComponents)
 	case "docker":
 		p.Docker = &DockerConfig{}
 		return nil
@@ -85,7 +103,7 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 		return value.Decode(p.SpriteService)
 	case "git_identity":
 		p.GitIdentity = &GitIdentityConfig{}
-		return nil
+		return value.Decode(p.GitIdentity)
 	case "ssh_setup":
 		p.SSHSetup = &SSHSetupConfig{}
 		return nil
@@ -137,23 +155,33 @@ type BinaryReleaseConfig struct {
 	Install string `yaml:"install"`
 }
 
-// CorepackConfig enables corepack and pre-activates pnpm and yarn.
-type CorepackConfig struct{}
-
-// RustComponentsConfig pins stable and installs clippy, rustfmt, rust-analyzer.
-type RustComponentsConfig struct{}
-
-// DockerConfig installs docker-ce and writes /etc/docker/daemon.json.
-type DockerConfig struct{}
-
-// SpriteServiceConfig registers a sprite-env managed service.
-type SpriteServiceConfig struct {
-	Service string `yaml:"service"`
+// CorepackConfig enables corepack and pre-activates the listed package managers.
+type CorepackConfig struct {
+	Managers []string `yaml:"managers"`
 }
 
-// GitIdentityConfig applies git user.name, user.email, default branch, and signing config.
-// It uses the top-level Identity fields; no per-phase YAML fields are needed.
-type GitIdentityConfig struct{}
+// RustComponentsConfig pins stable and installs the listed rustup components.
+type RustComponentsConfig struct {
+	Components []string `yaml:"components"`
+}
+
+// DockerConfig installs docker-ce via the official install script.
+type DockerConfig struct{}
+
+// SpriteServiceConfig registers a sprite-env managed service via the internal API socket.
+// Cmd is the executable path (e.g. /usr/bin/dockerd). Args are optional.
+type SpriteServiceConfig struct {
+	Service string   `yaml:"service"`
+	Cmd     string   `yaml:"cmd"`
+	Args    []string `yaml:"args"`
+}
+
+// GitIdentityConfig applies git user.name, user.email, and init.defaultBranch from
+// the top-level identity block. Config is an optional map of additional git config
+// key-value pairs to set (e.g. pull.rebase, core.editor).
+type GitIdentityConfig struct {
+	Config map[string]string `yaml:"config"`
+}
 
 // SSHSetupConfig configures the injected SSH key and known_hosts.
 type SSHSetupConfig struct{}
@@ -191,4 +219,28 @@ type ClaudeSettingsConfig struct {
 type CmdConfig struct {
 	Run   string `yaml:"run"`
 	Check string `yaml:"check"`
+}
+
+// GoTool is one entry in a go_install phase.
+type GoTool struct {
+	Pkg     string `yaml:"pkg"`
+	Version string `yaml:"version"` // "latest" or a full semver like v1.2.3
+}
+
+// GoInstallConfig installs Go tools via go install pkg@version.
+type GoInstallConfig struct {
+	Tools []GoTool `yaml:"tools"`
+}
+
+// CargoTool is one entry in a cargo_install phase.
+type CargoTool struct {
+	Name     string   `yaml:"name"`
+	Version  string   `yaml:"version"`  // optional; omit for latest
+	Locked   bool     `yaml:"locked"`   // optional; passes --locked
+	Features []string `yaml:"features"` // optional
+}
+
+// CargoInstallConfig installs Rust crates via cargo install.
+type CargoInstallConfig struct {
+	Tools []CargoTool `yaml:"tools"`
 }

@@ -6,6 +6,11 @@ identity:
   git_default_branch: main
   gh_username: justanotherspy
 
+env:
+  - from: MY_GH_TOKEN
+    as: GH_TOKEN
+    required: true
+
 phases:
   - type: apt
     packages: [shellcheck, jq]
@@ -30,10 +35,23 @@ phases:
       - justanotherspy/garlic
       - justanotherspy/poker
   - type: corepack
+    managers: [pnpm, yarn]
   - type: rust_components
+    components: [clippy, rustfmt, rust-analyzer]
   - type: docker
+  - type: go_install
+    tools:
+      - pkg: golang.org/x/tools/cmd/goimports
+        version: latest
+  - type: cargo_install
+    tools:
+      - name: ripgrep
+      - name: cargo-nextest
+        version: "0.9.72"
+        locked: true
   - type: sprite_service
     service: dockerd
+    cmd: /usr/bin/dockerd
   - type: git_identity
   - type: ssh_setup
   - type: gh_token
