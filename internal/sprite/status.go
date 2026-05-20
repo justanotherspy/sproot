@@ -17,24 +17,30 @@ func PrintStatus(statePath string, w io.Writer) error {
 	}
 
 	if len(state.Phases) == 0 {
-		fmt.Fprintf(w, "no phase records found at %s\n", statePath)
-		return nil
+		_, err = fmt.Fprintf(w, "no phase records found at %s\n", statePath)
+		return err
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(tw, "TYPE\tNAME\tSTATUS\tRAN AT\tERROR")
+	_, err = fmt.Fprintln(tw, "TYPE\tNAME\tSTATUS\tRAN AT\tERROR")
+	if err != nil {
+		return err
+	}
 	for _, rec := range state.Phases {
 		errCol := truncate(rec.Error, 60)
 		if errCol == "" {
 			errCol = truncate(rec.VerifyError, 60)
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
+		_, err = fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			rec.Type,
 			rec.Name,
 			phaseStatusLabel(rec),
 			rec.LastRunAt.Format("2006-01-02 15:04:05"),
 			errCol,
 		)
+		if err != nil {
+			return err
+		}
 	}
 	return tw.Flush()
 }
