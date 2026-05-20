@@ -52,7 +52,7 @@ func NewRunnerFromPhases(phases []Phase, opts RunnerOptions) *Runner {
 func (r *Runner) Run(ctx *Context) error {
 	statePath := r.opts.StatePath
 	if statePath == "" {
-		p, err := defaultStatePath()
+		p, err := DefaultStatePath()
 		if err != nil {
 			ctx.Log.Warnf("could not determine state path: %v", err)
 			statePath = "state.json"
