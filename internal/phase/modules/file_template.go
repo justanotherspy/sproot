@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"text/template" // nosemgrep: go.lang.security.audit.xss.import-text-template.import-text-template
+	"text/template" // nosemgrep
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"

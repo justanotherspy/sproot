@@ -13,7 +13,7 @@ import (
 
 // runCmd logs and executes name with args, streaming stdout+stderr to log line by line.
 func runCmd(l *log.Logger, name string, args ...string) error {
-	cmd := exec.Command(name, args...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	cmd := exec.Command(name, args...) // nosemgrep
 	pr, pw, err := pipeOf(cmd)
 	if err != nil {
 		return fmt.Errorf("%s: %w", name, err)
@@ -48,7 +48,7 @@ func pipeOf(cmd *exec.Cmd) (io.ReadCloser, io.WriteCloser, error) {
 
 // checkCmd returns true if name with args exits 0.
 func checkCmd(name string, args ...string) bool {
-	cmd := exec.Command(name, args...) // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	cmd := exec.Command(name, args...) // nosemgrep
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	return cmd.Run() == nil
@@ -56,7 +56,7 @@ func checkCmd(name string, args ...string) bool {
 
 // outputOf runs name with args and returns trimmed stdout. Stderr is discarded.
 func outputOf(name string, args ...string) (string, error) {
-	out, err := exec.Command(name, args...).Output() // nosemgrep: go.lang.security.audit.dangerous-exec-command.dangerous-exec-command
+	out, err := exec.Command(name, args...).Output() // nosemgrep
 	if err != nil {
 		return "", fmt.Errorf("%s: %w", name, err)
 	}

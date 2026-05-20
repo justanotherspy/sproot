@@ -224,7 +224,7 @@ func installFromTar(l *log.Logger, tarPath, name string) error {
 			return fmt.Errorf("create %s: %w", dest, err)
 		}
 		const maxBinarySize = 500 << 20 // 500 MB; guards against decompression bombs
-		if _, err := io.Copy(out, io.LimitReader(tr, maxBinarySize)); err != nil {
+		if _, err := io.CopyN(out, tr, maxBinarySize); err != nil && err != io.EOF {
 			_ = out.Close()
 			return fmt.Errorf("write %s: %w", dest, err)
 		}

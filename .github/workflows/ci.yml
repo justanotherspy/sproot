@@ -69,7 +69,7 @@ jobs:
         run: pip install semgrep
 
       - name: Semgrep
-        run: semgrep --config auto --sarif --sarif-output semgrep.sarif .
+        run: semgrep --config auto --error --sarif --sarif-output semgrep.sarif .
 
       - name: Upload SARIF
         if: always()
