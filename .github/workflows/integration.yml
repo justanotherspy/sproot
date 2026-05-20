@@ -62,6 +62,7 @@ jobs:
           {
             echo "config_repo: https://github.com/${{ github.repository }}.git"
             echo "config_ref: ${{ github.head_ref }}"
+            echo "config_path: testdata/integration/sproot.yaml"
             echo "token_env: SPRITE_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config
