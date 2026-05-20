@@ -31,10 +31,18 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"
 	"github.com/justanotherspy/sproot/pkg/log"
+)
+
+var (
+	// tagClient is used for short GitHub API calls (tag lookup, checksums file).
+	tagClient = &http.Client{Timeout: 30 * time.Second}
+	// downloadClient is used for asset downloads which can be large.
+	downloadClient = &http.Client{Timeout: 5 * time.Minute}
 )
 
 func init() {
@@ -120,8 +128,15 @@ func (p *binaryReleasePhase) Verify(_ *phase.Context) error {
 
 // githubLatestTag returns the latest release tag for owner/repo.
 func githubLatestTag(repo string) (string, error) {
-	url := "https://api.github.com/repos/" + repo + "/releases/latest"
-	resp, err := http.Get(url) //nolint:noctx
+	apiURL := "https://api.github.com/repos/" + repo + "/releases/latest"
+	req, err := http.NewRequest(http.MethodGet, apiURL, nil)
+	if err != nil {
+		return "", err
+	}
+	if tok := os.Getenv("GH_TOKEN"); tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+	resp, err := tagClient.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -153,7 +168,7 @@ func templateAsset(pattern, version string) string {
 
 // downloadAsset downloads url to a temp file and returns its path.
 func downloadAsset(url string) (string, error) {
-	resp, err := http.Get(url) //nolint:noctx
+	resp, err := downloadClient.Get(url) //nolint:noctx
 	if err != nil {
 		return "", err
 	}
@@ -244,7 +259,7 @@ func verifyChecksum(path, want string) error {
 // finds the line for assetName, and verifies the downloaded file at path.
 // Expected line format: "<sha256hex>  <filename>"
 func verifyChecksumAsset(path, assetName, checksumURL string) error {
-	resp, err := http.Get(checksumURL) //nolint:noctx
+	resp, err := tagClient.Get(checksumURL) //nolint:noctx
 	if err != nil {
 		return fmt.Errorf("download checksums file: %w", err)
 	}

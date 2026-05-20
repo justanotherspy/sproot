@@ -48,13 +48,17 @@ func (p *rcBlockPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 	if err != nil {
 		return true, nil
 	}
-	bashrc := filepath.Join(home, ".bashrc")
-	existing, err := os.ReadFile(bashrc)
-	if err != nil {
-		return true, nil
-	}
 	wantHash := blockHash(src)
-	return extractBlockHash(string(existing)) != wantHash, nil
+	for _, rc := range []string{".bashrc", ".zshrc"} {
+		existing, err := os.ReadFile(filepath.Join(home, rc))
+		if err != nil {
+			return true, nil
+		}
+		if extractBlockHash(string(existing)) != wantHash {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (p *rcBlockPhase) Run(ctx *phase.Context) error {
@@ -109,6 +113,9 @@ func (p *rcBlockPhase) readSrc(ctx *phase.Context) (string, error) {
 
 // applyRCBlock strips any existing managed block from the file, then appends a fresh one.
 func applyRCBlock(path, src string) error {
+	if !strings.HasSuffix(src, "\n") {
+		src += "\n"
+	}
 	existing, _ := os.ReadFile(path)
 	stripped := stripBlock(string(existing))
 	block := fmt.Sprintf("\n%s\n%s%s\n", rcBegin, src, rcEnd)

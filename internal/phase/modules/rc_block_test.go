@@ -79,6 +79,56 @@ func TestRCBlock_ShouldRunFalseAfterRun(t *testing.T) {
 	}
 }
 
+// TestRCBlock_ShouldRunWhenOnlyZshrcStale covers the 9a bug: ShouldRun previously
+// checked only .bashrc, so a stale .zshrc would not trigger a re-run.
+func TestRCBlock_ShouldRunWhenOnlyZshrcStale(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ctx := testCtx(t)
+	src := "export FOO=bar\n"
+	_ = os.WriteFile(filepath.Join(ctx.ConfigRepoPath, "rc.sh"), []byte(src), 0o644)
+
+	p := newRCBlockPhase("rc.sh")
+	// Write the block only to .bashrc; leave .zshrc absent.
+	if err := applyRCBlock(filepath.Join(home, ".bashrc"), src); err != nil {
+		t.Fatal(err)
+	}
+
+	should, err := p.ShouldRun(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !should {
+		t.Error("expected ShouldRun=true when .zshrc is missing even though .bashrc is current")
+	}
+}
+
+// TestRCBlock_TrailingNewlineNormalized covers the 9b bug: if src has no trailing
+// newline the end sentinel was appended on the same line as the last src line.
+func TestRCBlock_TrailingNewlineNormalized(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ctx := testCtx(t)
+	// Deliberate: no trailing newline.
+	src := "export BAR=baz"
+	_ = os.WriteFile(filepath.Join(ctx.ConfigRepoPath, "rc.sh"), []byte(src), 0o644)
+
+	p := newRCBlockPhase("rc.sh")
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	content, _ := os.ReadFile(filepath.Join(home, ".bashrc"))
+	s := string(content)
+	// The end sentinel must appear on its own line, not concatenated with src.
+	if strings.Contains(s, src+rcEnd) {
+		t.Errorf("end sentinel not on its own line:\n%s", s)
+	}
+	if !strings.Contains(s, "\n"+rcEnd) {
+		t.Errorf("end sentinel missing newline prefix:\n%s", s)
+	}
+}
+
 func TestRCBlock_ReplacesExistingBlock(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

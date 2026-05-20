@@ -160,5 +160,88 @@ func TestSSHSetup_WritesKeyIDs(t *testing.T) {
 	}
 }
 
+// TestSSHSetup_ShouldRunWhenAllowedSignersMissing covers the 9e idempotency gap:
+// if the key and known_hosts are present but allowed_signers lacks the pubkey,
+// ShouldRun must return true.
+func TestSSHSetup_ShouldRunWhenAllowedSignersMissing(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not on PATH")
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("GH_TOKEN", "")
+
+	sshDir := filepath.Join(home, ".ssh")
+	_ = os.MkdirAll(sshDir, 0o700)
+
+	// Generate a real keypair so the key exists.
+	keyPath := filepath.Join(sshDir, "id_ed25519")
+	cmd := exec.Command("ssh-keygen", "-t", "ed25519", "-f", keyPath, "-N", "")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("ssh-keygen: %v\n%s", err, out)
+	}
+
+	// Write known_hosts with github.com present so that check passes.
+	khPath := filepath.Join(sshDir, "known_hosts")
+	_ = os.WriteFile(khPath, []byte("|1|fake= ssh-ed25519 AAAA\n"), 0o600)
+	// Override the known_hosts check by writing a file that ssh-keygen -F will find.
+	// Rather than mocking, we write an actual known_hosts entry by running ssh-keyscan
+	// if available; otherwise skip.
+	ksOut, err := exec.Command("ssh-keyscan", "-H", "github.com").Output()
+	if err != nil {
+		t.Skip("ssh-keyscan failed; skipping")
+	}
+	_ = os.WriteFile(khPath, ksOut, 0o600)
+
+	// Do NOT write allowed_signers.
+
+	p := &sshSetupPhase{ghRegister: stubGHRegister}
+	should, err := p.ShouldRun(testCtx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !should {
+		t.Error("expected ShouldRun=true when allowed_signers is absent")
+	}
+}
+
+// TestSSHSetup_ShouldRunWhenGHTokenSetButNoKeyIDs covers the 9e idempotency gap:
+// if everything looks complete but GH_TOKEN is set and github_keys.json is absent
+// (key was generated but GitHub registration was skipped), ShouldRun must return true.
+func TestSSHSetup_ShouldRunWhenGHTokenSetButNoKeyIDs(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not on PATH")
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("GH_TOKEN", "fake-token")
+
+	// Run a full setup (stubbed) to get all artifacts in place.
+	ctx := testCtx(t)
+	p := &sshSetupPhase{ghRegister: func(_, _, _ string) (int64, int64, error) {
+		return 0, 0, nil // returns zero IDs so writeKeyIDs is skipped
+	}}
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// Confirm github_keys.json was NOT written (zero IDs → skipped).
+	keysPath, _ := GHKeyIDsPath()
+	if _, err := os.Stat(keysPath); !os.IsNotExist(err) {
+		t.Skip("github_keys.json was unexpectedly written; skipping")
+	}
+
+	should, err := p.ShouldRun(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !should {
+		t.Error("expected ShouldRun=true when GH_TOKEN is set but github_keys.json is absent")
+	}
+}
+
 // stubGHRegister is a no-op GitHub registration stub for tests.
 func stubGHRegister(_, _, _ string) (int64, int64, error) { return 1, 2, nil }
