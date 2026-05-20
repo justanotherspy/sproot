@@ -152,11 +152,16 @@ type UVToolConfig struct {
 // BinaryReleaseConfig downloads and installs a GitHub release asset.
 // Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch}.
 // Install methods: dpkg, tar+install, raw.
+// Checksum is an optional sha256 hex string to verify the downloaded asset.
+// ChecksumAsset is an optional asset name template for a goreleaser-style
+// checksums file; sproot downloads it, finds the matching line, and verifies.
 type BinaryReleaseConfig struct {
-	Name    string `yaml:"name"`
-	Repo    string `yaml:"repo"`
-	Asset   string `yaml:"asset"`
-	Install string `yaml:"install"`
+	Name          string `yaml:"name"`
+	Repo          string `yaml:"repo"`
+	Asset         string `yaml:"asset"`
+	Install       string `yaml:"install"`
+	Checksum      string `yaml:"checksum"`
+	ChecksumAsset string `yaml:"checksum_asset"`
 }
 
 // CorepackConfig enables corepack and pre-activates the listed package managers.
@@ -194,11 +199,13 @@ type SSHSetupConfig struct{}
 type GHTokenConfig struct{}
 
 // FileTemplateConfig copies a file from the config repo to a destination path.
-// Mode is an optional octal string (e.g. "0755").
+// Mode is an optional octal string (e.g. "0755"). Template enables Go template
+// rendering against ctx.Identity; without it the file is copied as-is.
 type FileTemplateConfig struct {
-	Src  string `yaml:"src"`
-	Dest string `yaml:"dest"`
-	Mode string `yaml:"mode"`
+	Src      string `yaml:"src"`
+	Dest     string `yaml:"dest"`
+	Mode     string `yaml:"mode"`
+	Template bool   `yaml:"template"`
 }
 
 // RCBlockConfig writes a sentinel-delimited block to .bashrc and .zshrc.
@@ -220,9 +227,11 @@ type ClaudeSettingsConfig struct {
 
 // CmdConfig runs an arbitrary command with an optional idempotency check.
 // Check is a command that exits 0 if the work is already done (skips Run).
+// Name is an optional display name; when set, Name() returns cmd(name).
 type CmdConfig struct {
 	Run   string `yaml:"run"`
 	Check string `yaml:"check"`
+	Name  string `yaml:"name"`
 }
 
 // GoTool is one entry in a go_install phase.

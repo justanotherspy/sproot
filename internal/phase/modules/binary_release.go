@@ -18,7 +18,10 @@ package modules
 
 import (
 	"archive/tar"
+	"bufio"
 	"compress/gzip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -76,6 +79,19 @@ func (p *binaryReleasePhase) Run(ctx *phase.Context) error {
 		return fmt.Errorf("binary_release(%s): download: %w", p.cfg.Name, err)
 	}
 	defer func() { _ = os.Remove(tmp) }()
+
+	if p.cfg.Checksum != "" {
+		if err := verifyChecksum(tmp, p.cfg.Checksum); err != nil {
+			return fmt.Errorf("binary_release(%s): checksum: %w", p.cfg.Name, err)
+		}
+	}
+	if p.cfg.ChecksumAsset != "" {
+		checksumAssetName := templateAsset(p.cfg.ChecksumAsset, version)
+		checksumURL := fmt.Sprintf("https://github.com/%s/releases/download/%s/%s", p.cfg.Repo, version, checksumAssetName)
+		if err := verifyChecksumAsset(tmp, assetName, checksumURL); err != nil {
+			return fmt.Errorf("binary_release(%s): checksum_asset: %w", p.cfg.Name, err)
+		}
+	}
 
 	switch p.cfg.Install {
 	case "dpkg":
@@ -203,6 +219,54 @@ func installFromTar(l *log.Logger, tarPath, name string) error {
 		return nil
 	}
 	return fmt.Errorf("binary %q not found in tarball", name)
+}
+
+// verifyChecksum computes the sha256 of the file at path and compares it to
+// the expected hex string. Returns an error if they do not match.
+func verifyChecksum(path, want string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return err
+	}
+	got := hex.EncodeToString(h.Sum(nil))
+	if got != strings.ToLower(want) {
+		return fmt.Errorf("sha256 mismatch: got %s, want %s", got, want)
+	}
+	return nil
+}
+
+// verifyChecksumAsset downloads a goreleaser-style checksums file from checksumURL,
+// finds the line for assetName, and verifies the downloaded file at path.
+// Expected line format: "<sha256hex>  <filename>"
+func verifyChecksumAsset(path, assetName, checksumURL string) error {
+	resp, err := http.Get(checksumURL) //nolint:noctx
+	if err != nil {
+		return fmt.Errorf("download checksums file: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("checksums file: HTTP %d for %s", resp.StatusCode, checksumURL)
+	}
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.SplitN(line, "  ", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		if parts[1] == assetName {
+			return verifyChecksum(path, parts[0])
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("read checksums file: %w", err)
+	}
+	return fmt.Errorf("asset %q not found in checksums file", assetName)
 }
 
 // installRaw copies the downloaded file to /usr/local/bin/<name> with execute permission.

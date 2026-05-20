@@ -91,7 +91,7 @@ func TestFileTemplate_GoTemplate(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(ctx.ConfigRepoPath, "tmpl.txt"), []byte(tmpl), 0o644)
 	dest := filepath.Join(home, "rendered.txt")
 
-	p := &fileTemplatePhase{cfg: &config.FileTemplateConfig{Src: "tmpl.txt", Dest: dest}}
+	p := &fileTemplatePhase{cfg: &config.FileTemplateConfig{Src: "tmpl.txt", Dest: dest, Template: true}}
 	if err := p.Run(ctx); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -100,6 +100,26 @@ func TestFileTemplate_GoTemplate(t *testing.T) {
 	want := "name: Test User\nemail: test@example.com\n"
 	if string(got) != want {
 		t.Errorf("rendered: got %q, want %q", got, want)
+	}
+}
+
+func TestFileTemplate_LiteralWhenTemplateNotSet(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ctx := testCtx(t)
+
+	raw := "name: {{.GitUserName}}\nemail: {{.GitUserEmail}}\n"
+	_ = os.WriteFile(filepath.Join(ctx.ConfigRepoPath, "tmpl.txt"), []byte(raw), 0o644)
+	dest := filepath.Join(home, "literal.txt")
+
+	p := &fileTemplatePhase{cfg: &config.FileTemplateConfig{Src: "tmpl.txt", Dest: dest}}
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	got, _ := os.ReadFile(dest)
+	if string(got) != raw {
+		t.Errorf("expected literal copy, got %q", got)
 	}
 }
 

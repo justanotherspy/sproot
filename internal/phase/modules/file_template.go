@@ -1,13 +1,14 @@
 package modules
 
 // file_template copies a file from the config repo to a destination path.
-// If the source file contains Go template directives, they are executed against
+// When template: true is set, the file is rendered as a Go template against
 // the identity struct. Tilde in dest is expanded to the home directory.
 //
 //	- type: file_template
 //	  src: files/statusline.py
 //	  dest: ~/.claude/statusline.py
-//	  mode: "0755"   # optional; octal string
+//	  mode: "0755"      # optional; octal string
+//	  template: false   # set true to render Go template variables
 
 import (
 	"bytes"
@@ -105,10 +106,12 @@ func (p *fileTemplatePhase) render(ctx *phase.Context) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("file_template: read src %q: %w", p.cfg.Src, err)
 	}
+	if !p.cfg.Template {
+		return raw, nil
+	}
 	tmpl, err := template.New("").Parse(string(raw))
 	if err != nil {
-		// Not a template or parse error; treat file as literal.
-		return raw, nil
+		return nil, fmt.Errorf("file_template: parse template %q: %w", p.cfg.Src, err)
 	}
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, ctx.Identity); err != nil {

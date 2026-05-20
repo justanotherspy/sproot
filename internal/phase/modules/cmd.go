@@ -33,7 +33,12 @@ type cmdPhase struct {
 }
 
 func (p *cmdPhase) Type() string { return "cmd" }
-func (p *cmdPhase) Name() string { return "cmd" }
+func (p *cmdPhase) Name() string {
+	if p.cfg.Name != "" {
+		return fmt.Sprintf("cmd(%s)", p.cfg.Name)
+	}
+	return "cmd"
+}
 
 func (p *cmdPhase) ShouldRun(_ *phase.Context) (bool, error) {
 	if p.cfg.Check == "" {

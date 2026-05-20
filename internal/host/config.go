@@ -12,6 +12,7 @@ import (
 
 const configSkeleton = `config_repo: ""
 config_ref: main
+config_path: ""       # optional; path to sproot.yaml within the config repo
 token_env: SPRITE_TOKEN
 gh_token_env: ""
 default_org: ""

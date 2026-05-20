@@ -30,11 +30,10 @@ Installs system packages via `apt-get`.
 
 ```yaml
 - type: apt
-  apt:
-    packages:
-      - git
-      - curl
-      - vim
+  packages:
+    - git
+    - curl
+    - vim
 ```
 
 **Idempotency:** checks `dpkg -s <pkg>` for each package; skips the phase if all are already installed.
@@ -49,11 +48,10 @@ Installs Python tools via `uv tool install`.
 
 ```yaml
 - type: uv_tool
-  uv_tool:
-    tools:
-      - name: ruff
-      - name: pyright
-      - name: black
+  tools:
+    - name: ruff
+    - name: pyright
+    - name: black
 ```
 
 **Idempotency:** checks that each tool binary is on PATH.
@@ -68,12 +66,11 @@ Installs Go tools via `go install`.
 
 ```yaml
 - type: go_install
-  go_install:
-    tools:
-      - pkg: golang.org/x/tools/cmd/goimports
-        version: latest
-      - pkg: github.com/golangci/golangci-lint/v2/cmd/golangci-lint
-        version: v2.1.6
+  tools:
+    - pkg: golang.org/x/tools/cmd/goimports
+      version: latest
+    - pkg: github.com/golangci/golangci-lint/v2/cmd/golangci-lint
+      version: v2.1.6
 ```
 
 **Fields:**
@@ -92,15 +89,14 @@ Installs Rust tools via `cargo install`.
 
 ```yaml
 - type: cargo_install
-  cargo_install:
-    tools:
-      - name: ripgrep
-      - name: cargo-edit
-        version: "0.12.2"
-        locked: true
-      - name: sccache
-        features:
-          - dist-client
+  tools:
+    - name: ripgrep
+    - name: cargo-edit
+      version: "0.12.2"
+      locked: true
+    - name: sccache
+      features:
+        - dist-client
 ```
 
 **Fields:**
@@ -121,11 +117,12 @@ Downloads and installs a binary from a GitHub release.
 
 ```yaml
 - type: binary_release
-  binary_release:
-    name: cosign
-    repo: sigstore/cosign
-    asset: "cosign_{version}_{arch}.deb"
-    install: dpkg
+  name: cosign
+  repo: sigstore/cosign
+  asset: "cosign_{version}_{arch}.deb"
+  install: dpkg
+  checksum: ""         # optional: sha256 hex of the downloaded asset
+  checksum_asset: ""   # optional: asset name template for a checksums file
 ```
 
 **Fields:**
@@ -133,6 +130,8 @@ Downloads and installs a binary from a GitHub release.
 - `repo`: `owner/repo` on GitHub
 - `asset`: asset filename template (see template variables below)
 - `install`: one of `dpkg`, `tar+install`, or `raw`
+- `checksum`: optional sha256 hex string; verified against the downloaded asset before install
+- `checksum_asset`: optional asset name template (e.g. `{name}_{version}_checksums.txt`) for a goreleaser-style checksums file; sproot downloads it, finds the matching line, and verifies
 
 **Asset template variables:**
 - `{version}`: latest release tag (e.g. `v2.4.1`)
@@ -155,8 +154,7 @@ Enables corepack and pre-activates the listed package managers.
 
 ```yaml
 - type: corepack
-  corepack:
-    managers: [pnpm, yarn]
+  managers: [pnpm, yarn]
 ```
 
 **Fields:**
@@ -174,8 +172,7 @@ Pins the stable Rust toolchain and installs the listed components.
 
 ```yaml
 - type: rust_components
-  rust_components:
-    components: [clippy, rustfmt, rust-analyzer]
+  components: [clippy, rustfmt, rust-analyzer]
 ```
 
 **Fields:**
@@ -195,7 +192,6 @@ Installs Docker via the official install script.
 
 ```yaml
 - type: docker
-  docker: {}
 ```
 
 Downloads and runs `https://get.docker.com`. Use `file_template` to manage `/etc/docker/daemon.json` if needed.
@@ -212,11 +208,10 @@ Registers a long-running service with the sprite-env daemon.
 
 ```yaml
 - type: sprite_service
-  sprite_service:
-    service: dockerd
-    cmd: /usr/bin/dockerd
-    args:
-      - --host=unix:///var/run/docker.sock
+  service: dockerd
+  cmd: /usr/bin/dockerd
+  args:
+    - --host=unix:///var/run/docker.sock
 ```
 
 **Fields:**
@@ -236,11 +231,10 @@ Configures global git identity and optional additional git settings.
 
 ```yaml
 - type: git_identity
-  git_identity:
-    config:
-      pull.rebase: "true"
-      push.autoSetupRemote: "true"
-      core.editor: vim
+  config:
+    pull.rebase: "true"
+    push.autoSetupRemote: "true"
+    core.editor: vim
 ```
 
 Always sets `user.name`, `user.email`, and `init.defaultBranch` from the top-level `identity` block. The optional `config` map lets the config repo apply any additional git settings without sproot prescribing them.
@@ -261,13 +255,15 @@ Generates a fresh ed25519 keypair and registers it with GitHub.
 
 - Generates `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub` if absent
 - Sets permissions on the private key (0600)
-- Registers the public key with GitHub as both an authentication key and a signing key using `GH_TOKEN` (set via the `env` block)
+- Registers the public key with GitHub as both an authentication key and a signing key using `GH_TOKEN` (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config`)
 - Runs `ssh-keyscan -H github.com` and appends to `~/.ssh/known_hosts`
 - Appends the user's key to `~/.ssh/allowed_signers` with the `namespaces="git"` constraint
 
 The GitHub key IDs are logged for use by `sproot destroy` when cleaning up the sprite account (Phase 5). If `GH_TOKEN` is not set, key generation and local setup proceed but GitHub registration is skipped with a warning.
 
 **Idempotency:** checks that `~/.ssh/id_ed25519` exists and `~/.ssh/known_hosts` contains the github.com host key.
+
+**Required GitHub token scopes:** `admin:public_key`, `admin:ssh_signing_key`
 
 ---
 
@@ -279,11 +275,11 @@ Authenticates `gh` (GitHub CLI) by persisting credentials from `GH_TOKEN`.
 - type: gh_token
 ```
 
-Reads `GH_TOKEN` from the environment (injected via the `env` block in `sproot.yaml`) and pipes it to `gh auth login --with-token --git-protocol ssh`. After this runs, `gh` works from stored credentials in `~/.config/gh/hosts.yml` without needing `GH_TOKEN` set in future sessions.
+Reads `GH_TOKEN` from the environment (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config`) and pipes it to `gh auth login --hostname github.com --git-protocol ssh --with-token`. After this runs, `gh` works from stored credentials in `~/.config/gh/hosts.yml` without needing `GH_TOKEN` set in future sessions.
 
 **Idempotency:** checks `gh auth status -h github.com` exits 0 and the logged-in user matches `identity.gh_username`.
 
-**Requires:** `GH_TOKEN` set in the sprite environment via the `env` block. Required scopes: `admin:public_key`, `admin:ssh_signing_key`.
+**Requires:** `GH_TOKEN` set in the sprite environment. Required scope: `repo`.
 
 ---
 
@@ -293,18 +289,17 @@ Copies or renders a file from the config repo to a destination path.
 
 ```yaml
 - type: file_template
-  file_template:
-    src: files/gitconfig
-    dest: ~/.gitconfig
-    mode: "0644"
-    template: true
+  src: files/gitconfig
+  dest: ~/.gitconfig
+  mode: "0644"
+  template: true   # set true to render Go template variables
 ```
 
 **Fields:**
 - `src`: path relative to the config repo root
 - `dest`: destination path (`~` is expanded)
 - `mode`: optional file permissions (default: `0644`)
-- `template`: optional; if true, executes `src` as a Go template with `ctx.Identity` as data
+- `template`: optional; when `true`, executes `src` as a Go template with `ctx.Identity` as data. When `false` (the default), the file is copied as-is.
 
 **Template data fields:** `GitUserName`, `GitUserEmail`, `GitDefaultBranch`, `GHUsername`
 
@@ -318,8 +313,7 @@ Injects a managed shell block into `.bashrc` and `.zshrc`.
 
 ```yaml
 - type: rc_block
-  rc_block:
-    src: rc.sh
+  src: rc.sh
 ```
 
 **Fields:**
@@ -344,11 +338,10 @@ Clones GitHub repositories into a base directory.
 
 ```yaml
 - type: repo_clone
-  repo_clone:
-    base_dir: ~/repos
-    repos:
-      - justanotherspy/sproot
-      - justanotherspy/sprite
+  base_dir: ~/repos
+  repos:
+    - justanotherspy/sproot
+    - justanotherspy/sprite
 ```
 
 **Fields:**
@@ -367,12 +360,11 @@ Deep-merges settings into `~/.claude/settings.json`.
 
 ```yaml
 - type: claude_settings
-  claude_settings:
-    settings:
-      theme: dark
-      autoApprove: true
-      env:
-        ANTHROPIC_SMALL_FAST_MODEL: claude-haiku-4-5-20251001
+  settings:
+    theme: dark
+    autoApprove: true
+    env:
+      ANTHROPIC_SMALL_FAST_MODEL: claude-haiku-4-5-20251001
 ```
 
 **Fields:**
@@ -390,16 +382,15 @@ Runs an arbitrary shell command.
 
 ```yaml
 - type: cmd
-  cmd:
-    run: "curl -fsSL https://example.com/install.sh | sh"
-    check: "which mytool"
-    name: "Install mytool"
+  run: "curl -fsSL https://example.com/install.sh | sh"
+  check: "which mytool"
+  name: "install-mytool"   # optional; shown as cmd(install-mytool) in status output
 ```
 
 **Fields:**
 - `run`: shell command to execute (passed to `sh -c`)
 - `check`: optional shell command; if it exits 0, the phase is skipped
-- `name`: optional display name
+- `name`: optional display name; when set, the phase appears as `cmd(name)` in status output. Useful when multiple `cmd` phases are present.
 
 **Idempotency:** if `check` is provided, skips when it exits 0. Without `check`, always runs.
 
