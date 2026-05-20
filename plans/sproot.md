@@ -159,109 +159,27 @@ Status: lives in a separate repo, not visible here.
 
 ---
 
-### Phase 8: Doc accuracy fixes (PARTIALLY DONE, bugs exist)
+### Phase 8: Doc accuracy fixes and Q1-Q5 code improvements (DONE)
 
-Docs exist but contain errors found in the external review. Items below are confirmed fixes (no open questions blocking them).
+Merged PR #17 on 2026-05-20.
 
-#### 8a. `docs/modules.md`: all 17 YAML examples use wrong nested form (CRITICAL)
+**Q1 (env block): Implemented (option 1).** `RunNew` now clones the config repo before creating the sprite, reads the `env` block from `sproot.yaml`, resolves each `from` var via `os.Getenv`, fails hard if `required: true` and the var is unset, and appends resolved vars to the env slice forwarded to `sproot setup`. The existing `gh_token_env` forwarding is preserved as a baseline.
 
-Every example shows `- type: apt\n  apt:\n    packages:` but the unmarshaler decodes the flat node directly. The nested sub-key has no matching field; values silently stay at zero, causing validation errors like `src is required`. Fix: rewrite all 17 YAML blocks to use flat form as in `internal/config/testdata/sproot.yaml`.
+**Q2 (file_template opt-in): Added `Template bool` (option 2).** Go template rendering is now opt-in via `template: true` in the phase config. Without it the file is copied as-is. Prevents silent substitution of unintended `{{...}}` patterns.
 
-#### 8b. `README.md` commands table: `sproot config validate` description is wrong
+**Q3 (cmd name field): Added (option 1).** `CmdConfig` gains `name: string`. `Name()` returns `cmd(foo)` when set, making multiple `cmd` phases distinguishable in status output.
 
-Current: "Validate host config and sproot.yaml". Correct: only validates `~/.sproot/config`. Add a separate row for `sproot validate [--path PATH]` which validates `sproot.yaml`.
+**Q4 (binary_release checksums): Both options shipped.** `BinaryReleaseConfig` gains `checksum` (direct sha256 hex) and `checksum_asset` (goreleaser-style checksums file template, e.g. `{repo}_{version}_checksums.txt`). Both are optional; either is verified after download and before install.
 
-#### 8c. `README.md` "How it works" step 2 is misleading
+**Q5 (validate commands): Partially combined.** `sproot validate` now also validates `~/.sproot/config` when the file exists, in addition to `sproot.yaml`. The README commands table was corrected to distinguish `config validate` (host config only) from `validate` (sproot.yaml + host config if present).
 
-Current: "Resolves tokens from your environment (`FLY_API_TOKEN`, `GITHUB_TOKEN`, etc.)" -- these names are not hardcoded. Reword to: "Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config` (`token_env` and `gh_token_env`)."
-
-#### 8d. `README.md` host config example missing `config_path`
-
-`HostConfig` has `ConfigPath` but the README example omits it. Add as a commented optional field. Also add to `configSkeleton` in `internal/host/config.go`.
-
-#### 8e. `CLAUDE.md`: phase table is stale
-
-Phase 7 and Phase 8 are shown as not done but are shipped (partially). Update: mark 7 done, mark 8 partial. Add note: "Phase 8 doc accuracy tracked in plans/findings.md."
-
-#### 8f. `CLAUDE.md`: CI section undercounts jobs
-
-"Two jobs run on every push" is wrong. `ci.yml` has three: `build-and-test`, `validate`, `lint`. `integration.yml` adds a build job and six matrix integration tests (owner only). Update both.
-
-#### 8g. `CLAUDE.md`: directory layout missing `docs/` and `testdata/integration/`
-
-Add:
-```
-docs/                - user-facing docs (modules.md, etc.)
-testdata/integration/ - integration test config used by integration.yml
-```
-
-#### 8h. `docs/modules.md` `gh_token`: required scopes listed under wrong module
-
-`admin:public_key` and `admin:ssh_signing_key` are needed by `ssh_setup`, not `gh_token`. Move or duplicate to the `ssh_setup` section.
-
-#### 8i. `docs/modules.md` `gh_token` and `ssh_setup`: env block reference is wrong
-
-Both sections say `GH_TOKEN` is "injected via the env block". It is not: it arrives via `gh_token_env` in `~/.sproot/config` forwarded by `RunNew`. Fix both references.
-
-#### 8j. `docs/modules.md` `gh_token`: flags in example differ from code (nit)
-
-Docs: `gh auth login --with-token --git-protocol ssh`. Code: `gh auth login --hostname github.com --git-protocol ssh --with-token`. Add `--hostname github.com` to the docs.
-
----
-
-### Phase 8 open questions (must answer before acting on these items)
-
-**Q1: `env` block (finding 3)**
-
-Schema, parsing, and validation exist for `env:` in `sproot.yaml` but nothing reads the parsed values at runtime. `GH_TOKEN` arrives via `gh_token_env` in `~/.sproot/config`.
-
-Options:
-1. **Implement it**: `RunNew` reads `sproot.yaml` from the config repo before creating the sprite, resolves each `from` env var via `os.Getenv`, fails if `required: true` and unset, builds the env slice passed to `sproot setup`. The `env` block then replaces the `gh_token_env` forwarding logic over time.
-2. **Drop it**: remove `EnvVar`, the `Env` field on `SprootConfig`, the validation cases, the testdata entries, and the docs section.
-3. **Mark as future**: leave parsing in place, add a TODO comment in `schema.go`, note in `docs/modules.md` that the block parses but does nothing yet.
-
-Recommendation: option 1 is the most flexible and makes the architecture cleaner (generic env forwarding vs. a single hardcoded `GH_TOKEN` field). Option 2 is safe if the single-token model is sufficient indefinitely. Option 3 is confusing in the interim.
-
-**Q2: `file_template` `template:` flag (finding 2)**
-
-`FileTemplateConfig` has no `Template` field. `render()` always attempts `template.Parse` and falls back silently to literal on parse error. This means a file with `{{ .GitUserName }}` (unintentional) will be substituted.
-
-Options:
-1. **Document the actual behavior**: always-attempt with fallback; no flag. Lower effort.
-2. **Add `Template bool`**: gate template parsing on the field; literal by default. Safer.
-
-Recommendation: option 2 prevents silent surprises. Add `Template bool \`yaml:"template"\`` to `FileTemplateConfig`, gate parse on it.
-
-**Q3: `cmd` module `name` field (finding 4)**
-
-Docs show a `name:` field but `CmdConfig` has none. `cmdPhase.Name()` always returns `"cmd"`. Multiple `cmd` phases in one `sproot.yaml` are indistinguishable in state output.
-
-Options:
-1. **Add `Name string \`yaml:"name"\``**: `cmdPhase.Name()` returns `fmt.Sprintf("cmd(%s)", p.cfg.Name)` when set, else `"cmd"`. Matches the pattern of `binary_release(cosign)` and `file_template(<dest>)`.
-2. **Drop from docs**.
-
-Recommendation: option 1 is unambiguously useful when using multiple `cmd` phases.
-
-**Q4: `binary_release` checksum verification (finding 7c)**
-
-`downloadAsset` pulls artifacts with no verification. sproot itself uses cosign for releases.
-
-Options:
-1. **Add optional `checksum:` field** (sha256 hex string) to `BinaryReleaseConfig`. Verify before installing. Update schema, template logic, run flow, docs.
-2. **Add optional `checksum_asset:` field** (template like `{repo}_{version}_checksums.txt`), download the checksums file, parse and verify.
-3. **Known tradeoff**: leave as-is, noting the gap in docs.
-
-Recommendation: option 1 is the pragmatic fix for high-value tools. Option 2 handles the common goreleaser/cosign pattern where a checksums file is published.
-
-**Q5: Combining validate commands (finding 5a)**
-
-`sproot config validate` validates only `~/.sproot/config`. `sproot validate` validates `sproot.yaml` only. The README conflates them.
-
-Options:
-1. **Keep separate**: fix the README description only (already captured in 8b).
-2. **Combine**: `sproot validate [--config PATH] [--sproot-yaml PATH]` checks both files when both flags present.
-
-Recommendation: keep separate. They validate different things used at different times.
+Doc fixes shipped (8a-8j):
+- All 15 nested YAML examples in `docs/modules.md` rewritten to flat form
+- `admin:public_key`/`admin:ssh_signing_key` scopes moved from `gh_token` to `ssh_setup` section
+- `GH_TOKEN` env reference corrected in `gh_token` and `ssh_setup` sections
+- `gh auth login` example updated with `--hostname github.com`
+- README commands table fixed, `config_path` added to host config example
+- `CLAUDE.md` phase table, CI section, and directory layout updated
 
 ---
 
@@ -463,31 +381,26 @@ A skill that takes an existing setup script (bash or other) as input and generat
 
 ## Open questions summary
 
-| # | Area | Question | Blocks |
-|---|------|----------|--------|
-| Q1 | `env` block | Implement, drop, or mark as future? | 8i, arch of env forwarding |
-| Q2 | `file_template` | Add `Template bool` opt-in or document always-attempt? | 8a (fixing the example anyway) |
-| Q3 | `cmd` `name` field | Add field or drop from docs? | 8a (fixing the example anyway) |
-| Q4 | `binary_release` checksums | Add optional `checksum:` field or known tradeoff? | 9d |
-| Q5 | validate commands | Keep `config validate` and `validate` separate (recommended) or combine? | 8b |
-| Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 |
-| Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a |
+| # | Area | Question | Blocks | Status |
+|---|------|----------|--------|--------|
+| Q1 | `env` block | Implement, drop, or mark as future? | 8i, arch of env forwarding | DONE: implemented (option 1) in PR #17 |
+| Q2 | `file_template` | Add `Template bool` opt-in or document always-attempt? | 8a | DONE: `Template bool` added (option 2) in PR #17 |
+| Q3 | `cmd` `name` field | Add field or drop from docs? | 8a | DONE: field added (option 1) in PR #17 |
+| Q4 | `binary_release` checksums | Add optional `checksum:` field or known tradeoff? | 9d | DONE: both `checksum` and `checksum_asset` added in PR #17 |
+| Q5 | validate commands | Keep separate or combine? | 8b | DONE: partially combined; `sproot validate` now also validates host config if present, in PR #17 |
+| Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 | OPEN |
+| Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a | OPEN |
 
 ---
 
 ## Suggested order of execution
 
-Once open questions are answered:
-
-1. **Phase 8 doc fixes** (no questions blocking 8b-8j): 8b, 8c, 8d, 8e, 8f, 8g, 8h, 8i, 8j.
-2. **Phase 8a** (YAML format fix for all 17 modules): biggest user-visible doc impact.
-3. **Phase 9 bug fixes** (no questions blocking): 9a, 9b, 9c, 9d, 9e, 9f.
-4. **Phase 10** (cross-arch injection fix): depends on answer to Q6; affects all non-Linux users.
-5. **Question-dependent changes**: Q2 (file_template), Q3 (cmd name), Q1 (env block), Q4 (binary_release checksums).
-6. **Phase 11 UX** (11a through 11i): independent; can be picked off one at a time.
-7. **Phase 12 SDK alignment** (12a-12d): review SDK docs first.
-8. **Phase 13 multi-target and push** (13a-13c): architecture changes; coordinate with Phase 6 (sprite config repo).
-9. **Phase 14 intelligence** (14a-14c): after everything else is stable.
+1. **Phase 9 bug fixes** (no questions blocking): 9a, 9b, 9c, 9d, 9e, 9f.
+2. **Phase 10** (cross-arch injection fix): depends on answer to Q6; affects all non-Linux users.
+3. **Phase 11 UX** (11a through 11i): independent; can be picked off one at a time.
+4. **Phase 12 SDK alignment** (12a-12d): review SDK docs first.
+5. **Phase 13 multi-target and push** (13a-13c): architecture changes; coordinate with Phase 6 (sprite config repo).
+6. **Phase 14 intelligence** (14a-14c): after everything else is stable.
 
 After each batch of changes: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
 
