@@ -16,6 +16,7 @@ import (
 type SetupOptions struct {
 	ConfigRepo string
 	Ref        string
+	ConfigPath string // path to config file within the cloned repo; defaults to "sproot.yaml"
 	Only       string
 	Force      bool
 	DryRun     bool
@@ -51,13 +52,17 @@ func RunSetup(opts SetupOptions) error {
 		return fmt.Errorf("clone config repo: %w", err)
 	}
 
-	cfg, err := config.LoadSprootConfig(filepath.Join(destDir, "sproot.yaml"))
+	configFile := opts.ConfigPath
+	if configFile == "" {
+		configFile = "sproot.yaml"
+	}
+	cfg, err := config.LoadSprootConfig(filepath.Join(destDir, configFile))
 	if err != nil {
-		return fmt.Errorf("load sproot.yaml: %w", err)
+		return fmt.Errorf("load %s: %w", configFile, err)
 	}
 
 	if err := config.ValidateSprootConfig(cfg); err != nil {
-		return fmt.Errorf("invalid sproot.yaml: %w", err)
+		return fmt.Errorf("invalid %s: %w", configFile, err)
 	}
 
 	phases := make([]phase.Phase, 0, len(cfg.Phases)+1)

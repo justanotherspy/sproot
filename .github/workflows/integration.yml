@@ -1,0 +1,85 @@
+name: integration
+
+on:
+  pull_request:
+
+# Integration jobs only run for the repo owner; they create real sprites and
+# require the SPRITE_TOKEN secret which is not available to other contributors.
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6.4.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: build
+        run: GOOS=linux GOARCH=amd64 go build -o sproot ./cmd/sproot
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sproot-linux-amd64
+          path: sproot
+          retention-days: 1
+
+  integration:
+    name: test ${{ matrix.name }}
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: apt
+            only: apt
+          - name: git-identity
+            only: git_identity
+          - name: file-template
+            only: file_template
+          - name: rc-block
+            only: rc_block
+          - name: claude-settings
+            only: claude_settings
+          - name: cmd
+            only: cmd
+    env:
+      SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_repo: https://github.com/${{ github.repository }}.git"
+            echo "config_ref: ${{ github.head_ref }}"
+            echo "config_path: testdata/integration/sproot.yaml"
+            echo "token_env: SPRITE_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config
+
+      - name: create sprite and run setup
+        run: |
+          ./sproot new spr-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }} \
+            --only ${{ matrix.only }}
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        run: |
+          ./sproot destroy spr-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}

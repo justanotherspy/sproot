@@ -22,6 +22,7 @@ func newNewCmd() *cobra.Command {
 	cmd.Flags().IntVar(&opts.RamMB, "ram-mb", 0, "RAM in MB for the sprite (0 uses default)")
 	cmd.Flags().IntVar(&opts.CPUs, "cpus", 0, "CPU count for the sprite (0 uses default)")
 	cmd.Flags().StringVar(&opts.Region, "region", "", "region for the sprite (empty uses default)")
+	cmd.Flags().StringVar(&opts.ConfigPath, "config-path", "", "path to config file within the repo (overrides host config)")
 	cmd.Flags().StringVar(&opts.Only, "only", "", "run only phases matching this type")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "re-run phases even if already complete")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")

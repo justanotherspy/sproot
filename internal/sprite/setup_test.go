@@ -8,13 +8,19 @@ import (
 	"testing"
 )
 
-// newLocalRepo creates a bare-enough git repo in dir with a minimal sproot.yaml
+// newLocalRepo creates a bare-enough git repo with sproot.yaml at the root
 // and returns a file:// URL pointing to it.
 func newLocalRepo(t *testing.T, sprootYAML string) string {
 	t.Helper()
+	return newLocalRepoAt(t, "sproot.yaml", sprootYAML)
+}
+
+// newLocalRepoAt creates a git repo with the config file at relPath
+// and returns a file:// URL pointing to it.
+func newLocalRepoAt(t *testing.T, relPath, content string) string {
+	t.Helper()
 	dir := t.TempDir()
 
-	// Configure git identity for this repo only.
 	run := func(args ...string) {
 		t.Helper()
 		cmd := exec.Command("git", args...)
@@ -35,11 +41,15 @@ func newLocalRepo(t *testing.T, sprootYAML string) string {
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "Test")
 
-	if err := os.WriteFile(filepath.Join(dir, "sproot.yaml"), []byte(sprootYAML), 0o644); err != nil {
+	fullPath := filepath.Join(dir, filepath.FromSlash(relPath))
+	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	run("add", "sproot.yaml")
+	run("add", ".")
 	run("commit", "-m", "init")
 
 	return "file://" + dir
@@ -90,6 +100,45 @@ func TestRunSetup_Status_NoStateFile(t *testing.T) {
 	err := RunSetup(SetupOptions{Status: true})
 	if err != nil {
 		t.Fatalf("RunSetup --status with no state file: %v", err)
+	}
+}
+
+func TestRunSetup_CustomConfigPath(t *testing.T) {
+	repoURL := newLocalRepoAt(t, "configs/dev.yaml", minimalSprootYAML)
+
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpHome, ".config"))
+
+	err := RunSetup(SetupOptions{
+		ConfigRepo: repoURL,
+		Ref:        "main",
+		ConfigPath: "configs/dev.yaml",
+		DryRun:     true,
+	})
+	if err != nil {
+		t.Fatalf("RunSetup with custom config path: %v", err)
+	}
+}
+
+func TestRunSetup_CustomConfigPath_NotFound(t *testing.T) {
+	repoURL := newLocalRepo(t, minimalSprootYAML)
+
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpHome, ".config"))
+
+	err := RunSetup(SetupOptions{
+		ConfigRepo: repoURL,
+		Ref:        "main",
+		ConfigPath: "nonexistent/path.yaml",
+		DryRun:     true,
+	})
+	if err == nil {
+		t.Fatal("expected error for missing config file")
+	}
+	if !strings.Contains(err.Error(), "nonexistent/path.yaml") {
+		t.Errorf("error should mention the config path, got: %v", err)
 	}
 }
 

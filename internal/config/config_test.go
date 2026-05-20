@@ -633,7 +633,6 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		{"missing_config_repo", func(c *HostConfig) { c.ConfigRepo = "" }, "config_repo is required"},
 		{"missing_config_ref", func(c *HostConfig) { c.ConfigRef = "" }, "config_ref is required"},
 		{"missing_token_env", func(c *HostConfig) { c.TokenEnv = "" }, "token_env is required"},
-		{"missing_gh_token_env", func(c *HostConfig) { c.GHTokenEnv = "" }, "gh_token_env is required"},
 	}
 
 	for _, tc := range cases {
@@ -648,6 +647,33 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 				t.Errorf("error %q does not contain %q", err.Error(), tc.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateHostConfig_EmptyGHTokenEnvIsValid(t *testing.T) {
+	cfg := &HostConfig{
+		ConfigRepo: "git@github.com:user/repo.git",
+		ConfigRef:  "main",
+		TokenEnv:   "SPRITE_TOKEN",
+		GHTokenEnv: "",
+	}
+	if err := ValidateHostConfig(cfg); err != nil {
+		t.Errorf("expected no error with empty gh_token_env, got: %v", err)
+	}
+}
+
+func TestLoadHostConfig_TokenEnvDefault(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/config"
+	if err := writeFile(t, path, "config_repo: git@github.com:u/r.git\nconfig_ref: main\n"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadHostConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.TokenEnv != "SPRITE_TOKEN" {
+		t.Errorf("TokenEnv default: got %q, want SPRITE_TOKEN", cfg.TokenEnv)
 	}
 }
 

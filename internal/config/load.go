@@ -33,6 +33,9 @@ func LoadHostConfig(path string) (*HostConfig, error) {
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing host config: %w", err)
 	}
+	if cfg.TokenEnv == "" {
+		cfg.TokenEnv = "SPRITE_TOKEN"
+	}
 	return &cfg, nil
 }
 

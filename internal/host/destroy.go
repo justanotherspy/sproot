@@ -55,9 +55,12 @@ func RunDestroy(ctx context.Context, opts DestroyOptions) error {
 
 	if ghToken != "" {
 		data, err := handle.ReadFile(ghKeyIDsSpritePath)
-		if err != nil {
+		switch {
+		case os.IsNotExist(err):
+			l.Info("no SSH keys registered in this sprite, skipping key cleanup")
+		case err != nil:
 			l.Warnf("could not read GitHub key IDs from sprite: %v", err)
-		} else {
+		default:
 			var ids modules.GHKeyIDs
 			if err := json.Unmarshal(data, &ids); err != nil {
 				l.Warnf("could not parse GitHub key IDs: %v", err)

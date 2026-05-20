@@ -1,0 +1,33 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Reference config for the integration test workflow.
+# Each CI job runs a single phase via --only <type>.
+# Add a phase here and a matrix entry in .github/workflows/integration.yml
+# to test a new module type.
+phases:
+  - type: apt
+    packages: [jq, curl]
+
+  - type: git_identity
+
+  - type: file_template
+    src: testdata/integration/files/hello.sh
+    dest: /tmp/sproot-test-hello.sh
+    mode: "0755"
+
+  - type: rc_block
+    src: testdata/integration/files/rc_block.sh
+
+  - type: claude_settings
+    settings:
+      theme: dark
+      autoUpdaterStatus: disabled
+
+  - type: cmd
+    run: "echo 'integration test complete'"

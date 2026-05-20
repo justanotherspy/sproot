@@ -149,8 +149,5 @@ func ValidateHostConfig(cfg *HostConfig) error {
 	if cfg.TokenEnv == "" {
 		errs = append(errs, errors.New("token_env is required"))
 	}
-	if cfg.GHTokenEnv == "" {
-		errs = append(errs, errors.New("gh_token_env is required"))
-	}
 	return errors.Join(errs...)
 }

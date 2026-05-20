@@ -13,13 +13,14 @@ import (
 
 // NewOptions controls the behavior of RunNew.
 type NewOptions struct {
-	Name   string
-	RamMB  int
-	CPUs   int
-	Region string
-	Only   string
-	Force  bool
-	DryRun bool
+	Name       string
+	RamMB      int
+	CPUs       int
+	Region     string
+	ConfigPath string // path to config file within the repo; overrides host config; empty uses host config or "sproot.yaml"
+	Only       string
+	Force      bool
+	DryRun     bool
 
 	client SpritesClient // nil: constructed from token at runtime (test injection point)
 }
@@ -44,9 +45,12 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	if token == "" {
 		return fmt.Errorf("env var %s (token_env) is not set", cfg.TokenEnv)
 	}
-	ghToken := os.Getenv(cfg.GHTokenEnv)
-	if ghToken == "" {
-		return fmt.Errorf("env var %s (gh_token_env) is not set", cfg.GHTokenEnv)
+	var ghToken string
+	if cfg.GHTokenEnv != "" {
+		ghToken = os.Getenv(cfg.GHTokenEnv)
+		if ghToken == "" {
+			l.Warnf("%s (gh_token_env) is not set; GitHub features will be unavailable", cfg.GHTokenEnv)
+		}
 	}
 
 	client := opts.client
@@ -85,7 +89,15 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return fmt.Errorf("inject sproot binary: %w", err)
 	}
 
+	configPath := opts.ConfigPath
+	if configPath == "" {
+		configPath = cfg.ConfigPath
+	}
+
 	args := []string{"setup", "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef}
+	if configPath != "" {
+		args = append(args, "--config-path", configPath)
+	}
 	if opts.Only != "" {
 		args = append(args, "--only", opts.Only)
 	}
@@ -96,7 +108,10 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		args = append(args, "--dry-run")
 	}
 
-	env := []string{"GH_TOKEN=" + ghToken}
+	var env []string
+	if ghToken != "" {
+		env = []string{"GH_TOKEN=" + ghToken}
+	}
 
 	l.Infof("running setup in sprite %s", opts.Name)
 	return handle.RunCommand("sproot", args, env, os.Stdout, os.Stderr)
