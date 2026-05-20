@@ -3,8 +3,8 @@ name: integration
 on:
   pull_request:
 
-# Skip for fork PRs: they cannot access repo secrets.
-# Remove this condition once you have a strategy for fork secret sharing.
+# Integration jobs only run for the repo owner; they create real sprites and
+# require the SPRITE_TOKEN secret which is not available to other contributors.
 
 permissions:
   contents: read
@@ -33,7 +33,7 @@ jobs:
   integration:
     name: test ${{ matrix.name }}
     needs: build
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.user.login == 'justanotherspy'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
