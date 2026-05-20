@@ -55,7 +55,31 @@ func (p *sshSetupPhase) ShouldRun(_ *phase.Context) (bool, error) {
 		return true, nil
 	}
 	kh := filepath.Join(home, ".ssh", "known_hosts")
-	return !checkCmd("ssh-keygen", "-F", "github.com", "-f", kh), nil
+	if !checkCmd("ssh-keygen", "-F", "github.com", "-f", kh) {
+		return true, nil
+	}
+	// Return true if the local pubkey is missing from allowed_signers.
+	pubBytes, err := os.ReadFile(key + ".pub")
+	if err != nil {
+		return true, nil
+	}
+	pubKey := strings.TrimSpace(string(pubBytes))
+	signersPath := filepath.Join(home, ".ssh", "allowed_signers")
+	signersData, err := os.ReadFile(signersPath)
+	if err != nil || !strings.Contains(string(signersData), pubKey) {
+		return true, nil
+	}
+	// Return true if GH_TOKEN is set but GitHub keys were never registered.
+	if os.Getenv("GH_TOKEN") != "" {
+		keysPath, err := GHKeyIDsPath()
+		if err != nil {
+			return true, nil
+		}
+		if _, err := os.Stat(keysPath); os.IsNotExist(err) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (p *sshSetupPhase) Run(ctx *phase.Context) error {

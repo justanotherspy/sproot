@@ -1,10 +1,12 @@
 package sprite
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"
@@ -89,8 +91,17 @@ func RunSetup(opts SetupOptions) error {
 
 // cloneOrPull clones repoURL at ref into dest. If dest already contains a git
 // repository it fetches and checks out the requested ref instead.
+// If the recorded remote URL differs from repoURL, the remote is updated first.
 func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 	if _, err := os.Stat(filepath.Join(dest, ".git")); err == nil {
+		if current, err := gitOutput("-C", dest, "remote", "get-url", "origin"); err == nil {
+			if strings.TrimSpace(current) != repoURL {
+				l.Infof("config_repo URL changed; updating remote to %s", repoURL)
+				if err := runGit("-C", dest, "remote", "set-url", "origin", repoURL); err != nil {
+					return fmt.Errorf("update remote URL: %w", err)
+				}
+			}
+		}
 		l.Infof("updating config repo at %s", dest)
 		if err := runGit("-C", dest, "fetch", "--prune", "origin"); err != nil {
 			return err
@@ -113,4 +124,16 @@ func runGit(args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// gitOutput runs git and returns its trimmed stdout.
+func gitOutput(args ...string) (string, error) {
+	var buf bytes.Buffer
+	cmd := exec.Command("git", args...)
+	cmd.Stdout = &buf
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }

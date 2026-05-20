@@ -1,12 +1,17 @@
 package sprite
 
 import (
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/justanotherspy/sproot/pkg/log"
 )
+
+func newTestLogger() *log.Logger { return log.New(io.Discard) }
 
 // newLocalRepo creates a bare-enough git repo with sproot.yaml at the root
 // and returns a file:// URL pointing to it.
@@ -139,6 +144,42 @@ func TestRunSetup_CustomConfigPath_NotFound(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "nonexistent/path.yaml") {
 		t.Errorf("error should mention the config path, got: %v", err)
+	}
+}
+
+// TestCloneOrPull_UpdatesRemoteURL covers the 9f fix: if the recorded remote URL
+// differs from the requested one, cloneOrPull updates it before fetching.
+func TestCloneOrPull_UpdatesRemoteURL(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not on PATH")
+	}
+
+	// Create the original upstream repo.
+	origURL := newLocalRepo(t, minimalSprootYAML)
+
+	dest := t.TempDir()
+	l := newTestLogger()
+
+	// Initial clone.
+	if err := cloneOrPull(l, origURL, "main", dest); err != nil {
+		t.Fatalf("initial clone: %v", err)
+	}
+
+	// Create a second repo to serve as the new origin.
+	newURL := newLocalRepo(t, minimalSprootYAML)
+
+	// cloneOrPull with the new URL: should update origin and fetch successfully.
+	if err := cloneOrPull(l, newURL, "main", dest); err != nil {
+		t.Fatalf("cloneOrPull after URL change: %v", err)
+	}
+
+	// Confirm the recorded remote is now the new URL.
+	out, err := gitOutput("-C", dest, "remote", "get-url", "origin")
+	if err != nil {
+		t.Fatalf("git remote get-url: %v", err)
+	}
+	if strings.TrimSpace(out) != newURL {
+		t.Errorf("remote origin: got %q, want %q", strings.TrimSpace(out), newURL)
 	}
 }
 

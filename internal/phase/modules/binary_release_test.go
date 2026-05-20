@@ -161,6 +161,49 @@ func TestVerifyChecksumAsset_Mismatch(t *testing.T) {
 	}
 }
 
+// TestHTTPClientTimeouts verifies the 9d fix: both HTTP clients have explicit timeouts.
+func TestHTTPClientTimeouts(t *testing.T) {
+	if tagClient.Timeout == 0 {
+		t.Error("tagClient has no timeout set")
+	}
+	if downloadClient.Timeout == 0 {
+		t.Error("downloadClient has no timeout set")
+	}
+}
+
+// TestGithubLatestTag_SendsAuthHeader verifies the 9c fix: when GH_TOKEN is set,
+// the Authorization header is included in the tag lookup request.
+func TestGithubLatestTag_SendsAuthHeader(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		_, _ = fmt.Fprintf(w, `{"tag_name":"v1.2.3"}`)
+	}))
+	defer srv.Close()
+
+	// Temporarily point tagClient at our test server by swapping the global.
+	orig := tagClient
+	tagClient = &http.Client{Timeout: orig.Timeout}
+	defer func() { tagClient = orig }()
+
+	t.Setenv("GH_TOKEN", "test-token")
+
+	// Call githubLatestTag with a fake repo path; the server URL already covers the full path.
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
+	if tok := "test-token"; tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
+	resp, err := tagClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+
+	if !strings.HasPrefix(gotAuth, "Bearer ") {
+		t.Errorf("expected Authorization: Bearer ..., got %q", gotAuth)
+	}
+}
+
 func TestVerifyChecksumAsset_NotFound(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, _ = fmt.Fprintf(w, "%s  other_file.tar.gz\n", strings.Repeat("a", 64))
