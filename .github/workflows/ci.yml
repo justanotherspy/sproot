@@ -69,15 +69,10 @@ jobs:
         run: pip install semgrep
 
       - name: Semgrep
-        id: semgrep
         run: semgrep --config auto --sarif --sarif-output semgrep.sarif .
-        continue-on-error: true
 
       - name: Upload SARIF
+        if: always()
         uses: github/codeql-action/upload-sarif@7fd177fa680c9881b53cdab4d346d32574c9f7f4 # v3.35.4
         with:
           sarif_file: semgrep.sarif
-
-      - name: Fail on findings
-        if: steps.semgrep.outcome == 'failure'
-        run: exit 1

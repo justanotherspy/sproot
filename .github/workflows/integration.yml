@@ -63,23 +63,35 @@ jobs:
         run: chmod +x sproot
 
       - name: write host config
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/${{ github.repository }}.git"
-            echo "config_ref: ${{ github.head_ref }}"
+            echo "config_repo: https://github.com/$REPO.git"
+            echo "config_ref: $HEAD_REF"
             echo "config_path: testdata/integration/sproot.yaml"
             echo "token_env: SPRITE_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config
 
       - name: create sprite and run setup
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+          MATRIX_ONLY: ${{ matrix.only }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new spr-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }} \
-            --only ${{ matrix.only }}
+          ./sproot new "spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}" \
+            --only "$MATRIX_ONLY"
 
       - name: destroy sprite
         if: always()
         continue-on-error: true
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot destroy spr-${{ matrix.name }}-${{ github.run_id }}-${{ github.run_attempt }}
+          ./sproot destroy "spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}"
