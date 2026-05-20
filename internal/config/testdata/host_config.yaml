@@ -1,4 +1,5 @@
 config_repo: git@github.com:justanotherspy/sprite.git
 config_ref: main
-private_key: ~/.sproot/private/id_ed25519
+token_env: FLY_API_TOKEN
+gh_token_env: GITHUB_TOKEN
 default_org: ""

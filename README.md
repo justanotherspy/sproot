@@ -8,10 +8,12 @@ sproot bootstraps [sprite.dev](https://sprite.dev) sprites from a user-owned con
 sproot new my-sprite
 ```
 
-1. Reads `~/.sproot/config` for your config repo URL and SSH key path
-2. Creates a new sprite via `sprite create`
-3. Copies your SSH key and the sproot binary into the sprite
-4. Runs `sproot setup` inside the sprite, which clones your config repo and executes each phase
+1. Reads `~/.sproot/config` for your config repo URL and token env var names
+2. Resolves tokens from your environment (`FLY_API_TOKEN`, `GITHUB_TOKEN`, etc.)
+3. Creates a new sprite via the sprites-go SDK
+4. Injects the sproot binary into the sprite at `/usr/local/bin/sproot`
+5. Runs `sproot setup` inside the sprite with `GH_TOKEN` forwarded, which clones your config repo and executes each phase
+6. The `ssh_setup` phase generates a fresh ed25519 keypair, registers it with GitHub using `GH_TOKEN`, and records the key IDs for cleanup
 
 Each phase is idempotent. Re-running setup is safe.
 
@@ -51,9 +53,7 @@ See [docs/modules.md](docs/modules.md) for all module types.
 
 ```
 ~/.sproot/
-├── config           # YAML: config_repo, config_ref, private_key
-└── private/
-    └── id_ed25519   # SSH key loaded into each sprite
+└── config           # YAML: config_repo, token_env, gh_token_env
 ```
 
 `~/.sproot/config` format:
@@ -61,9 +61,12 @@ See [docs/modules.md](docs/modules.md) for all module types.
 ```yaml
 config_repo: git@github.com:yourname/sprite.git
 config_ref: main
-private_key: ~/.sproot/private/id_ed25519
+token_env: FLY_API_TOKEN    # name of env var holding your Fly/sprites API token
+gh_token_env: GITHUB_TOKEN  # name of env var holding your GitHub PAT
 default_org: ""
 ```
+
+The config stores environment variable **names**, not token values. Tokens stay in your shell environment (e.g. exported from your password manager or `.profile`). Each sprite generates its own SSH keypair; `sproot destroy` removes it from GitHub automatically.
 
 Initialize with:
 

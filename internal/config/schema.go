@@ -32,10 +32,13 @@ type Identity struct {
 }
 
 // HostConfig is the struct for ~/.sproot/config, the per-machine host file.
+// TokenEnv and GHTokenEnv hold environment variable *names*, not token values.
+// At runtime sproot reads os.Getenv(TokenEnv) to obtain the actual token.
 type HostConfig struct {
 	ConfigRepo string `yaml:"config_repo"`
 	ConfigRef  string `yaml:"config_ref"`
-	PrivateKey string `yaml:"private_key"`
+	TokenEnv   string `yaml:"token_env"`    // env var name holding the Fly/sprites API token
+	GHTokenEnv string `yaml:"gh_token_env"` // env var name holding the GitHub PAT
 	DefaultOrg string `yaml:"default_org"`
 }
 
