@@ -32,3 +32,4 @@ Flags:
 12. make config setup interactive to ask for the details we need and validate at the end always. then make a non-interactive flag
 13. have a detailed explanation of what scopes are needed on the gh token at minimum (cloning repos for eg), and if we want to do an ssh key we need extra scopes
 14. what values are allowed for ram-mb and region? if left off we should defer to the api choices.
+15. we should have a sproot list which is a sprite list but only shows us sprites setup by sproot. we can add labels to all sprites that show that it was made by sproot
