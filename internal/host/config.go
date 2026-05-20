@@ -12,8 +12,8 @@ import (
 
 const configSkeleton = `config_repo: ""
 config_ref: main
-token_env: FLY_API_TOKEN
-gh_token_env: GITHUB_TOKEN
+token_env: SPRITE_TOKEN
+gh_token_env: ""
 default_org: ""
 `
 

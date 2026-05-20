@@ -101,7 +101,31 @@ gh_token_env: MY_GH_TOKEN
 	}
 }
 
-func TestRunNew_GHTokenEnvUnset(t *testing.T) {
+func TestRunNew_NoGHToken_Succeeds(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{Name: "test", client: client})
+	if err != nil {
+		t.Fatalf("expected success without gh_token_env, got: %v", err)
+	}
+	for _, e := range handle.lastCmdEnv {
+		if strings.HasPrefix(e, "GH_TOKEN=") {
+			t.Errorf("GH_TOKEN should not be forwarded when not configured, got: %v", handle.lastCmdEnv)
+		}
+	}
+}
+
+func TestRunNew_GHTokenEnvSetButEmpty_Succeeds(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
@@ -113,9 +137,17 @@ gh_token_env: MY_GH_TOKEN
 	t.Setenv("MY_TOKEN", "fly-tok")
 	t.Setenv("MY_GH_TOKEN", "")
 
-	err := RunNew(context.Background(), NewOptions{Name: "test"})
-	if err == nil || !strings.Contains(err.Error(), "MY_GH_TOKEN") {
-		t.Errorf("expected gh token env error, got %v", err)
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{Name: "test", client: client})
+	if err != nil {
+		t.Fatalf("expected success when gh token env var is empty, got: %v", err)
+	}
+	for _, e := range handle.lastCmdEnv {
+		if strings.HasPrefix(e, "GH_TOKEN=") {
+			t.Errorf("GH_TOKEN should not be forwarded when empty, got: %v", handle.lastCmdEnv)
+		}
 	}
 }
 
@@ -161,6 +193,85 @@ gh_token_env: MY_GH_TOKEN
 	}
 	if !found {
 		t.Errorf("GH_TOKEN not forwarded in env: %v", handle.lastCmdEnv)
+	}
+}
+
+func TestRunNew_ForwardsConfigPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:       "my-sprite",
+		ConfigPath: "configs/dev.yaml",
+		client:     client,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if !containsSeq(handle.lastCmdArgs, "--config-path", "configs/dev.yaml") {
+		t.Errorf("--config-path not forwarded: %v", handle.lastCmdArgs)
+	}
+}
+
+func TestRunNew_ConfigPathFromHostConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+config_path: infra/sproot.yaml
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:   "my-sprite",
+		client: client,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if !containsSeq(handle.lastCmdArgs, "--config-path", "infra/sproot.yaml") {
+		t.Errorf("--config-path from host config not forwarded: %v", handle.lastCmdArgs)
+	}
+}
+
+func TestRunNew_CLIConfigPathOverridesHostConfig(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+config_path: infra/sproot.yaml
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:       "my-sprite",
+		ConfigPath: "override.yaml",
+		client:     client,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if !containsSeq(handle.lastCmdArgs, "--config-path", "override.yaml") {
+		t.Errorf("CLI --config-path should override host config: %v", handle.lastCmdArgs)
 	}
 }
 

@@ -30,6 +30,10 @@ func (p *ghTokenPhase) Type() string { return "gh_token" }
 func (p *ghTokenPhase) Name() string { return "gh_token" }
 
 func (p *ghTokenPhase) ShouldRun(ctx *phase.Context) (bool, error) {
+	if os.Getenv("GH_TOKEN") == "" {
+		ctx.Log.Warn("gh_token: GH_TOKEN not set, skipping")
+		return false, nil
+	}
 	if !checkCmd("gh", "auth", "status", "-h", "github.com") {
 		return true, nil
 	}
@@ -48,8 +52,8 @@ func (p *ghTokenPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 func (p *ghTokenPhase) Run(ctx *phase.Context) error {
 	token := os.Getenv("GH_TOKEN")
 	if token == "" {
-		return fmt.Errorf("gh_token: GH_TOKEN is not set; " +
-			"add it to the env block in sproot.yaml or export it before running setup")
+		ctx.Log.Warn("gh_token: GH_TOKEN not set, skipping GitHub authentication")
+		return nil
 	}
 
 	cmd := ghLoginCmd(token)
@@ -74,6 +78,9 @@ func ghLoginCmd(token string) *exec.Cmd {
 }
 
 func (p *ghTokenPhase) Verify(ctx *phase.Context) error {
+	if os.Getenv("GH_TOKEN") == "" {
+		return nil
+	}
 	if !checkCmd("gh", "auth", "status", "-h", "github.com") {
 		return fmt.Errorf("gh_token: gh auth status failed after login")
 	}

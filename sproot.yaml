@@ -1,0 +1,19 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Minimal reference config used by the integration test workflow.
+# Each CI job runs a single phase via --only <type>.
+# Add phases here to enable new test matrix entries.
+phases:
+  - type: apt
+    packages: [jq, curl]
+
+  - type: git_identity
+
+  - type: cmd
+    run: "echo 'integration test complete'"

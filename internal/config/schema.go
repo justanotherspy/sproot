@@ -37,7 +37,8 @@ type Identity struct {
 type HostConfig struct {
 	ConfigRepo string `yaml:"config_repo"`
 	ConfigRef  string `yaml:"config_ref"`
-	TokenEnv   string `yaml:"token_env"`    // env var name holding the Fly/sprites API token
+	ConfigPath string `yaml:"config_path"` // path to config file within the repo; defaults to "sproot.yaml"
+	TokenEnv   string `yaml:"token_env"`   // env var name holding the Fly/sprites API token
 	GHTokenEnv string `yaml:"gh_token_env"` // env var name holding the GitHub PAT
 	DefaultOrg string `yaml:"default_org"`
 }
