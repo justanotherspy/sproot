@@ -183,56 +183,21 @@ Doc fixes shipped (8a-8j):
 
 ---
 
-### Phase 9: Bug fixes
+### Phase 9: Bug fixes (DONE)
 
-These are real behavior bugs found in the external review. Can land independently.
+Merged PR #18 on 2026-05-20. All six items fixed with unit tests added for each.
 
-#### 9a. `rc_block` `ShouldRun` only checks `.bashrc` (BUG)
+**9a. `rc_block` `ShouldRun` checks both shells.** `ShouldRun` now iterates `.bashrc` and `.zshrc` and returns true if either is missing or has a stale hash, matching the two-file write in `Run`. Previously only `.bashrc` was checked, causing `Verify` to fail on `.zshrc` after `ShouldRun` returned false.
 
-`ShouldRun` reads only `~/.bashrc` for the block hash. `Run` writes both `.bashrc` and `.zshrc`. If `.bashrc` is current but `.zshrc` is missing or stale, `ShouldRun` returns false, `Run` is skipped, then `Verify` fails on `.zshrc`.
+**9b. `rc_block` trailing newline normalised.** `applyRCBlock` ensures `src` ends with `\n` before composing the block, so the end sentinel always appears on its own line regardless of source file content.
 
-Fix: check both `.bashrc` and `.zshrc` in `ShouldRun`. Return true if either is missing or has the wrong hash. Add a test for the case where only one file is stale.
+**9c. `binary_release` GitHub API auth.** `githubLatestTag` now sends `Authorization: Bearer $GH_TOKEN` when the var is set, avoiding the 60 req/hr anonymous rate limit on shared runners.
 
-#### 9b. `rc_block` trailing newline not guaranteed
+**9d. `binary_release` HTTP timeouts.** Two module-level `*http.Client` values replace bare `http.Get` calls: `tagClient` (30s) for API and checksums requests, `downloadClient` (5m) for asset downloads.
 
-`applyRCBlock` formats the block as `"\n%s\n%s%s\n"`. If `src` does not end with `\n`, the end sentinel sits on the same line as the last src line.
+**9e. `ssh_setup` idempotency gap closed.** `ShouldRun` now also returns true when `~/.ssh/allowed_signers` does not contain the local pubkey, or when `GH_TOKEN` is set but `~/.config/sproot/github_keys.json` is absent (key was generated but GitHub registration was skipped on a prior run without the token).
 
-Fix: before composing the block, ensure `src` ends with `\n`:
-```go
-if !strings.HasSuffix(src, "\n") {
-    src += "\n"
-}
-```
-
-#### 9c. `binary_release` unauthenticated GitHub API (7d)
-
-`githubLatestTag` hits `api.github.com` with no auth. Anonymous rate limit is 60 req/hour per IP; on shared CI runners this triggers regularly.
-
-Fix: when `os.Getenv("GH_TOKEN") != ""`, send `Authorization: Bearer $GH_TOKEN`. One-liner change in `githubLatestTag`.
-
-#### 9d. `binary_release` no HTTP timeout (7e)
-
-`http.Get(url)` with no timeout or context. Stalled connections hang the phase indefinitely.
-
-Fix: build an `*http.Client` with timeouts (5 minutes for downloads, 30 seconds for tag lookup). Longer term, thread `context.Context` through `phase.Context` and use `http.NewRequestWithContext`.
-
-#### 9e. `ssh_setup` idempotency gap (7f)
-
-`ShouldRun` only checks that `~/.ssh/id_ed25519` exists and `github.com` is in `known_hosts`. Does not check:
-- That the key is registered on GitHub (`github_keys.json` exists).
-- That `allowed_signers` contains the local pubkey.
-
-Concretely: if a previous run generated the key but `GH_TOKEN` was unset (so GitHub registration was skipped with a warning), the next run with `GH_TOKEN` set will still skip the whole phase. Workaround today is `--force`.
-
-Fix: also return true (should run) if:
-- `GH_TOKEN` is set AND `~/.config/sproot/github_keys.json` does not exist.
-- `~/.ssh/allowed_signers` does not contain the local public key.
-
-#### 9f. Sprite `cloneOrPull` does not handle changed `config_repo` URL (7h, low priority)
-
-If the user changes `config_repo` in `~/.sproot/config`, the next setup still fetches from the old remote.
-
-Fix: before fetching, compare `git remote get-url origin` against `opts.ConfigRepo`. If they differ, either re-clone or `git remote set-url origin <new>`.
+**9f. `cloneOrPull` handles changed remote URL.** Before fetching, `cloneOrPull` compares `git remote get-url origin` against the requested URL. If they differ it runs `git remote set-url origin <new>` so a changed `config_repo` takes effect without requiring `--force` or a manual re-clone.
 
 ---
 
