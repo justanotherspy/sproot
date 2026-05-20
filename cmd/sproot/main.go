@@ -22,6 +22,12 @@ func newRootCmd() *cobra.Command {
 		Long:    "sproot reads a sproot.yaml from your config repo and runs each phase to provision a sprite environment.",
 		Version: version,
 	}
-	root.AddCommand(newSetupCmd())
+	root.AddCommand(
+		newSetupCmd(),
+		newNewCmd(),
+		newDestroyCmd(),
+		newSpriteStatusCmd(),
+		newConfigCmd(),
+	)
 	return root
 }

@@ -324,8 +324,11 @@ func TestLoadHostConfig_HappyPath(t *testing.T) {
 	if cfg.ConfigRef != "main" {
 		t.Errorf("config_ref: got %q", cfg.ConfigRef)
 	}
-	if cfg.PrivateKey != "~/.sproot/private/id_ed25519" {
-		t.Errorf("private_key: got %q", cfg.PrivateKey)
+	if cfg.TokenEnv != "FLY_API_TOKEN" {
+		t.Errorf("token_env: got %q", cfg.TokenEnv)
+	}
+	if cfg.GHTokenEnv != "GITHUB_TOKEN" {
+		t.Errorf("gh_token_env: got %q", cfg.GHTokenEnv)
 	}
 	if cfg.DefaultOrg != "" {
 		t.Errorf("default_org: got %q, want empty", cfg.DefaultOrg)
@@ -617,7 +620,8 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		return &HostConfig{
 			ConfigRepo: "git@github.com:user/repo.git",
 			ConfigRef:  "main",
-			PrivateKey: "~/.sproot/private/id_ed25519",
+			TokenEnv:   "FLY_API_TOKEN",
+			GHTokenEnv: "GITHUB_TOKEN",
 		}
 	}
 
@@ -628,7 +632,8 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 	}{
 		{"missing_config_repo", func(c *HostConfig) { c.ConfigRepo = "" }, "config_repo is required"},
 		{"missing_config_ref", func(c *HostConfig) { c.ConfigRef = "" }, "config_ref is required"},
-		{"missing_private_key", func(c *HostConfig) { c.PrivateKey = "" }, "private_key is required"},
+		{"missing_token_env", func(c *HostConfig) { c.TokenEnv = "" }, "token_env is required"},
+		{"missing_gh_token_env", func(c *HostConfig) { c.GHTokenEnv = "" }, "gh_token_env is required"},
 	}
 
 	for _, tc := range cases {

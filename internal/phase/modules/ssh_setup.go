@@ -23,6 +23,13 @@ import (
 	"github.com/justanotherspy/sproot/internal/phase"
 )
 
+// GHKeyIDs holds the GitHub key IDs registered by ssh_setup, written to disk
+// so that sproot destroy can remove them from the account on cleanup.
+type GHKeyIDs struct {
+	AuthKeyID    int64 `json:"auth_key_id"`
+	SigningKeyID int64 `json:"signing_key_id"`
+}
+
 func init() {
 	phase.Register("ssh_setup", func(cfg config.PhaseConfig) (phase.Phase, error) {
 		return &sshSetupPhase{ghRegister: registerKeyWithGitHub}, nil
@@ -92,6 +99,11 @@ func (p *sshSetupPhase) Run(ctx *phase.Context) error {
 		}
 		ctx.Log.Infof("registered GitHub auth key (id=%d)", authID)
 		ctx.Log.Infof("registered GitHub signing key (id=%d)", signingID)
+		if authID != 0 || signingID != 0 {
+			if err := writeKeyIDs(GHKeyIDs{AuthKeyID: authID, SigningKeyID: signingID}); err != nil {
+				ctx.Log.Warnf("ssh_setup: could not persist key IDs: %v", err)
+			}
+		}
 	}
 
 	keyscanOut, err := outputOf("ssh-keyscan", "-H", "github.com")
@@ -167,6 +179,30 @@ func registerKeyWithGitHub(token, title, pubKey string) (int64, int64, error) {
 		return 0, 0, fmt.Errorf("signing key: %w", err)
 	}
 	return authID, signingID, nil
+}
+
+// GHKeyIDsPath returns the path where ssh_setup writes the registered key IDs.
+func GHKeyIDsPath() (string, error) {
+	dir, err := os.UserConfigDir()
+	if err != nil {
+		return "", fmt.Errorf("could not determine config dir: %w", err)
+	}
+	return filepath.Join(dir, "sproot", "github_keys.json"), nil
+}
+
+func writeKeyIDs(ids GHKeyIDs) error {
+	path, err := GHKeyIDsPath()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return fmt.Errorf("mkdir: %w", err)
+	}
+	data, err := json.MarshalIndent(ids, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal key IDs: %w", err)
+	}
+	return os.WriteFile(path, data, 0o640)
 }
 
 func postGHKey(token, url, title, pubKey string) (int64, error) {

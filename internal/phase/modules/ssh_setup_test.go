@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,6 +116,47 @@ func TestSSHSetup_SkipsGHRegistrationWithoutToken(t *testing.T) {
 	}
 	if called {
 		t.Error("expected ghRegister not to be called when GH_TOKEN is empty")
+	}
+}
+
+func TestSSHSetup_WritesKeyIDs(t *testing.T) {
+	if _, err := exec.LookPath("ssh-keygen"); err != nil {
+		t.Skip("ssh-keygen not on PATH")
+	}
+	if _, err := exec.LookPath("ssh-keyscan"); err != nil {
+		t.Skip("ssh-keyscan not on PATH")
+	}
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	t.Setenv("GH_TOKEN", "fake-token")
+
+	p := &sshSetupPhase{ghRegister: func(_, _, _ string) (int64, int64, error) {
+		return 42, 99, nil
+	}}
+	if err := p.Run(testCtx(t)); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	path, err := GHKeyIDsPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("github_keys.json not written: %v", err)
+	}
+
+	var ids GHKeyIDs
+	if err := json.Unmarshal(data, &ids); err != nil {
+		t.Fatalf("parse github_keys.json: %v", err)
+	}
+	if ids.AuthKeyID != 42 {
+		t.Errorf("auth_key_id: got %d, want 42", ids.AuthKeyID)
+	}
+	if ids.SigningKeyID != 99 {
+		t.Errorf("signing_key_id: got %d, want 99", ids.SigningKeyID)
 	}
 }
 
