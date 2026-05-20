@@ -28,6 +28,7 @@ func newRootCmd() *cobra.Command {
 		newDestroyCmd(),
 		newSpriteStatusCmd(),
 		newConfigCmd(),
+		newValidateCmd(),
 	)
 	return root
 }
