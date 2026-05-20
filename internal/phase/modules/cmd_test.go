@@ -96,3 +96,17 @@ func TestCmd_VerifyCheckFails(t *testing.T) {
 		t.Fatal("expected Verify error when check fails")
 	}
 }
+
+func TestCmd_NamedPhase(t *testing.T) {
+	p := &cmdPhase{cfg: &config.CmdConfig{Run: "true", Name: "mything"}}
+	if got := p.Name(); got != "cmd(mything)" {
+		t.Errorf("Name() = %q, want %q", got, "cmd(mything)")
+	}
+}
+
+func TestCmd_UnnamedPhase(t *testing.T) {
+	p := &cmdPhase{cfg: &config.CmdConfig{Run: "true"}}
+	if got := p.Name(); got != "cmd" {
+		t.Errorf("Name() = %q, want %q", got, "cmd")
+	}
+}

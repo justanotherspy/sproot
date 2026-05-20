@@ -61,3 +61,4 @@ phases:
   - type: cmd
     run: "echo hello"
     check: "true"
+    name: "echo-hello"

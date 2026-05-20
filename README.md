@@ -9,7 +9,7 @@ sproot new my-sprite
 ```
 
 1. Reads `~/.sproot/config` for your config repo URL and token env var names
-2. Resolves tokens from your environment (`FLY_API_TOKEN`, `GITHUB_TOKEN`, etc.)
+2. Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config` (`token_env` and `gh_token_env`)
 3. Creates a new sprite via the sprites-go SDK
 4. Injects the sproot binary into the sprite at `/usr/local/bin/sproot`
 5. Runs `sproot setup` inside the sprite with `GH_TOKEN` forwarded, which clones your config repo and executes each phase
@@ -61,6 +61,7 @@ See [docs/modules.md](docs/modules.md) for all module types.
 ```yaml
 config_repo: git@github.com:yourname/sprite.git
 config_ref: main
+config_path: ""             # optional; path to sproot.yaml within the config repo
 token_env: FLY_API_TOKEN    # name of env var holding your Fly/sprites API token
 gh_token_env: GITHUB_TOKEN  # name of env var holding your GitHub PAT
 default_org: ""
@@ -82,7 +83,8 @@ sproot config init
 | `sproot destroy <name>` | host | Destroy a sprite |
 | `sproot status <name>` | host | Show setup state for a sprite |
 | `sproot config init` | host | Write a skeleton ~/.sproot/config |
-| `sproot config validate` | host | Validate host config and sproot.yaml |
+| `sproot config validate` | host | Validate ~/.sproot/config only |
+| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates ~/.sproot/config) |
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 

@@ -20,14 +20,16 @@ make lint        # golangci-lint run ./...
 ## Directory layout
 
 ```
-cmd/sproot/          - main package and subcommand wiring
-internal/config/     - sproot.yaml and ~/.sproot/config schema + loaders
-internal/phase/      - Phase interface, runner, state, registry
+cmd/sproot/           - main package and subcommand wiring
+internal/config/      - sproot.yaml and ~/.sproot/config schema + loaders
+internal/phase/       - Phase interface, runner, state, registry
 internal/phase/modules/ - one file per module type (apt, uv_tool, etc.)
-internal/host/       - host-side command implementations (new, destroy, status)
-internal/sprite/     - in-sprite command implementations (setup)
-pkg/log/             - structured logger (+/-/!/x visual conventions)
-plans/               - design docs, not shipped
+internal/host/        - host-side command implementations (new, destroy, status)
+internal/sprite/      - in-sprite command implementations (setup)
+pkg/log/              - structured logger (+/-/!/x visual conventions)
+docs/                 - user-facing docs (modules.md)
+testdata/integration/ - integration test config used by integration.yml
+plans/                - design docs, not shipped
 ```
 
 ## Conventions
@@ -57,10 +59,11 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 4 | `sproot setup` (in-sprite command) (done) |
 | 5 | Host CLI commands (new, destroy, status, config) (done) |
 | 6 | Convert justanotherspy/sprite into a config repo |
-| 7 | Release pipeline (goreleaser, sigstore signing) |
-| 8 | Docs |
+| 7 | Release pipeline (goreleaser, sigstore signing) (done) |
+| 8 | Doc accuracy fixes + Q1-Q5 code improvements (partial, see plans/findings.md) |
 
 ## CI
 
-Two jobs run on every push: `build-and-test` and `lint`. Both must pass before merging.
-golangci-lint uses `.golangci.yml` (standard preset).
+Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
+
+`integration.yml` runs on owner-triggered pushes: builds the binary and runs six matrix integration tests against real sprites.

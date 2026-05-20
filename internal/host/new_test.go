@@ -2,6 +2,7 @@ package host
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
@@ -10,6 +11,8 @@ import (
 	"testing"
 
 	sprites "github.com/superfly/sprites-go"
+
+	"github.com/justanotherspy/sproot/pkg/log"
 )
 
 // mockClient implements SpritesClient for testing.
@@ -71,6 +74,10 @@ func (h *mockHandle) RunCommand(name string, args, env []string, _, _ io.Writer)
 	return h.runErr
 }
 
+// noopEnvBlock is an envBlockReaderFn that always returns an empty slice.
+// Used in tests that don't exercise env block logic.
+func noopEnvBlock(_, _, _ string, _ *log.Logger) ([]string, error) { return nil, nil }
+
 func writeHostConfig(t *testing.T, dir, content string) string {
 	t.Helper()
 	path := filepath.Join(dir, "config")
@@ -114,7 +121,7 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	err := RunNew(context.Background(), NewOptions{Name: "test", client: client})
+	err := RunNew(context.Background(), NewOptions{Name: "test", client: client, envBlockReaderFn: noopEnvBlock})
 	if err != nil {
 		t.Fatalf("expected success without gh_token_env, got: %v", err)
 	}
@@ -140,7 +147,7 @@ gh_token_env: MY_GH_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	err := RunNew(context.Background(), NewOptions{Name: "test", client: client})
+	err := RunNew(context.Background(), NewOptions{Name: "test", client: client, envBlockReaderFn: noopEnvBlock})
 	if err != nil {
 		t.Fatalf("expected success when gh token env var is empty, got: %v", err)
 	}
@@ -167,8 +174,9 @@ gh_token_env: MY_GH_TOKEN
 	client := &mockClient{handle: handle}
 
 	err := RunNew(context.Background(), NewOptions{
-		Name:   "my-sprite",
-		client: client,
+		Name:             "my-sprite",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -210,9 +218,10 @@ token_env: MY_TOKEN
 	client := &mockClient{handle: handle}
 
 	err := RunNew(context.Background(), NewOptions{
-		Name:       "my-sprite",
-		ConfigPath: "configs/dev.yaml",
-		client:     client,
+		Name:             "my-sprite",
+		ConfigPath:       "configs/dev.yaml",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -237,8 +246,9 @@ config_path: infra/sproot.yaml
 	client := &mockClient{handle: handle}
 
 	err := RunNew(context.Background(), NewOptions{
-		Name:   "my-sprite",
-		client: client,
+		Name:             "my-sprite",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -263,9 +273,10 @@ config_path: infra/sproot.yaml
 	client := &mockClient{handle: handle}
 
 	err := RunNew(context.Background(), NewOptions{
-		Name:       "my-sprite",
-		ConfigPath: "override.yaml",
-		client:     client,
+		Name:             "my-sprite",
+		ConfigPath:       "override.yaml",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -291,11 +302,12 @@ gh_token_env: MY_GH_TOKEN
 	client := &mockClient{handle: handle}
 
 	err := RunNew(context.Background(), NewOptions{
-		Name:   "my-sprite",
-		Only:   "apt",
-		Force:  true,
-		DryRun: true,
-		client: client,
+		Name:             "my-sprite",
+		Only:             "apt",
+		Force:            true,
+		DryRun:           true,
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -310,6 +322,74 @@ gh_token_env: MY_GH_TOKEN
 	}
 	if !contains(args, "--dry-run") {
 		t.Errorf("--dry-run not forwarded: %v", args)
+	}
+}
+
+func TestRunNew_EnvBlockForwarded(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+	t.Setenv("MY_SECRET", "top-secret")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, error) {
+		return []string{"APP_SECRET=top-secret"}, nil
+	}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "my-sprite",
+		client:           client,
+		envBlockReaderFn: stubEnvBlock,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+
+	found := false
+	for _, e := range handle.lastCmdEnv {
+		if e == "APP_SECRET=top-secret" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("env block entry not forwarded: %v", handle.lastCmdEnv)
+	}
+}
+
+func TestRunNew_EnvBlockRequiredVarMissing(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, error) {
+		return nil, fmt.Errorf("required env var MISSING_VAR (mapped as DEST_VAR) is not set on host")
+	}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "my-sprite",
+		client:           client,
+		envBlockReaderFn: stubEnvBlock,
+	})
+	if err == nil {
+		t.Fatal("expected error when required env var is missing")
+	}
+	if !strings.Contains(err.Error(), "required") {
+		t.Errorf("error should mention required: %v", err)
 	}
 }
 
