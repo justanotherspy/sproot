@@ -201,23 +201,22 @@ Merged PR #18 on 2026-05-20. All six items fixed with unit tests added for each.
 
 ---
 
-### Phase 10: Binary injection cross-arch fix (CRITICAL BUG from todo.md)
+### Phase 10: Binary injection cross-arch fix (DONE)
 
-`RunNew` reads its own executable and injects it into the sprite:
-```go
-execPath, err := os.Executable()
-binaryData, err := os.ReadFile(execPath)
-handle.WriteFile("/usr/local/bin/sproot", binaryData, 0755)
-```
+Merged PR #21 on 2026-05-20.
 
-Sprites run Linux/amd64. If sproot is run from a macOS arm64 host, the injected binary is Mach-O arm64 and the sprite gets `exec: Exec format error`.
+`RunNew` now auto-detects the host platform at runtime:
 
-Fix: embed the Linux/amd64 binary into the release build using `go:embed`, and inject the embedded binary instead of the host binary. The goreleaser build produces `linux/amd64` already; the embed approach requires either:
-1. A release-time `embed.FS` populated by the build pipeline (complex).
-2. Download the matching Linux/amd64 binary from GitHub releases at `sproot new` time (simpler, requires network, uses version tag).
-3. Require the user to run sproot from a Linux host or a sprite (simplest short term; document the limitation).
+- **Linux/amd64**: reads and injects its own executable (unchanged from before).
+- **Any other platform** (macOS arm64, etc.): downloads the matching Linux/amd64 release tarball from GitHub using the running binary's version, extracts the `sproot` binary, and injects that.
 
-**OPEN QUESTION**: which approach? The todo entry shows this is a real hit (actual error from the user). Options 2 (download the matching version) or 1 (embed in release build) are the correct long-term fix. Option 3 is a doc-only workaround.
+Key details:
+- `internal/host/fetch.go`: `fetchLinuxAmd64Binary(version)` and `extractSprootFromTarGz(r)`.
+  - Returns a clear error when `version == "dev"` (no release to download).
+  - Handles binary at tarball top level or inside a goreleaser-style prefixed directory.
+- `NewOptions.binarySrcFn` injection point (`func(version string) ([]byte, error)`) lets tests override binary sourcing without platform detection.
+- `NewOptions.Version` carries the build version from `main.version` (set by goreleaser ldflags).
+- Q6 resolved: option 2 (download at runtime).
 
 ---
 
@@ -353,7 +352,7 @@ A skill that takes an existing setup script (bash or other) as input and generat
 | Q3 | `cmd` `name` field | Add field or drop from docs? | 8a | DONE: field added (option 1) in PR #17 |
 | Q4 | `binary_release` checksums | Add optional `checksum:` field or known tradeoff? | 9d | DONE: both `checksum` and `checksum_asset` added in PR #17 |
 | Q5 | validate commands | Keep separate or combine? | 8b | DONE: partially combined; `sproot validate` now also validates host config if present, in PR #17 |
-| Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 | OPEN |
+| Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 | DONE: download at runtime (option 2) in PR #21 |
 | Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a | OPEN |
 
 ---

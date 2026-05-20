@@ -1,6 +1,7 @@
 package host
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -390,6 +391,76 @@ token_env: MY_TOKEN
 	}
 	if !strings.Contains(err.Error(), "required") {
 		t.Errorf("error should mention required: %v", err)
+	}
+}
+
+func TestRunNew_BinarySrcFnCalled(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+	fetchCalled := false
+	fakeBinary := []byte("linux-amd64-binary")
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "test-sprite",
+		Version:          "1.2.3",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
+		binarySrcFn: func(version string) ([]byte, error) {
+			fetchCalled = true
+			if version != "1.2.3" {
+				t.Errorf("binarySrcFn: got version %q, want 1.2.3", version)
+			}
+			return fakeBinary, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if !fetchCalled {
+		t.Error("expected binarySrcFn to be called")
+	}
+	if !bytes.Equal(handle.writtenFiles["/usr/local/bin/sproot"], fakeBinary) {
+		t.Errorf("injected binary mismatch: got %q, want %q",
+			handle.writtenFiles["/usr/local/bin/sproot"], fakeBinary)
+	}
+}
+
+func TestRunNew_BinarySrcFnError(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "test-sprite",
+		Version:          "dev",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
+		binarySrcFn: func(_ string) ([]byte, error) {
+			return nil, fmt.Errorf("dev build: no release available")
+		},
+	})
+	if err == nil {
+		t.Fatal("expected error from binarySrcFn")
+	}
+	if !strings.Contains(err.Error(), "dev build") {
+		t.Errorf("error should mention dev build, got: %v", err)
 	}
 }
 
