@@ -93,14 +93,14 @@ phases:
 
 **`~/.sproot/config`** shape:
 ```yaml
-token: <sprite.dev API token>
 config_repo: git@github.com:justanotherspy/sprite.git
 config_ref: main
-private_key: ~/.sproot/private/id_ed25519
+token_env: FLY_API_TOKEN    # env var name holding the Fly/sprites API token
+gh_token_env: GITHUB_TOKEN  # env var name holding the GitHub PAT
 default_org: ""
 ```
 
-Note: `token` was not in the original schema. It must be added before Phase 5 work begins (update `HostConfig` in `schema.go` and `validate.go`).
+The config stores environment variable **names**, not token values. `sproot` calls `os.Getenv(name)` at runtime. This keeps secrets out of the config file and lets each machine use whatever token source it prefers (password manager export, `.profile`, CI secret, etc.).
 
 ---
 
@@ -144,50 +144,37 @@ Note: `token` was not in the original schema. It must be added before Phase 5 wo
 
 ---
 
-### Phase 4: `sproot setup` (in-sprite command)
+### Phase 4: `sproot setup` (in-sprite command) (DONE)
 
-The command that runs inside the sprite.
-
-**Deliverables:**
-- `cmd/sproot/setup.go`:
-  - Flags: `--config-repo`, `--ref`, `--only`, `--force`, `--status`, `--dry-run`
-  - Clones `--config-repo` to `~/.sproot/config-repo/` (or pulls if present)
-  - Loads `sproot.yaml`, validates, runs phases
-  - Returns non-zero on failure
-- A built-in `verify` phase that runs last: checks commands on PATH, file modes, rc block content, gh auth, ssh to github.com. Same coverage as the current `_lib_verify.sh`.
-
-**Acceptance:** invoked manually inside a fresh sprite with a known-good config, produces a working environment matching current `setup.sh` output. `sproot setup --status` dumps the state file as a table.
+**What was built:**
+- `cmd/sproot/setup.go`: cobra command with flags `--config-repo` (required), `--ref`, `--only`, `--force`, `--dry-run`, `--status`
+- `internal/sprite/setup.go`: `RunSetup` clones or pulls the config repo, loads and validates `sproot.yaml`, builds phase objects, appends the built-in verify phase, and runs the phase runner
+- `internal/sprite/verify.go`: built-in verify phase checks PATH commands (git, gh, go, cargo, uv, docker, node, pnpm, rustup), SSH key permissions, RC block presence, `gh auth status`, and SSH connectivity to github.com
+- `internal/sprite/status.go`: `PrintStatus` loads the state file and renders a formatted table (type, name, status, ran-at, error)
+- Also updated `ssh_setup` module: generates a fresh ed25519 keypair inside the sprite (not injected from host), registers it with GitHub using `GH_TOKEN`, and writes the auth/signing key IDs to `~/.config/sproot/github_keys.json` for cleanup on destroy
 
 ---
 
-### Phase 5: Host CLI commands
+### Phase 5: Host CLI commands (DONE)
 
-The commands the user runs on their laptop. All sprite interaction uses the `github.com/superfly/sprites-go` SDK directly, not the `sprite` CLI.
+**Auth design (differs from original plan):**
+- No private key on the host. Each sprite generates its own keypair via `ssh_setup`.
+- `HostConfig` stores env var **names** (`token_env`, `gh_token_env`), not token values. `sproot` calls `os.Getenv(name)` at runtime to resolve them.
+- `sproot new` forwards `GH_TOKEN` into the sprite via `cmd.Env` so `ssh_setup` can register the generated key with GitHub.
+- `sproot destroy` reads the key IDs from `/root/.config/sproot/github_keys.json` in the sprite (written by `ssh_setup`), deletes them from GitHub using the host's GH token, then destroys the sprite.
 
-**sprites-go integration:**
-- `sprites.New(token)` constructs the client from `~/.sproot/config`'s `token` field
-- `client.CreateSprite(ctx, name, *SpriteConfig)` for sprite creation (config allows optional `ram_mb`, `cpus`, `region`)
-- `sprite.Filesystem().WriteFile(path, data, perm)` injects the SSH key and sproot binary before running setup
-- `sprite.Command("sproot", "setup", ...).Run()` streams setup output with `Stdout`/`Stderr` wired to `os.Stdout`/`os.Stderr`
-- `client.DestroySprite(ctx, name)` for destroy
-- `client.GetSprite(ctx, name)` for status queries
+**What was built:**
+- `internal/config/schema.go`: `HostConfig` replaced `PrivateKey` with `TokenEnv` and `GHTokenEnv`
+- `internal/host/client.go`: `SpritesClient` and `SpriteHandle` interfaces wrapping `sprites-go`; `NewClient(token)` for production use; interfaces enable unit testing without real HTTP calls
+- `internal/host/new.go`: `RunNew` creates sprite, injects sproot binary via `sprite.Filesystem().WriteFile`, runs `sproot setup` with `GH_TOKEN` in env
+- `internal/host/destroy.go`: `RunDestroy` reads GitHub key IDs from sprite filesystem, deletes them via GitHub API (warnings on failure), then calls `client.DestroySprite`
+- `internal/host/status.go`: `RunStatus` streams `sproot setup --status` from the sprite
+- `internal/host/config.go`: `RunConfigInit` writes skeleton config; `RunConfigValidate` loads and validates
+- `cmd/sproot/new.go`, `destroy.go`, `sprite_status.go`, `config.go`: cobra wiring for all four commands
+- `go.mod`: added `github.com/superfly/sprites-go` dependency
+- Full unit test coverage for all host commands; mock `SpritesClient`/`SpriteHandle` in tests
 
-**Deliverables:**
-- `internal/host/`: add `token` field to `HostConfig` (and update `schema.go` + `validate.go`)
-- `sproot new <name>`:
-  - Reads `~/.sproot/config`
-  - Creates sprite via `client.CreateSprite`
-  - Reads `private_key` from disk; injects it at `.ssh/id_ed25519` via `sprite.Filesystem().WriteFile`
-  - Reads the running sproot binary (`os.Executable()`); injects it at `/usr/local/bin/sproot`
-  - Runs `sproot setup --config-repo <url>` via `sprite.Command`, streaming output live
-  - Returns the sprite's exit code
-- `sproot destroy <name>` — calls `client.DestroySprite`. No GitHub-side cleanup needed under the one-key model.
-- `sproot status <name>` — runs `sproot setup --status` via `sprite.Command`, prints the table
-- `sproot config init` — writes a skeleton `~/.sproot/config`
-- `sproot config validate` — validates `~/.sproot/config` and optionally fetches and validates the config repo's `sproot.yaml`
-- Optional `sproot new` flags: `--ram-mb`, `--cpus`, `--region` forwarded into `SpriteConfig`
-
-**Acceptance:** `sproot new my-sprite` produces a working sprite end-to-end against `justanotherspy/sprite` as the config repo. Opening a console on the sprite lands in a usable shell.
+**Acceptance:** `sproot new my-sprite` produces a working sprite end-to-end against `justanotherspy/sprite` as the config repo; `sproot destroy my-sprite` cleans up GitHub SSH keys and removes the sprite.
 
 ---
 

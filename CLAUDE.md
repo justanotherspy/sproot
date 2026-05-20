@@ -52,10 +52,10 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 |-------|-------------|
 | 0 | Scaffold: module, cobra wiring, CI (done) |
 | 1 | Config schema: sproot.yaml and ~/.sproot/config structs + loaders (done) |
-| 2 | Phase engine: runner, state file, registry |
-| 3 | Module implementations (apt, uv_tool, file_template, etc.) |
-| 4 | `sproot setup` (in-sprite command) |
-| 5 | Host CLI commands (new, destroy, status, config) |
+| 2 | Phase engine: runner, state file, registry (done) |
+| 3 | Module implementations (apt, uv_tool, file_template, etc.) (done) |
+| 4 | `sproot setup` (in-sprite command) (done) |
+| 5 | Host CLI commands (new, destroy, status, config) (done) |
 | 6 | Convert justanotherspy/sprite into a config repo |
 | 7 | Release pipeline (goreleaser, sigstore signing) |
 | 8 | Docs |
