@@ -43,6 +43,12 @@ jobs:
             only: apt
           - name: git-identity
             only: git_identity
+          - name: file-template
+            only: file_template
+          - name: rc-block
+            only: rc_block
+          - name: claude-settings
+            only: claude_settings
           - name: cmd
             only: cmd
     env:
