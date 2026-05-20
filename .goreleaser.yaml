@@ -1,0 +1,93 @@
+version: 2
+
+project_name: sproot
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: sproot
+    main: ./cmd/sproot
+    binary: sproot
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: sproot
+    builds:
+      - sproot
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+signs:
+  - id: cosign-keyless
+    cmd: cosign
+    signature: "${artifact}.sigstore.json"
+    args:
+      - sign-blob
+      - --bundle=${signature}
+      - --yes
+      - ${artifact}
+    artifacts: checksum
+    env:
+      - COSIGN_EXPERIMENTAL=1
+
+release:
+  github:
+    owner: justanotherspy
+    name: sproot
+  prerelease: auto
+  draft: false
+  replace_existing_draft: true
+  header: |
+    ## sproot {{ .Version }}
+
+    One-line install:
+    ```sh
+    curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
+    ```
+  footer: |
+    Binaries are signed with [cosign](https://github.com/sigstore/cosign) keyless signing via Sigstore.
+    To verify:
+    ```sh
+    cosign verify-blob \
+      --bundle sproot_{{ .Version }}_checksums.txt.sigstore.json \
+      sproot_{{ .Version }}_checksums.txt
+    ```
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
