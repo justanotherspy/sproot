@@ -61,7 +61,13 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 6 | Convert justanotherspy/sprite into a config repo |
 | 7 | Release pipeline (goreleaser, sigstore signing) (done) |
 | 8 | Doc accuracy fixes + Q1-Q5 code improvements (done) |
-| 9 | Bug fixes (rc_block, binary_release, ssh_setup) |
+| 9 | Bug fixes (rc_block, binary_release, ssh_setup, cloneOrPull) (done) |
+
+## Workflow
+
+- Each phase or feature goes on its own branch and merges via PR. Never push directly to main.
+- Run `make check` before every push (vet + test + lint must all pass).
+- When behavior changes, update the relevant docs in the same PR: `docs/modules.md` for module changes, `README.md` for user-facing command or config changes, `CLAUDE.md` phase table for phase completion, and `plans/sproot.md` for design decisions and phase summaries.
 
 ## CI
 
