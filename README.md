@@ -86,6 +86,42 @@ sproot config init
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
+## Quickstart
+
+**1. Initialize host config:**
+
+```sh
+sproot config init
+```
+
+Edit `~/.sproot/config` and fill in your config repo URL and token env var names.
+
+**2. Validate your config:**
+
+```sh
+sproot config validate
+```
+
+**3. Create a sprite:**
+
+```sh
+sproot new my-sprite
+```
+
+This creates the sprite, injects the sproot binary, and runs `sproot setup` inside it.
+
+**4. Check setup status:**
+
+```sh
+sproot status my-sprite
+```
+
+**5. Tear down:**
+
+```sh
+sproot destroy my-sprite
+```
+
 ## Installation
 
 Binaries are available on the [releases page](https://github.com/justanotherspy/sproot/releases).
@@ -96,6 +132,14 @@ Binaries are available on the [releases page](https://github.com/justanotherspy/
 curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
 ```
 
+The installer detects your OS and architecture, downloads the correct archive, verifies the SHA256 checksum, and places the binary in `/usr/local/bin` (if writable) or `~/.local/bin`.
+
+To install a specific version, set `SPROOT_VERSION`:
+
+```sh
+SPROOT_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
+```
+
 **From source:**
 
 ```sh
@@ -104,13 +148,29 @@ cd sproot
 make install
 ```
 
+Requires Go 1.25+.
+
+## Verifying release signatures
+
+Releases are signed with [cosign](https://github.com/sigstore/cosign) keyless signing via Sigstore. To verify:
+
+```sh
+cosign verify-blob \
+  --bundle sproot_v0.1.0_checksums.txt.sigstore.json \
+  sproot_v0.1.0_checksums.txt
+```
+
+A successful verify confirms the checksum file was signed by the GitHub Actions release workflow for this repository.
+
 ## Development
 
 ```sh
-make build        # build ./sproot
-make test         # run tests
-make check        # vet + test + lint
-make lint         # golangci-lint
+make build              # build ./sproot
+make test               # run tests
+make check              # vet + test + lint
+make lint               # golangci-lint
+make release-check      # validate .goreleaser.yaml syntax
+make release-dry-run    # local snapshot build (requires goreleaser)
 ```
 
 Requires Go 1.25+.

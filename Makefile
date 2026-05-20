@@ -2,7 +2,7 @@ BINARY     := sproot
 CMD        := ./cmd/sproot
 BUILD_FLAGS := -ldflags "-X main.version=$(shell git describe --tags --always --dirty 2>/dev/null || echo dev)"
 
-.PHONY: build test lint vet tidy clean install run fmt check
+.PHONY: build test lint vet tidy clean install run fmt check release-dry-run release-check
 
 build:
 	go build $(BUILD_FLAGS) -o $(BINARY) $(CMD)
@@ -41,3 +41,12 @@ run:
 
 # Run all checks locally before pushing
 check: vet test lint
+
+# Dry-run the release pipeline locally (requires goreleaser in PATH).
+# Skips signing (needs GitHub OIDC) and publishing.
+release-dry-run:
+	goreleaser release --snapshot --clean --skip=publish,sign
+
+# Validate .goreleaser.yaml syntax without building.
+release-check:
+	goreleaser check
