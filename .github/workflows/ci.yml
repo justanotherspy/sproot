@@ -71,6 +71,22 @@ jobs:
       - name: Semgrep
         run: semgrep --config auto --error --sarif --sarif-output semgrep.sarif .
 
+      - name: Strip suppressed findings from SARIF
+        if: always()
+        run: |
+          python3 - <<'EOF'
+          import json, os
+          path = "semgrep.sarif"
+          if not os.path.exists(path):
+              raise SystemExit(0)
+          with open(path) as f:
+              sarif = json.load(f)
+          for run in sarif.get("runs", []):
+              run["results"] = [r for r in run.get("results", []) if not r.get("suppressions")]
+          with open(path, "w") as f:
+              json.dump(sarif, f)
+          EOF
+
       - name: Upload SARIF
         if: always()
         uses: github/codeql-action/upload-sarif@7fd177fa680c9881b53cdab4d346d32574c9f7f4 # v3.35.4
