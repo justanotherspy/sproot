@@ -43,3 +43,6 @@ Flags:
 - test out checkpointing and wrap those commands too, make sproot.yaml decide if we should checkpoint after setup. doing it before is pointless as the checkpoint will just be what is in the base image already
 - make sure that our state is readable from the host easily and shows a summary to the user of what is setup and if there is any out standing module phases.
 - if we can better align our tool with the sdk, improve our sproot yaml and modules and have good documentation we should have a skill we can install for sproot usage
+- update required checks to have specific ones before merging so that auto merge works better
+- consider a claude code review workflow
+- test out the release workflow
