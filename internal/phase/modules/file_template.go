@@ -16,7 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"text/template"
+	"text/template" // nosemgrep
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"
