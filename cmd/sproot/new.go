@@ -21,6 +21,8 @@ func newNewCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().StringVar(&opts.ConfigPath, "config-path", "", "path to config file within the repo (overrides host config)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "named target to run from sproot.yaml (requires targets: block)")
+	cmd.Flags().StringVar(&opts.LocalConfig, "local-config", "", "host directory to use as config source instead of git clone")
 	cmd.Flags().StringVar(&opts.Only, "only", "", "run only phases matching this type")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "re-run phases even if already complete")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")

@@ -51,6 +51,49 @@ phases:
 
 See [docs/modules.md](docs/modules.md) for all module types.
 
+### Multi-target configs
+
+A single `sproot.yaml` can define named targets so one config repo produces several sprite flavors. Use `extends` to inherit phases from another target:
+
+```yaml
+targets:
+  base:
+    phases:
+      - type: apt
+        packages: [curl, git]
+  web:
+    extends: base
+    phases:
+      - type: apt
+        packages: [nginx]
+```
+
+```sh
+sproot new my-web-sprite --target web
+sproot push --target web
+```
+
+A flat `phases:` list (no `targets:`) continues to work unchanged.
+
+### Local config source
+
+For development or generated configs, you can point sproot at a local directory instead of a git repo:
+
+```yaml
+# ~/.sproot/config.yaml
+config_source: local
+config_local_path: ~/my-sprite-config
+token_env: SPRITE_TOKEN
+```
+
+Or pass it inline:
+
+```sh
+sproot new my-sprite --local-config ~/my-sprite-config
+```
+
+sproot uploads the directory to the sprite and runs setup without a git clone.
+
 ## Host config
 
 ```
@@ -67,6 +110,8 @@ config_path: ""             # optional; path to sproot.yaml within the config re
 token_env: SPRITE_TOKEN     # name of env var holding your sprites API token
 gh_token_env: GITHUB_TOKEN  # name of env var holding your GitHub PAT
 default_org: ""
+# config_source: local      # set to "local" to use a directory instead of a git repo
+# config_local_path: ~/my-sprite-config
 ```
 
 The config stores environment variable **names**, not token values. Tokens stay in your shell environment (e.g. exported from your password manager or `.profile`). Each sprite generates its own SSH keypair; `sproot destroy` removes it from GitHub automatically.
@@ -91,6 +136,7 @@ sproot config init
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
+| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint) |
 | `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
 | `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
 | `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`) |

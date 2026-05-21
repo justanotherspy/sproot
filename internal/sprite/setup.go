@@ -16,13 +16,15 @@ import (
 
 // SetupOptions controls the behavior of RunSetup.
 type SetupOptions struct {
-	ConfigRepo string
-	Ref        string
-	ConfigPath string // path to config file within the cloned repo; defaults to "sproot.yaml"
-	Only       string
-	Force      bool
-	DryRun     bool
-	Status     bool
+	ConfigRepo  string
+	Ref         string
+	ConfigPath  string // path to config file within the cloned repo; defaults to "sproot.yaml"
+	Target      string // named target from sproot.yaml; empty uses default/flat phases
+	LocalConfig string // absolute path to config directory already in the sprite; skips git clone
+	Only        string
+	Force       bool
+	DryRun      bool
+	Status      bool
 }
 
 const defaultConfigRepoDir = "~/.sproot/config-repo"
@@ -41,17 +43,21 @@ func RunSetup(opts SetupOptions) error {
 		return PrintStatus(statePath, os.Stdout)
 	}
 
-	if opts.ConfigRepo == "" {
-		return fmt.Errorf("--config-repo is required")
-	}
-
-	destDir, err := config.ExpandTilde(defaultConfigRepoDir)
-	if err != nil {
-		return fmt.Errorf("expand config repo dir: %w", err)
-	}
-
-	if err := cloneOrPull(l, opts.ConfigRepo, opts.Ref, destDir); err != nil {
-		return fmt.Errorf("clone config repo: %w", err)
+	var destDir string
+	if opts.LocalConfig != "" {
+		destDir = opts.LocalConfig
+	} else {
+		if opts.ConfigRepo == "" {
+			return fmt.Errorf("--config-repo is required")
+		}
+		var err error
+		destDir, err = config.ExpandTilde(defaultConfigRepoDir)
+		if err != nil {
+			return fmt.Errorf("expand config repo dir: %w", err)
+		}
+		if err := cloneOrPull(l, opts.ConfigRepo, opts.Ref, destDir); err != nil {
+			return fmt.Errorf("clone config repo: %w", err)
+		}
 	}
 
 	configFile := opts.ConfigPath
@@ -67,8 +73,13 @@ func RunSetup(opts SetupOptions) error {
 		return fmt.Errorf("invalid %s: %w", configFile, err)
 	}
 
-	phases := make([]phase.Phase, 0, len(cfg.Phases)+1)
-	for _, phaseCfg := range cfg.Phases {
+	resolvedPhases, err := cfg.ResolveTarget(opts.Target)
+	if err != nil {
+		return fmt.Errorf("resolve target: %w", err)
+	}
+
+	phases := make([]phase.Phase, 0, len(resolvedPhases)+1)
+	for _, phaseCfg := range resolvedPhases {
 		p, err := phase.Build(phaseCfg)
 		if err != nil {
 			return fmt.Errorf("build phase %q: %w", phaseCfg.Type, err)

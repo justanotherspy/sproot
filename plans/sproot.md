@@ -271,7 +271,7 @@ Merged PR #23 on 2026-05-21.
 
 ---
 
-### Phase 13: Multi-target and push
+### Phase 13: Multi-target and push (DONE)
 
 #### 13a. Multiple sproot targets in one `sproot.yaml`
 
@@ -309,7 +309,32 @@ Push a config change to all sprites created by sproot (identified by the sproot 
 - `sproot push --target <name>`: push to a specific sprite by name.
 - Run pushes in parallel with progress output.
 
-**OPEN QUESTION**: should `sproot push` checkpoint before updating? Recommendation: yes, always checkpoint before a push so the user can restore if the update breaks something.
+**OPEN QUESTION resolved**: yes, `sproot push` checkpoints before updating by default. Use `--no-checkpoint` to skip.
+
+**Implementation summary (PR #28):**
+
+**13a: Multi-target (done).**
+- `TargetConfig` struct added to `internal/config/schema.go` with `Extends` and `Phases` fields.
+- `SprootConfig.Targets map[string]*TargetConfig` added alongside the existing flat `Phases` field.
+- `(*SprootConfig).ResolveTarget(name string)` resolves a named target with extends inheritance and cycle detection.
+- `ValidateSprootConfig` updated: error if both `phases` and `targets` are set; validates per-target phases using shared `validatePhase` helper; validates `extends` references exist.
+- `SetupOptions.Target` added to `internal/sprite/setup.go`; `RunSetup` calls `ResolveTarget` instead of using `cfg.Phases` directly.
+- `--target` flag added to `sproot setup` and `sproot new`. `NewOptions.Target` appended to setup args.
+- Fixture `internal/config/testdata/sproot_targets.yaml` added; 15+ unit tests cover backward compat, extends chain, cycles, ambiguous configs.
+
+**13b: Local path config source (done).**
+- `ConfigSource` and `ConfigLocalPath` added to `HostConfig`.
+- `ValidateHostConfig` handles `config_source: local` (requires `config_local_path`, relaxes `config_repo`/`config_ref`).
+- `SetupOptions.LocalConfig` added; `RunSetup` skips git clone when set, uses that directory as config repo root.
+- `--local-config` flag added to `sproot setup` and `sproot new`.
+- `readLocalEnvBlock` reads sproot.yaml from a local directory (no clone). `uploadDirectory` walks a host directory and uploads all non-hidden files to the sprite via `WriteFile`.
+- `RunNew` detects local config via `opts.LocalConfig` or `cfg.ConfigSource == "local"`, uploads the directory, and passes `--local-config` to setup.
+
+**13c: `sproot push` (done).**
+- `internal/host/push.go`: `RunPush` lists sproot-managed sprites, checkpoints each (default), then runs `sproot setup --force` in parallel using goroutines. `--name` filters to one sprite, `--target` passes through to setup.
+- `cmd/sproot/push.go`: cobra command with `--name`, `--target`, `--dry-run`, `--no-checkpoint`.
+- `prefixWriter` prepends `[sprite-name]` to all output lines for readability.
+- Unit tests in `internal/host/push_test.go` cover all combinations.
 
 ---
 

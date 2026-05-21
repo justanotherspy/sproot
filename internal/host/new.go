@@ -22,15 +22,18 @@ const sprootLabel = "sproot"
 type NewOptions struct {
 	Name        string
 	ConfigPath  string // path to config file within the repo; overrides host config; empty uses host config or "sproot.yaml"
+	Target      string // named target from sproot.yaml; empty uses default/flat phases
+	LocalConfig string // host directory path to use instead of git clone (overrides config_source in host config)
 	Only        string
 	Force       bool
 	DryRun      bool
 	SkipConsole bool   // skip opening console after successful setup
 	Version     string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
-	client           SpritesClient                                                                     // nil: use real client (test injection point)
-	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readEnvBlock (test injection point)
-	binarySrcFn      func(version string) ([]byte, error)                                               // nil: auto-detect by arch (test injection point)
+	client              SpritesClient                                                                     // nil: use real client (test injection point)
+	envBlockReaderFn    func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readEnvBlock (test injection point)
+	localCfgReaderFn    func(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readLocalEnvBlock (test injection point)
+	binarySrcFn         func(version string) ([]byte, error)                                               // nil: auto-detect by arch (test injection point)
 }
 
 // RunNew creates a sprite, injects the sproot binary, and runs sproot setup inside it.
@@ -61,19 +64,45 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		}
 	}
 
-	// Resolve configPath early so readEnvBlock can find the right yaml file.
+	// Resolve configPath early so readers can find the right yaml file.
 	configPath := opts.ConfigPath
 	if configPath == "" {
 		configPath = cfg.ConfigPath
 	}
 
-	envReader := opts.envBlockReaderFn
-	if envReader == nil {
-		envReader = readEnvBlock
+	// Determine the effective local config directory (flag takes precedence over host config).
+	localConfigDir := opts.LocalConfig
+	if localConfigDir == "" && cfg.ConfigSource == "local" {
+		localConfigDir = cfg.ConfigLocalPath
 	}
-	envBlock, sprootCfg, err := envReader(cfg.ConfigRepo, cfg.ConfigRef, configPath, l)
-	if err != nil {
-		return err
+
+	var (
+		envBlock  []string
+		sprootCfg *config.SprootConfig
+	)
+	if localConfigDir != "" {
+		expanded, err := config.ExpandTilde(localConfigDir)
+		if err != nil {
+			return fmt.Errorf("expand local config path: %w", err)
+		}
+		localConfigDir = expanded
+		localReader := opts.localCfgReaderFn
+		if localReader == nil {
+			localReader = readLocalEnvBlock
+		}
+		envBlock, sprootCfg, err = localReader(localConfigDir, configPath, l)
+		if err != nil {
+			return err
+		}
+	} else {
+		envReader := opts.envBlockReaderFn
+		if envReader == nil {
+			envReader = readEnvBlock
+		}
+		envBlock, sprootCfg, err = envReader(cfg.ConfigRepo, cfg.ConfigRef, configPath, l)
+		if err != nil {
+			return err
+		}
 	}
 
 	client := opts.client
@@ -114,9 +143,25 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return fmt.Errorf("inject sproot binary: %w", err)
 	}
 
-	args := []string{"setup", "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef}
-	if configPath != "" {
-		args = append(args, "--config-path", configPath)
+	var args []string
+	if localConfigDir != "" {
+		const spriteLocalConfigDir = "/tmp/sproot-local-config"
+		l.Infof("uploading local config from %s", localConfigDir)
+		if err := uploadDirectory(handle, localConfigDir, spriteLocalConfigDir); err != nil {
+			return fmt.Errorf("upload local config: %w", err)
+		}
+		args = []string{"setup", "--local-config", spriteLocalConfigDir}
+		if configPath != "" {
+			args = append(args, "--config-path", configPath)
+		}
+	} else {
+		args = []string{"setup", "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef}
+		if configPath != "" {
+			args = append(args, "--config-path", configPath)
+		}
+	}
+	if opts.Target != "" {
+		args = append(args, "--target", opts.Target)
 	}
 	if opts.Only != "" {
 		args = append(args, "--only", opts.Only)
@@ -155,6 +200,69 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return handle.Console(nil)
 	}
 	return nil
+}
+
+// readLocalEnvBlock loads sproot.yaml from a local directory (no git clone),
+// validates it, and resolves the env block. Used when config_source=local.
+func readLocalEnvBlock(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, error) {
+	l.Debugf("reading local config from %s", dir)
+	yamlFile := configPath
+	if yamlFile == "" {
+		yamlFile = "sproot.yaml"
+	}
+	sprootCfg, err := config.LoadSprootConfig(filepath.Join(dir, yamlFile))
+	if err != nil {
+		return nil, nil, fmt.Errorf("readLocalEnvBlock: load sproot.yaml: %w", err)
+	}
+	if err := config.ValidateSprootConfig(sprootCfg); err != nil {
+		return nil, nil, fmt.Errorf("readLocalEnvBlock: validate sproot.yaml: %w", err)
+	}
+	var env []string
+	for _, ev := range sprootCfg.Env {
+		val := os.Getenv(ev.From)
+		if val == "" {
+			if ev.Required {
+				return nil, nil, fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
+			}
+			continue
+		}
+		env = append(env, ev.As+"="+val)
+	}
+	return env, sprootCfg, nil
+}
+
+// uploadDirectory walks srcDir and writes each file to destDir in the sprite,
+// skipping .git and any entry whose name starts with ".".
+func uploadDirectory(handle SpriteHandle, srcDir, destDir string) error {
+	return filepath.Walk(srcDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		name := info.Name()
+		if name == ".git" || (name[0] == '.' && info.IsDir()) {
+			return filepath.SkipDir
+		}
+		if name[0] == '.' {
+			return nil
+		}
+		if info.IsDir() {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", path, err)
+		}
+		rel, err := filepath.Rel(srcDir, path)
+		if err != nil {
+			return err
+		}
+		dest := destDir + "/" + filepath.ToSlash(rel)
+		perm := info.Mode().Perm()
+		if err := handle.WriteFile(dest, data, perm); err != nil {
+			return fmt.Errorf("upload %s: %w", rel, err)
+		}
+		return nil
+	})
 }
 
 // readEnvBlock clones the config repo at configRepo/configRef into a temp dir,

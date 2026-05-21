@@ -15,13 +15,61 @@ type EnvVar struct {
 	Required bool   `yaml:"required"`
 }
 
+// TargetConfig defines a named set of phases in a multi-target sproot.yaml.
+// Extends names another target whose phases are prepended before this target's phases.
+type TargetConfig struct {
+	Extends string        `yaml:"extends"`
+	Phases  []PhaseConfig `yaml:"phases"`
+}
+
 // SprootConfig is the top-level struct for sproot.yaml, found in the config repo.
+// Either Phases or Targets must be set, not both.
+// When Targets is used, sproot new --target <name> selects which target to run.
+// A flat Phases list (no Targets) is treated as a single implicit default target.
 type SprootConfig struct {
-	SchemaVersion      int           `yaml:"schema_version"`
-	Identity           Identity      `yaml:"identity"`
-	Env                []EnvVar      `yaml:"env"`
-	Phases             []PhaseConfig `yaml:"phases"`
-	CheckpointAfterSetup bool        `yaml:"checkpoint_after_setup"`
+	SchemaVersion        int                       `yaml:"schema_version"`
+	Identity             Identity                  `yaml:"identity"`
+	Env                  []EnvVar                  `yaml:"env"`
+	Phases               []PhaseConfig             `yaml:"phases"`
+	Targets              map[string]*TargetConfig  `yaml:"targets"`
+	CheckpointAfterSetup bool                      `yaml:"checkpoint_after_setup"`
+}
+
+// ResolveTarget returns the phases for the named target, applying extends inheritance.
+// When name is empty and Targets is defined, looks for a "default" target; if absent
+// falls back to Phases. When Targets is not defined, returns Phases regardless of name.
+func (c *SprootConfig) ResolveTarget(name string) ([]PhaseConfig, error) {
+	if len(c.Targets) == 0 {
+		return c.Phases, nil
+	}
+	lookup := name
+	if lookup == "" {
+		lookup = "default"
+	}
+	return resolveTargetChain(c.Targets, lookup, nil)
+}
+
+func resolveTargetChain(targets map[string]*TargetConfig, name string, visited []string) ([]PhaseConfig, error) {
+	for _, seen := range visited {
+		if seen == name {
+			return nil, fmt.Errorf("target cycle detected: %s -> %s", visited[len(visited)-1], name)
+		}
+	}
+	t, ok := targets[name]
+	if !ok {
+		return nil, fmt.Errorf("target %q not found", name)
+	}
+	if t.Extends == "" {
+		return t.Phases, nil
+	}
+	parent, err := resolveTargetChain(targets, t.Extends, append(visited, name))
+	if err != nil {
+		return nil, err
+	}
+	combined := make([]PhaseConfig, 0, len(parent)+len(t.Phases))
+	combined = append(combined, parent...)
+	combined = append(combined, t.Phases...)
+	return combined, nil
 }
 
 // Identity holds user identity fields referenced by multiple modules.
@@ -35,13 +83,18 @@ type Identity struct {
 // HostConfig is the struct for ~/.sproot/config.yaml, the per-machine host file.
 // TokenEnv and GHTokenEnv hold environment variable *names*, not token values.
 // At runtime sproot reads os.Getenv(TokenEnv) to obtain the actual token.
+// ConfigSource is "git" (default) or "local". When "local", ConfigLocalPath is
+// a host directory path used instead of a git clone; ConfigRepo and ConfigRef
+// are not required.
 type HostConfig struct {
-	ConfigRepo string `yaml:"config_repo"`
-	ConfigRef  string `yaml:"config_ref"`
-	ConfigPath string `yaml:"config_path"` // path to config file within the repo; defaults to "sproot.yaml"
-	TokenEnv   string `yaml:"token_env"`   // env var name holding the sprites API token
-	GHTokenEnv string `yaml:"gh_token_env"` // env var name holding the GitHub PAT
-	DefaultOrg string `yaml:"default_org"`
+	ConfigRepo      string `yaml:"config_repo"`
+	ConfigRef       string `yaml:"config_ref"`
+	ConfigPath      string `yaml:"config_path"`       // path to config file within the repo; defaults to "sproot.yaml"
+	TokenEnv        string `yaml:"token_env"`         // env var name holding the sprites API token
+	GHTokenEnv      string `yaml:"gh_token_env"`      // env var name holding the GitHub PAT
+	DefaultOrg      string `yaml:"default_org"`
+	ConfigSource    string `yaml:"config_source"`     // "git" (default/empty) or "local"
+	ConfigLocalPath string `yaml:"config_local_path"` // host directory path when config_source=local
 }
 
 // PhaseConfig represents one entry in the phases list. Type is always set.
