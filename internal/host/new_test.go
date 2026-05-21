@@ -31,10 +31,9 @@ func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.Sprite
 	return m.handle, nil
 }
 
-func (m *mockClient) GetHandle(_ string) SpriteHandle                              { return m.handle }
-func (m *mockClient) DestroySprite(_ context.Context, _ string) error             { return m.destroyErr }
-func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error)    { return nil, nil }
-func (m *mockClient) UpgradeSprite(_ context.Context, _ string) error             { return nil }
+func (m *mockClient) GetHandle(_ string) SpriteHandle                           { return m.handle }
+func (m *mockClient) DestroySprite(_ context.Context, _ string) error           { return m.destroyErr }
+func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error)  { return nil, nil }
 
 // mockHandle records calls for assertions.
 type mockHandle struct {
@@ -80,8 +79,6 @@ func (h *mockHandle) RunCommand(name string, args, env []string, _, _ io.Writer)
 }
 
 func (h *mockHandle) Console(_ []string) error { return h.runErr }
-
-func (h *mockHandle) Upgrade(_ context.Context) error { return nil }
 
 func (h *mockHandle) Checkpoint(_ context.Context, _ string, _ io.Writer) error {
 	h.checkpointDone = true
@@ -526,7 +523,7 @@ token_env: MY_TOKEN
 		client:           client,
 		envBlockReaderFn: stubEnv,
 		binarySrcFn:      func(_ string) ([]byte, error) { return []byte("bin"), nil },
-		NoConsole:        true,
+		SkipConsole:      true,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)
@@ -554,7 +551,7 @@ token_env: MY_TOKEN
 		client:           client,
 		envBlockReaderFn: noopEnvBlock,
 		binarySrcFn:      func(_ string) ([]byte, error) { return []byte("bin"), nil },
-		NoConsole:        true,
+		SkipConsole:      true,
 	})
 	if err != nil {
 		t.Fatalf("RunNew: %v", err)

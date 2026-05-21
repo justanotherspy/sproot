@@ -228,7 +228,7 @@ Merged PR #22 on 2026-05-21.
 
 **11b (token scope docs): Deferred.** Low-priority doc-only change; can be added alongside Phase 12 SDK docs.
 
-**11c (`sproot new` opens console): Done.** After `sproot setup` completes successfully, `RunNew` opens an interactive TTY shell. `--no-console` and `--dry-run` both skip the console step.
+**11c (`sproot new` opens console): Done.** After `sproot setup` completes successfully, `RunNew` opens an interactive TTY shell. `--skip-console` and `--dry-run` both skip the console step.
 
 **11d (`sproot console <name>`): Done.** `internal/host/console.go` + `cmd/sproot/console.go`. Opens `bash` with TTY on the named sprite. Terminal size is read from the host; raw mode is enabled when stdin is a TTY.
 
@@ -257,7 +257,7 @@ Merged PR #23 on 2026-05-21.
 
 **12b: SDK audit (done).**
 - Audited all sprites-go SDK methods against sproot usage. All calls map to real SDK methods.
-- Added `--storage-gb` to `sproot new` (maps to `SpriteConfig.StorageGB`).
+- Audited `SpriteConfig` fields against the sprite CLI; resource sizing flags were later removed in Phase 15h.
 - Added `Upgrade`, `Checkpoint`, `ListCheckpoints`, `Restore` to `SpriteHandle` interface and `realHandle`.
 - Added `UpgradeSprite` to `SpritesClient` interface and `realClient`.
 
@@ -329,9 +329,9 @@ Document the minimum GitHub token scopes needed for each use case:
 - `ssh_setup` module: `admin:public_key` + `admin:ssh_signing_key`
 Add a "Required scopes" section to `docs/modules.md` under `gh_token` and `ssh_setup`, and a brief note in the README.
 
-#### 15c. Valid values for `--ram-mb` and `--region`
+#### 15c. Valid values for `--ram-mb` and `--region` (DONE: removed)
 
-Document the accepted values for these `sproot new` flags. The intent is to defer to the API defaults when omitted. Add a note to `sproot new --help` (cobra long description or flag usage) pointing to the Sprites docs or listing common values. No validation needed against a hardcoded list; the API error message is sufficient.
+Resolved in the sprite CLI alignment PR: `--ram-mb`, `--cpus`, `--region`, and `--storage-gb` were removed from `sproot new` entirely. The sprite CLI `create` command exposes none of these flags, confirming the API does not support them at the create endpoint. No documentation needed.
 
 #### 15d. CI required checks for auto-merge
 
@@ -349,13 +349,11 @@ Run the goreleaser release pipeline against a test tag (e.g. `v0.0.0-test`) to c
 
 Establish a repeatable code review process for PRs. The `/ultrareview` skill in Claude Code on the web can run a multi-agent review of the current branch. Document the step in `CLAUDE.md` or the PR template.
 
-#### 15h. Audit `sproot new` config flags against the real API
+#### 15h. Audit `sproot new` config flags against the real API (DONE)
 
-The sprites-go SDK defines `SpriteConfig{RamMB, CPUs, Region, StorageGB}` and sends these fields in the `POST /v1/sprites` request body. However, the SDK README labels sprite creation as "future functionality" and is at a pre-release version (`v0.0.0-...`). Whether the sprites.dev API actually respects these fields is unverified.
+Resolved: the sprite CLI (v0.0.1-rc43) `create` command was enumerated. It exposes only `--skip-console` and `--label`. All four resource sizing flags (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) are absent from the CLI, confirming they are not supported. They were removed from `sproot new`. `--no-console` was renamed `--skip-console` to match the sprite CLI. Additionally, `--force` was added to `destroy`, `--env` to `exec`, `--prefix` and `--watch` to `list`, and `upgrade` was changed to run `sprite upgrade` inside the sprite rather than calling the SDK VM upgrade method.
 
-**Action:** test `sproot new` with each flag (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) and verify the created sprite reflects the requested config. For any flag the API silently ignores, either remove the flag from `sproot new` or add a clear warning in the help text (e.g. "passed to API; support depends on your account tier"). A silently no-op flag is worse than no flag at all.
-
-Also audit the `org` handling: `CreateSpriteWithOrg` stores org on the returned `Sprite` struct but does NOT include it in the request body or URL. If org-scoped sprite creation is unsupported by the API, remove the `default_org` forwarding or document the limitation.
+Deferred exec flags (`--dir`, `--tty`, `--file`, `--http-post`) require changes to the `SpriteHandle.RunCommand` interface; tracked for a future PR after SDK investigation.
 
 ---
 

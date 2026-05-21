@@ -15,7 +15,7 @@ type UpgradeOptions struct {
 	client SpritesClient // nil: constructed from token at runtime
 }
 
-// RunUpgrade upgrades the named sprite to the latest version.
+// RunUpgrade runs "sprite upgrade" inside the named sprite, upgrading the sprite CLI binary.
 func RunUpgrade(ctx context.Context, opts UpgradeOptions) error {
 	l := log.Stderr()
 
@@ -42,10 +42,6 @@ func RunUpgrade(ctx context.Context, opts UpgradeOptions) error {
 	}
 
 	handle := client.GetHandle(opts.Name)
-	l.Infof("upgrading sprite %s", opts.Name)
-	if err := handle.Upgrade(ctx); err != nil {
-		return fmt.Errorf("upgrade sprite: %w", err)
-	}
-	l.Successf("upgraded %s", opts.Name)
-	return nil
+	l.Infof("upgrading sprite CLI in %s", opts.Name)
+	return handle.RunCommand("sprite", []string{"upgrade"}, nil, os.Stdout, os.Stderr)
 }

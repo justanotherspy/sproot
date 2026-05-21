@@ -23,7 +23,7 @@ token_env: MY_TOKEN
 	}
 }
 
-func TestRunUpgrade_CallsUpgrade(t *testing.T) {
+func TestRunUpgrade_CallsSpriteUpgrade(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
@@ -39,5 +39,11 @@ token_env: MY_TOKEN
 	err := RunUpgrade(context.Background(), UpgradeOptions{Name: "my-sprite", client: client})
 	if err != nil {
 		t.Fatalf("RunUpgrade: %v", err)
+	}
+	if handle.lastCmdName != "sprite" {
+		t.Errorf("expected sprite command, got %q", handle.lastCmdName)
+	}
+	if len(handle.lastCmdArgs) != 1 || handle.lastCmdArgs[0] != "upgrade" {
+		t.Errorf("expected [upgrade] args, got %v", handle.lastCmdArgs)
 	}
 }

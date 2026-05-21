@@ -1,11 +1,15 @@
 package host
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
+
+	"golang.org/x/term"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase/modules"
@@ -18,9 +22,10 @@ const ghKeyIDsSpritePath = "/root/.config/sproot/github_keys.json"
 
 // DestroyOptions controls the behavior of RunDestroy.
 type DestroyOptions struct {
-	Name       string
-	client     SpritesClient // nil: constructed from token at runtime
-	ghAPIBase  string        // nil: "https://api.github.com" (test injection point)
+	Name      string
+	Force     bool          // skip confirmation prompt
+	client    SpritesClient // nil: constructed from token at runtime
+	ghAPIBase string        // nil: "https://api.github.com" (test injection point)
 }
 
 // RunDestroy reads GitHub key IDs from the sprite, removes them from GitHub,
@@ -45,6 +50,14 @@ func RunDestroy(ctx context.Context, opts DestroyOptions) error {
 		return fmt.Errorf("env var %s (token_env) is not set", cfg.TokenEnv)
 	}
 	ghToken := os.Getenv(cfg.GHTokenEnv)
+
+	if !opts.Force && term.IsTerminal(int(os.Stdin.Fd())) {
+		fmt.Fprintf(os.Stderr, "Destroy sprite %q? This cannot be undone. [y/N] ", opts.Name)
+		scanner := bufio.NewScanner(os.Stdin)
+		if !scanner.Scan() || strings.ToLower(strings.TrimSpace(scanner.Text())) != "y" {
+			return fmt.Errorf("destroy cancelled")
+		}
+	}
 
 	client := opts.client
 	if client == nil {

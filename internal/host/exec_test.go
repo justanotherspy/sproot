@@ -23,6 +23,42 @@ token_env: MY_TOKEN
 	}
 }
 
+func TestRunExec_ForwardsEnv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunExec(context.Background(), ExecOptions{
+		Name:   "my-sprite",
+		Cmd:    "env",
+		Env:    "FOO=bar,BAZ=qux",
+		client: client,
+	})
+	if err != nil {
+		t.Fatalf("RunExec: %v", err)
+	}
+	if len(handle.lastCmdEnv) != 2 {
+		t.Errorf("expected 2 env vars, got %v", handle.lastCmdEnv)
+	}
+	found := map[string]bool{"FOO=bar": false, "BAZ=qux": false}
+	for _, e := range handle.lastCmdEnv {
+		found[e] = true
+	}
+	for k, v := range found {
+		if !v {
+			t.Errorf("env var %q not forwarded; got %v", k, handle.lastCmdEnv)
+		}
+	}
+}
+
 func TestRunExec_RunsCommandWithArgs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

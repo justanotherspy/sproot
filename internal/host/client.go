@@ -34,8 +34,6 @@ type SpriteHandle interface {
 	RunCommand(name string, args, env []string, stdout, stderr io.Writer) error
 	// Console opens an interactive TTY shell on the sprite.
 	Console(env []string) error
-	// Upgrade upgrades the sprite to the latest version.
-	Upgrade(ctx context.Context) error
 	// Checkpoint creates a checkpoint with an optional comment, streaming
 	// progress messages to w.
 	Checkpoint(ctx context.Context, comment string, w io.Writer) error
@@ -52,8 +50,6 @@ type SpritesClient interface {
 	GetHandle(name string) SpriteHandle
 	DestroySprite(ctx context.Context, name string) error
 	ListSprites(ctx context.Context) ([]SpriteListEntry, error)
-	// UpgradeSprite upgrades the named sprite to the latest version.
-	UpgradeSprite(ctx context.Context, name string) error
 }
 
 // NewClient constructs a real SpritesClient from an API token.
@@ -77,10 +73,6 @@ func (r *realClient) GetHandle(name string) SpriteHandle {
 
 func (r *realClient) DestroySprite(ctx context.Context, name string) error {
 	return r.c.DestroySprite(ctx, name)
-}
-
-func (r *realClient) UpgradeSprite(ctx context.Context, name string) error {
-	return r.c.UpgradeSprite(ctx, name)
 }
 
 func (r *realClient) ListSprites(ctx context.Context) ([]SpriteListEntry, error) {
@@ -144,10 +136,6 @@ func (h *realHandle) Console(env []string) error {
 		defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
 	}
 	return cmd.Run()
-}
-
-func (h *realHandle) Upgrade(ctx context.Context) error {
-	return h.s.Upgrade(ctx)
 }
 
 func (h *realHandle) Checkpoint(ctx context.Context, comment string, w io.Writer) error {
