@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	sprites "github.com/superfly/sprites-go"
 
@@ -23,9 +24,11 @@ type NewOptions struct {
 	Only       string
 	Force      bool
 	DryRun     bool
+	Version    string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
-	client          SpritesClient                                                          // nil: use real client (test injection point)
-	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, error) // nil: use readEnvBlock (test injection point)
+	client           SpritesClient                                                         // nil: use real client (test injection point)
+	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, error)         // nil: use readEnvBlock (test injection point)
+	binarySrcFn      func(version string) ([]byte, error)                                  // nil: auto-detect by arch (test injection point)
 }
 
 // RunNew creates a sprite, injects the sproot binary, and runs sproot setup inside it.
@@ -93,13 +96,26 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return fmt.Errorf("create sprite: %w", err)
 	}
 
-	execPath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("find own binary: %w", err)
+	binarySrc := opts.binarySrcFn
+	if binarySrc == nil {
+		if runtime.GOOS == "linux" && runtime.GOARCH == "amd64" {
+			binarySrc = func(_ string) ([]byte, error) {
+				execPath, err := os.Executable()
+				if err != nil {
+					return nil, fmt.Errorf("find own binary: %w", err)
+				}
+				return os.ReadFile(execPath)
+			}
+		} else {
+			binarySrc = func(v string) ([]byte, error) {
+				l.Infof("host is %s/%s; downloading Linux/amd64 sproot binary for version %s", runtime.GOOS, runtime.GOARCH, v)
+				return fetchLinuxAmd64Binary(v)
+			}
+		}
 	}
-	binaryData, err := os.ReadFile(execPath)
+	binaryData, err := binarySrc(opts.Version)
 	if err != nil {
-		return fmt.Errorf("read own binary: %w", err)
+		return fmt.Errorf("get linux/amd64 binary: %w", err)
 	}
 
 	l.Info("injecting sproot binary")

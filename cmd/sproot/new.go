@@ -16,6 +16,7 @@ func newNewCmd() *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Name = args[0]
+			opts.Version = version
 			return host.RunNew(cmd.Context(), opts)
 		},
 	}
