@@ -63,6 +63,7 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 8 | Doc accuracy fixes + Q1-Q5 code improvements (done) |
 | 9 | Bug fixes (rc_block, binary_release, ssh_setup, cloneOrPull) (done) |
 | 10 | Cross-arch binary injection fix (download Linux/amd64 binary at runtime) (done) |
+| 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
 
 ## Workflow
 

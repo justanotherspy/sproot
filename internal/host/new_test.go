@@ -23,7 +23,7 @@ type mockClient struct {
 	destroyErr error
 }
 
-func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.SpriteConfig) (SpriteHandle, error) {
+func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.SpriteConfig, _ []string) (SpriteHandle, error) {
 	if m.createErr != nil {
 		return nil, m.createErr
 	}
@@ -33,6 +33,8 @@ func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.Sprite
 func (m *mockClient) GetHandle(_ string) SpriteHandle { return m.handle }
 
 func (m *mockClient) DestroySprite(_ context.Context, _ string) error { return m.destroyErr }
+
+func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error) { return nil, nil }
 
 // mockHandle records calls for assertions.
 type mockHandle struct {
@@ -74,6 +76,8 @@ func (h *mockHandle) RunCommand(name string, args, env []string, _, _ io.Writer)
 	h.lastCmdEnv = env
 	return h.runErr
 }
+
+func (h *mockHandle) Console(_ []string) error { return h.runErr }
 
 // noopEnvBlock is an envBlockReaderFn that always returns an empty slice.
 // Used in tests that don't exercise env block logic.

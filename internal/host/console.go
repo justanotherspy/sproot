@@ -8,14 +8,14 @@ import (
 	"github.com/justanotherspy/sproot/internal/config"
 )
 
-// StatusOptions controls the behavior of RunStatus.
-type StatusOptions struct {
+// ConsoleOptions controls the behavior of RunConsole.
+type ConsoleOptions struct {
 	Name   string
 	client SpritesClient // nil: constructed from token at runtime
 }
 
-// RunStatus runs "sproot setup --status" inside the named sprite and streams its output.
-func RunStatus(ctx context.Context, opts StatusOptions) error {
+// RunConsole opens an interactive TTY shell on the named sprite.
+func RunConsole(ctx context.Context, opts ConsoleOptions) error {
 	cfgPath, err := config.DefaultHostConfigPath()
 	if err != nil {
 		return err
@@ -39,5 +39,5 @@ func RunStatus(ctx context.Context, opts StatusOptions) error {
 	}
 
 	handle := client.GetHandle(opts.Name)
-	return handle.RunCommand("sproot", []string{"setup", "--status"}, nil, os.Stdout, os.Stderr)
+	return handle.Console(nil)
 }
