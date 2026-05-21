@@ -30,10 +30,10 @@ type NewOptions struct {
 	SkipConsole bool   // skip opening console after successful setup
 	Version     string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
-	client              SpritesClient                                                                     // nil: use real client (test injection point)
-	envBlockReaderFn    func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readEnvBlock (test injection point)
-	localCfgReaderFn    func(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readLocalEnvBlock (test injection point)
-	binarySrcFn         func(version string) ([]byte, error)                                               // nil: auto-detect by arch (test injection point)
+	client              SpritesClient                                                                            // nil: use real client (test injection point)
+	envBlockReaderFn    func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, string, error) // nil: use readEnvBlock (test injection point)
+	localCfgReaderFn    func(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, string, error) // nil: use readLocalEnvBlock (test injection point)
+	binarySrcFn         func(version string) ([]byte, error)                                                        // nil: auto-detect by arch (test injection point)
 }
 
 // RunNew creates a sprite, injects the sproot binary, and runs sproot setup inside it.
@@ -79,6 +79,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	var (
 		envBlock  []string
 		sprootCfg *config.SprootConfig
+		configSHA string
 	)
 	if localConfigDir != "" {
 		expanded, err := config.ExpandTilde(localConfigDir)
@@ -90,7 +91,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		if localReader == nil {
 			localReader = readLocalEnvBlock
 		}
-		envBlock, sprootCfg, err = localReader(localConfigDir, configPath, l)
+		envBlock, sprootCfg, configSHA, err = localReader(localConfigDir, configPath, l)
 		if err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		if envReader == nil {
 			envReader = readEnvBlock
 		}
-		envBlock, sprootCfg, err = envReader(cfg.ConfigRepo, cfg.ConfigRef, configPath, l)
+		envBlock, sprootCfg, configSHA, err = envReader(cfg.ConfigRepo, cfg.ConfigRef, configPath, l)
 		if err != nil {
 			return err
 		}
@@ -186,6 +187,25 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return err
 	}
 
+	// Record config metadata as sprite labels for staleness tracking.
+	if !opts.DryRun && configSHA != "" {
+		meta := ConfigMeta{
+			Target: opts.Target,
+			SHA:    configSHA,
+		}
+		if localConfigDir != "" {
+			meta.Source = "local"
+			meta.Repo = localConfigDir
+		} else {
+			meta.Source = "git"
+			meta.Repo = cfg.ConfigRepo
+			meta.Ref = cfg.ConfigRef
+		}
+		if err := handle.SetLabels(ctx, meta.Labels()); err != nil {
+			l.Warnf("set config labels failed: %v", err)
+		}
+	}
+
 	if !opts.DryRun && sprootCfg != nil && sprootCfg.CheckpointAfterSetup {
 		l.Info("creating post-setup checkpoint")
 		if err := handle.Checkpoint(ctx, "sproot setup", os.Stdout); err != nil {
@@ -204,31 +224,35 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 
 // readLocalEnvBlock loads sproot.yaml from a local directory (no git clone),
 // validates it, and resolves the env block. Used when config_source=local.
-func readLocalEnvBlock(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, error) {
+func readLocalEnvBlock(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, string, error) {
 	l.Debugf("reading local config from %s", dir)
 	yamlFile := configPath
 	if yamlFile == "" {
 		yamlFile = "sproot.yaml"
 	}
-	sprootCfg, err := config.LoadSprootConfig(filepath.Join(dir, yamlFile))
+	raw, err := os.ReadFile(filepath.Join(dir, yamlFile))
 	if err != nil {
-		return nil, nil, fmt.Errorf("readLocalEnvBlock: load sproot.yaml: %w", err)
+		return nil, nil, "", fmt.Errorf("readLocalEnvBlock: read sproot.yaml: %w", err)
+	}
+	sprootCfg, err := config.LoadSprootConfigBytes(raw)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("readLocalEnvBlock: load sproot.yaml: %w", err)
 	}
 	if err := config.ValidateSprootConfig(sprootCfg); err != nil {
-		return nil, nil, fmt.Errorf("readLocalEnvBlock: validate sproot.yaml: %w", err)
+		return nil, nil, "", fmt.Errorf("readLocalEnvBlock: validate sproot.yaml: %w", err)
 	}
 	var env []string
 	for _, ev := range sprootCfg.Env {
 		val := os.Getenv(ev.From)
 		if val == "" {
 			if ev.Required {
-				return nil, nil, fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
+				return nil, nil, "", fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
 			}
 			continue
 		}
 		env = append(env, ev.As+"="+val)
 	}
-	return env, sprootCfg, nil
+	return env, sprootCfg, ConfigSHA(raw), nil
 }
 
 // uploadDirectory walks srcDir and writes each file to destDir in the sprite,
@@ -268,12 +292,12 @@ func uploadDirectory(handle SpriteHandle, srcDir, destDir string) error {
 // readEnvBlock clones the config repo at configRepo/configRef into a temp dir,
 // loads the sproot.yaml at configPath (or "sproot.yaml" when empty), validates it,
 // and resolves each env entry against the host environment. Returns the env slice
-// to pass to the sprite and the parsed SprootConfig. Fails if a required variable
-// is unset on the host.
-func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]string, *config.SprootConfig, error) {
+// to pass to the sprite, the parsed SprootConfig, and the SHA of the config file.
+// Fails if a required variable is unset on the host.
+func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]string, *config.SprootConfig, string, error) {
 	tmpdir, err := os.MkdirTemp("", "sproot-config-*")
 	if err != nil {
-		return nil, nil, fmt.Errorf("readEnvBlock: create temp dir: %w", err)
+		return nil, nil, "", fmt.Errorf("readEnvBlock: create temp dir: %w", err)
 	}
 	defer func() { _ = os.RemoveAll(tmpdir) }()
 
@@ -281,19 +305,23 @@ func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]st
 	cloneArgs := []string{"clone", "--depth", "1", "--branch", configRef, configRepo, tmpdir}
 	out, err := exec.Command("git", cloneArgs...).CombinedOutput()
 	if err != nil {
-		return nil, nil, fmt.Errorf("readEnvBlock: git clone: %w\n%s", err, out)
+		return nil, nil, "", fmt.Errorf("readEnvBlock: git clone: %w\n%s", err, out)
 	}
 
 	yamlFile := configPath
 	if yamlFile == "" {
 		yamlFile = "sproot.yaml"
 	}
-	sprootCfg, err := config.LoadSprootConfig(filepath.Join(tmpdir, yamlFile))
+	raw, err := os.ReadFile(filepath.Join(tmpdir, yamlFile))
 	if err != nil {
-		return nil, nil, fmt.Errorf("readEnvBlock: load sproot.yaml: %w", err)
+		return nil, nil, "", fmt.Errorf("readEnvBlock: read sproot.yaml: %w", err)
+	}
+	sprootCfg, err := config.LoadSprootConfigBytes(raw)
+	if err != nil {
+		return nil, nil, "", fmt.Errorf("readEnvBlock: load sproot.yaml: %w", err)
 	}
 	if err := config.ValidateSprootConfig(sprootCfg); err != nil {
-		return nil, nil, fmt.Errorf("readEnvBlock: validate sproot.yaml: %w", err)
+		return nil, nil, "", fmt.Errorf("readEnvBlock: validate sproot.yaml: %w", err)
 	}
 
 	var env []string
@@ -301,11 +329,11 @@ func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]st
 		val := os.Getenv(ev.From)
 		if val == "" {
 			if ev.Required {
-				return nil, nil, fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
+				return nil, nil, "", fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
 			}
 			continue
 		}
 		env = append(env, ev.As+"="+val)
 	}
-	return env, sprootCfg, nil
+	return env, sprootCfg, ConfigSHA(raw), nil
 }

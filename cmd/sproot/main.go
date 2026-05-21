@@ -47,6 +47,7 @@ func newRootCmd() *cobra.Command {
 		newCheckpointsCmd(),
 		newRestoreCmd(),
 		newPushCmd(),
+		newOutdatedCmd(),
 	)
 	return root
 }

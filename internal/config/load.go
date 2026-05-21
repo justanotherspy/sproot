@@ -15,6 +15,11 @@ func LoadSprootConfig(path string) (*SprootConfig, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading sproot.yaml: %w", err)
 	}
+	return LoadSprootConfigBytes(data)
+}
+
+// LoadSprootConfigBytes parses a sproot.yaml from an already-read byte slice.
+func LoadSprootConfigBytes(data []byte) (*SprootConfig, error) {
 	var cfg SprootConfig
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parsing sproot.yaml: %w", err)

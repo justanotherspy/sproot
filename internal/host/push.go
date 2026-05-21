@@ -17,12 +17,14 @@ type PushOptions struct {
 	SpriteName   string // empty = all sproot-managed sprites
 	Target       string // passed as --target to sproot setup
 	DryRun       bool
-	NoCheckpoint bool // skip the pre-push checkpoint
+	NoCheckpoint bool   // skip the pre-push checkpoint
 	client       SpritesClient
+	shaFn        func() (string, ConfigMeta, error) // nil: compute from host config
 }
 
 // RunPush re-runs setup on all sproot-managed sprites (or a specific one).
 // It checkpoints before updating by default so the user can restore on failure.
+// After each successful push it updates the sprite's metadata labels.
 func RunPush(ctx context.Context, opts PushOptions) error {
 	l := log.Stderr()
 
@@ -46,6 +48,19 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 	client := opts.client
 	if client == nil {
 		client = NewClient(token)
+	}
+
+	// Compute the current config SHA and base metadata once before pushing.
+	shaFn := opts.shaFn
+	if shaFn == nil {
+		shaFn = func() (string, ConfigMeta, error) {
+			return currentConfigSHA(cfg, l)
+		}
+	}
+	currentSHA, baseMeta, err := shaFn()
+	if err != nil {
+		l.Warnf("could not compute config SHA (labels will not be updated): %v", err)
+		currentSHA = ""
 	}
 
 	all, err := client.ListSprites(ctx)
@@ -87,7 +102,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, l),
 			}
 		}(i, entry)
 	}
@@ -108,8 +123,9 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 	return nil
 }
 
-// pushOne runs setup on a single sprite, optionally checkpointing first.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, l *log.Logger) error {
+// pushOne runs setup on a single sprite, optionally checkpointing first,
+// then updates the sprite's metadata labels.
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, base ConfigMeta, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -129,7 +145,53 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 
 	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout}
 	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr}
-	return handle.RunCommand("sproot", args, nil, stdout, stderr)
+	if err := handle.RunCommand("sproot", args, nil, stdout, stderr); err != nil {
+		return err
+	}
+
+	if !opts.DryRun && sha != "" {
+		meta := ConfigMeta{
+			Target: opts.Target,
+			Source: base.Source,
+			Repo:   base.Repo,
+			Ref:    base.Ref,
+			SHA:    sha,
+		}
+		if err := handle.SetLabels(ctx, meta.Labels()); err != nil {
+			l.Warnf("[%s] set config labels failed: %v", name, err)
+		}
+	}
+	return nil
+}
+
+// currentConfigSHA clones/reads the current config and returns its SHA plus
+// base metadata (source, repo, ref). Used by RunPush to compute the target SHA.
+func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta, error) {
+	if cfg.ConfigSource == "local" {
+		dir, err := config.ExpandTilde(cfg.ConfigLocalPath)
+		if err != nil {
+			return "", ConfigMeta{}, err
+		}
+		yamlFile := cfg.ConfigPath
+		if yamlFile == "" {
+			yamlFile = "sproot.yaml"
+		}
+		raw, err := os.ReadFile(dir + "/" + yamlFile)
+		if err != nil {
+			return "", ConfigMeta{}, fmt.Errorf("read local config: %w", err)
+		}
+		meta := ConfigMeta{Source: "local", Repo: dir}
+		return ConfigSHA(raw), meta, nil
+	}
+
+	// Git source: readEnvBlock clones into its own temp dir and returns the SHA.
+	l.Debugf("cloning config repo to compute current SHA")
+	_, _, sha, err := readEnvBlock(cfg.ConfigRepo, cfg.ConfigRef, cfg.ConfigPath, l)
+	if err != nil {
+		return "", ConfigMeta{}, fmt.Errorf("compute current SHA: %w", err)
+	}
+	meta := ConfigMeta{Source: "git", Repo: cfg.ConfigRepo, Ref: cfg.ConfigRef}
+	return sha, meta, nil
 }
 
 // prefixWriter wraps an io.Writer and prepends a prefix to each line of output.

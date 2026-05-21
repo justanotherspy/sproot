@@ -91,10 +91,15 @@ func (h *mockHandle) ListCheckpoints(_ context.Context, _ bool) ([]CheckpointEnt
 
 func (h *mockHandle) Restore(_ context.Context, _ string, _ io.Writer) error { return nil }
 
+func (h *mockHandle) SetLabels(_ context.Context, labels []string) error {
+	h.writtenFiles["__labels__"] = []byte(strings.Join(labels, "\n"))
+	return nil
+}
+
 // noopEnvBlock is an envBlockReaderFn that always returns an empty slice and nil config.
 // Used in tests that don't exercise env block logic.
-func noopEnvBlock(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
-	return nil, nil, nil
+func noopEnvBlock(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, string, error) {
+	return nil, nil, "", nil
 }
 
 func writeHostConfig(t *testing.T, dir, content string) string {
@@ -358,8 +363,8 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
-		return []string{"APP_SECRET=top-secret"}, nil, nil
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, string, error) {
+		return []string{"APP_SECRET=top-secret"}, nil, "", nil
 	}
 
 	err := RunNew(context.Background(), NewOptions{
@@ -395,8 +400,8 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
-		return nil, nil, fmt.Errorf("required env var MISSING_VAR (mapped as DEST_VAR) is not set on host")
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, string, error) {
+		return nil, nil, "", fmt.Errorf("required env var MISSING_VAR (mapped as DEST_VAR) is not set on host")
 	}
 
 	err := RunNew(context.Background(), NewOptions{
@@ -514,8 +519,8 @@ token_env: MY_TOKEN
 	client := &mockClient{handle: handle}
 
 	cfgWithCheckpoint := &config.SprootConfig{CheckpointAfterSetup: true}
-	stubEnv := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
-		return nil, cfgWithCheckpoint, nil
+	stubEnv := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, string, error) {
+		return nil, cfgWithCheckpoint, "", nil
 	}
 
 	err := RunNew(context.Background(), NewOptions{

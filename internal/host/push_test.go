@@ -30,6 +30,10 @@ func (m *pushMockClient) ListSprites(_ context.Context) ([]SpriteListEntry, erro
 	return m.sprites, m.listErr
 }
 
+func noopSHAFn() (string, ConfigMeta, error) {
+	return "abc123def456", ConfigMeta{Source: "git", Repo: "git@github.com:u/r.git", Ref: "main"}, nil
+}
+
 func TestRunPush_AllSprites(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -52,6 +56,7 @@ token_env: MY_TOKEN
 	err := RunPush(context.Background(), PushOptions{
 		NoCheckpoint: true,
 		client:       client,
+		shaFn:        noopSHAFn,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -96,6 +101,7 @@ token_env: MY_TOKEN
 	err := RunPush(context.Background(), PushOptions{
 		NoCheckpoint: false,
 		client:       client,
+		shaFn:        noopSHAFn,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -187,6 +193,7 @@ token_env: MY_TOKEN
 		Target:       "web",
 		NoCheckpoint: true,
 		client:       client,
+		shaFn:        noopSHAFn,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -223,6 +230,7 @@ token_env: MY_TOKEN
 	err := RunPush(context.Background(), PushOptions{
 		NoCheckpoint: true,
 		client:       client,
+		shaFn:        noopSHAFn,
 	})
 	if err != nil {
 		t.Errorf("expected no error when no sprites found, got %v", err)
