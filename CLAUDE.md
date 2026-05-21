@@ -21,7 +21,7 @@ make lint        # golangci-lint run ./...
 
 ```
 cmd/sproot/           - main package and subcommand wiring
-internal/config/      - sproot.yaml and ~/.sproot/config schema + loaders
+internal/config/      - sproot.yaml and ~/.sproot/config.yaml schema + loaders
 internal/phase/       - Phase interface, runner, state, registry
 internal/phase/modules/ - one file per module type (apt, uv_tool, etc.)
 internal/host/        - host-side command implementations (new, destroy, status)
@@ -53,7 +53,7 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | Phase | Description |
 |-------|-------------|
 | 0 | Scaffold: module, cobra wiring, CI (done) |
-| 1 | Config schema: sproot.yaml and ~/.sproot/config structs + loaders (done) |
+| 1 | Config schema: sproot.yaml and ~/.sproot/config.yaml structs + loaders (done) |
 | 2 | Phase engine: runner, state file, registry (done) |
 | 3 | Module implementations (apt, uv_tool, file_template, etc.) (done) |
 | 4 | `sproot setup` (in-sprite command) (done) |

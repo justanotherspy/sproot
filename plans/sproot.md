@@ -21,7 +21,7 @@ Replaces the current bash-based `sprite` repo with a generic, reusable tool.
 
 ```
 sproot new my-sprite
-  ├─ reads ~/.sproot/config
+  ├─ reads ~/.sproot/config.yaml
   ├─ sprites.New(token).CreateSprite(ctx, "my-sprite", nil)
   ├─ sprite.Filesystem().WriteFile("/usr/local/bin/sproot", binaryBytes, 0755)
   ├─ sprite.Command("sproot", "setup", "--config-repo", url).Run()   // streams output
@@ -80,7 +80,7 @@ phases:
       - justanotherspy/garlic
 ```
 
-**`~/.sproot/config`** shape:
+**`~/.sproot/config.yaml`** shape:
 
 ```yaml
 config_repo: git@github.com:justanotherspy/sprite.git
@@ -171,7 +171,7 @@ Merged PR #17 on 2026-05-20.
 
 **Q4 (binary_release checksums): Both options shipped.** `BinaryReleaseConfig` gains `checksum` (direct sha256 hex) and `checksum_asset` (goreleaser-style checksums file template, e.g. `{repo}_{version}_checksums.txt`). Both are optional; either is verified after download and before install.
 
-**Q5 (validate commands): Partially combined.** `sproot validate` now also validates `~/.sproot/config` when the file exists, in addition to `sproot.yaml`. The README commands table was corrected to distinguish `config validate` (host config only) from `validate` (sproot.yaml + host config if present).
+**Q5 (validate commands): Partially combined.** `sproot validate` now also validates `~/.sproot/config.yaml` when the file exists, in addition to `sproot.yaml`. The README commands table was corrected to distinguish `config validate` (host config only) from `validate` (sproot.yaml + host config if present).
 
 Doc fixes shipped (8a-8j):
 - All 15 nested YAML examples in `docs/modules.md` rewritten to flat form
@@ -234,7 +234,7 @@ Merged PR #22 on 2026-05-21.
 
 **11e (`sproot list`): Done.** `internal/host/list.go` + `cmd/sproot/list.go`. Sprites created by `sproot new` are tagged with the `"sproot"` label via `CreateSpriteWithOrg`. `sproot list` filters to that label; `--all` shows every sprite.
 
-**11f (auto-setup config): Done.** `loadOrInitHostConfig` in `config.go` detects a missing `~/.sproot/config`, prints a warning, and offers the interactive init flow when stdin is a terminal. Used by `RunNew`, `RunStatus`, `RunDestroy`, `RunConsole`, `RunList`.
+**11f (auto-setup config): Done.** `loadOrInitHostConfig` in `config.go` detects a missing `~/.sproot/config.yaml`, prints a warning, and offers the interactive init flow when stdin is a terminal. Used by `RunNew`, `RunStatus`, `RunDestroy`, `RunConsole`, `RunList`.
 
 **11g (debug logging): Done.** `--debug` global flag on the root cobra command calls `log.SetDebug(true)`. `Logger.Debug/Debugf` write `. <msg>` lines only when debug is enabled.
 
@@ -295,7 +295,7 @@ targets:
 Currently `sproot.yaml` must live in a git repo. Add support for a local path:
 
 ```yaml
-# ~/.sproot/config
+# ~/.sproot/config.yaml
 config_source: local     # "git" (default) or "local"
 config_local_path: ~/my-sprite-config/sproot.yaml
 ```

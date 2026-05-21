@@ -74,7 +74,7 @@ jobs:
             echo "config_path: testdata/integration/sproot.yaml"
             echo "token_env: SPRITE_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
-          } > ~/.sproot/config
+          } > ~/.sproot/config.yaml
 
       - name: create sprite and run setup
         env:
