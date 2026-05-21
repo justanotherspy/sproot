@@ -286,7 +286,9 @@ targets:
 ```
 `sproot new my-sprite --target web` runs only the `web` target's phases. The `extends` field inherits the parent's phase list. Without a target flag, a default target (or the flat `phases:` block) is used. This enables one config repo to produce several specialized sprite flavors.
 
-**OPEN QUESTION**: flat `phases:` backward compat -- should a `sproot.yaml` with only `phases:` still work unchanged, or require migration? Recommendation: yes, treat flat `phases:` as an implicit `default` target.
+**Backward compat (Q7 resolved):** flat `phases:` is treated as an implicit `default` target. A `sproot.yaml` with only `phases:` continues to work unchanged; no migration needed.
+
+**Future direction (inter-sproot templating):** Once multi-target is working, a natural extension is handing values from one sprite's setup into another sprite's config. For example: a `postgres` target completes setup, exposes its connection string via a known path or file, and the `web` target's `sproot.yaml` templates that value in before running phases. This enables fully automated multi-sprite stacks from a single config repo. This is not part of Phase 13 scope but should inform the target data model design.
 
 #### 13b. Local path as config source
 
@@ -308,6 +310,52 @@ Push a config change to all sprites created by sproot (identified by the sproot 
 - Run pushes in parallel with progress output.
 
 **OPEN QUESTION**: should `sproot push` checkpoint before updating? Recommendation: yes, always checkpoint before a push so the user can restore if the update breaks something.
+
+---
+
+### Phase 15: Operational improvements
+
+Small, independent items that do not fit a larger phase. Can be picked off in any order.
+
+#### 15a. Config init org auto-select
+
+During `sproot config init`, after the user provides `token_env`, read the env var to get the token and call the Sprites API to fetch the list of orgs available to the user. Present the list and let the user select one as `default_org`. Fall back to leaving it blank if the API call fails or the user skips.
+
+#### 15b. Token scope documentation
+
+Document the minimum GitHub token scopes needed for each use case:
+- Cloning private config repos: `repo` (or `contents:read` for fine-grained tokens)
+- `gh_token` module (runs `gh auth login`): whatever the user wants `gh` to use (typically `repo`)
+- `ssh_setup` module: `admin:public_key` + `admin:ssh_signing_key`
+Add a "Required scopes" section to `docs/modules.md` under `gh_token` and `ssh_setup`, and a brief note in the README.
+
+#### 15c. Valid values for `--ram-mb` and `--region`
+
+Document the accepted values for these `sproot new` flags. The intent is to defer to the API defaults when omitted. Add a note to `sproot new --help` (cobra long description or flag usage) pointing to the Sprites docs or listing common values. No validation needed against a hardcoded list; the API error message is sufficient.
+
+#### 15d. CI required checks for auto-merge
+
+Configure branch protection rules for `main` so that all three CI jobs (`build-and-test`, `validate`, `lint`) are required before merging. This makes the auto-merge queue work without manual intervention. Done in GitHub repo settings, not in code.
+
+#### 15e. Module improvements for edge cases
+
+Audit the `justanotherspy/sprite` config repo and identify phases that fall back to `cmd` because no suitable module exists. For each pattern found, decide whether to add a new module type or improve an existing one. Goal: reduce `cmd` usage to genuinely one-off commands, not to paper over module gaps.
+
+#### 15f. Release workflow test
+
+Run the goreleaser release pipeline against a test tag (e.g. `v0.0.0-test`) to confirm the full release works: multi-arch builds, checksums, sigstore signing, GitHub release assets, `install.sh` download.
+
+#### 15g. Code review workflow
+
+Establish a repeatable code review process for PRs. The `/ultrareview` skill in Claude Code on the web can run a multi-agent review of the current branch. Document the step in `CLAUDE.md` or the PR template.
+
+#### 15h. Audit `sproot new` config flags against the real API
+
+The sprites-go SDK defines `SpriteConfig{RamMB, CPUs, Region, StorageGB}` and sends these fields in the `POST /v1/sprites` request body. However, the SDK README labels sprite creation as "future functionality" and is at a pre-release version (`v0.0.0-...`). Whether the sprites.dev API actually respects these fields is unverified.
+
+**Action:** test `sproot new` with each flag (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) and verify the created sprite reflects the requested config. For any flag the API silently ignores, either remove the flag from `sproot new` or add a clear warning in the help text (e.g. "passed to API; support depends on your account tier"). A silently no-op flag is worse than no flag at all.
+
+Also audit the `org` handling: `CreateSpriteWithOrg` stores org on the returned `Sprite` struct but does NOT include it in the request body or URL. If org-scoped sprite creation is unsupported by the API, remove the `default_org` forwarding or document the limitation.
 
 ---
 
@@ -340,18 +388,19 @@ A skill that takes an existing setup script (bash or other) as input and generat
 | Q4 | `binary_release` checksums | Add optional `checksum:` field or known tradeoff? | 9d | DONE: both `checksum` and `checksum_asset` added in PR #17 |
 | Q5 | validate commands | Keep separate or combine? | 8b | DONE: partially combined; `sproot validate` now also validates host config if present, in PR #17 |
 | Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 | DONE: download at runtime (option 2) in PR #21 |
-| Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a | OPEN |
+| Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a | DONE: yes, flat `phases:` = implicit default; no migration required |
 
 ---
 
 ## Suggested order of execution
 
-1. **Phase 9 bug fixes** (no questions blocking): 9a, 9b, 9c, 9d, 9e, 9f.
-2. **Phase 10** (cross-arch injection fix): depends on answer to Q6; affects all non-Linux users.
-3. **Phase 11 UX** (11a through 11i): independent; can be picked off one at a time.
-4. **Phase 12 SDK alignment** (12a-12d): review SDK docs first.
-5. **Phase 13 multi-target and push** (13a-13c): architecture changes; coordinate with Phase 6 (sprite config repo).
-6. **Phase 14 intelligence** (14a-14c): after everything else is stable.
+1. **Phase 9 bug fixes** (no questions blocking): 9a, 9b, 9c, 9d, 9e, 9f. (DONE)
+2. **Phase 10** (cross-arch injection fix): depends on answer to Q6; affects all non-Linux users. (DONE)
+3. **Phase 11 UX** (11a through 11i): independent; can be picked off one at a time. (DONE)
+4. **Phase 12 SDK alignment** (12a-12d): review SDK docs first. (DONE)
+5. **Phase 15 operational improvements** (15a-15g): independent items, pick off in any order alongside Phase 13 or 14 work.
+6. **Phase 13 multi-target and push** (13a-13c): architecture changes; coordinate with Phase 6 (sprite config repo).
+7. **Phase 14 intelligence** (14a-14c): after everything else is stable.
 
 After each batch of changes: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
 
