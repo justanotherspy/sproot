@@ -84,7 +84,8 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           ./sproot new "spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}" \
-            --only "$MATRIX_ONLY"
+            --only "$MATRIX_ONLY" \
+            --no-console
 
       - name: destroy sprite
         if: always()

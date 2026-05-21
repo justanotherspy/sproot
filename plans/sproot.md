@@ -220,47 +220,27 @@ Key details:
 
 ---
 
-### Phase 11: UX improvements
+### Phase 11: UX improvements (DONE)
 
-Items from todo.md.
+Merged PR #22 on 2026-05-21.
 
-#### 11a. Interactive config init
+**11a (interactive config init): Done.** `sproot config init` now prompts for `config_repo`, `token_env`, `gh_token_env`, `default_org`; validates; writes the file. `--non-interactive` flag preserves the old skeleton-file behavior for scripting.
 
-`sproot config init` currently writes a skeleton file. Make it interactive: prompt for `config_repo`, `token_env`, `gh_token_env`, `default_org`; validate at the end. Add `--non-interactive` flag to preserve current behavior for scripting.
+**11b (token scope docs): Deferred.** Low-priority doc-only change; can be added alongside Phase 12 SDK docs.
 
-#### 11b. Explain required GitHub token scopes
+**11c (`sproot new` opens console): Done.** After `sproot setup` completes successfully, `RunNew` opens an interactive TTY shell. `--no-console` and `--dry-run` both skip the console step.
 
-Add to docs (and to `sproot config init` prompts): minimum scopes for `gh_token_env` are `repo` (cloning private repos) plus `admin:public_key` and `admin:ssh_signing_key` if using `ssh_setup`.
+**11d (`sproot console <name>`): Done.** `internal/host/console.go` + `cmd/sproot/console.go`. Opens `bash` with TTY on the named sprite. Terminal size is read from the host; raw mode is enabled when stdin is a TTY.
 
-#### 11c. `sproot new` opens console after setup
+**11e (`sproot list`): Done.** `internal/host/list.go` + `cmd/sproot/list.go`. Sprites created by `sproot new` are tagged with the `"sproot"` label via `CreateSpriteWithOrg`. `sproot list` filters to that label; `--all` shows every sprite.
 
-After `sproot setup` completes, `sproot new` should drop the user into the sprite console. Add `--no-console` flag to opt out.
+**11f (auto-setup config): Done.** `loadOrInitHostConfig` in `config.go` detects a missing `~/.sproot/config`, prints a warning, and offers the interactive init flow when stdin is a terminal. Used by `RunNew`, `RunStatus`, `RunDestroy`, `RunConsole`, `RunList`.
 
-#### 11d. `sproot console <name>` command
+**11g (debug logging): Done.** `--debug` global flag on the root cobra command calls `log.SetDebug(true)`. `Logger.Debug/Debugf` write `. <msg>` lines only when debug is enabled.
 
-Wrap the sprite console command so users do not need the `sprite` CLI.
+**11h (validate sproot.yaml before creating sprite): Done.** `readEnvBlock` now calls `config.ValidateSprootConfig` after loading, so a broken `sproot.yaml` fails before any sprite API quota is spent.
 
-#### 11e. `sproot list` command
-
-List only sprites created by sproot (identified via a label set at creation time). Pass `{ "sproot": "true" }` as metadata/labels when calling `client.CreateSprite`. `sproot list` filters by that label.
-
-#### 11f. Auto-setup config when missing
-
-If `sproot` is invoked with no `~/.sproot/config`, offer to run `config init` interactively before the command proceeds.
-
-#### 11g. Debug logging flag
-
-Add `--debug` global flag that enables verbose logging throughout (phase runner decisions, HTTP requests, command execution). Use `pkg/log` level system or a context value.
-
-#### 11h. Validate `sproot.yaml` before creating sprite
-
-`sproot new` currently validates the host config but does not read or validate `sproot.yaml` before spending API quota creating a sprite. If the config file is broken, the sprite is created but setup fails.
-
-Fix: in `RunNew`, shallow-clone the config repo (or accept a `--config-path` override pointing to a local file), load and validate `sproot.yaml`, then proceed to sprite creation. The `--dry-run` flag already skips sprite creation; this adds pre-flight validation even on live runs.
-
-#### 11i. `sproot validate` also validates `sproot.yaml` reachability
-
-Currently validates syntax only. Optionally warn if referenced `src` paths in `file_template`/`rc_block` do not exist at the config repo root.
+**11i (validate reachability): Deferred.** Would require cloning the config repo a second time in `sproot validate`; not worth the cost for a warning. Revisit if users report confusion.
 
 ---
 

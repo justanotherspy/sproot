@@ -121,7 +121,7 @@ type mockClientTracked struct {
 	onDestroySprite func()
 }
 
-func (m *mockClientTracked) CreateSprite(_ context.Context, _ string, _ *sprites.SpriteConfig) (SpriteHandle, error) {
+func (m *mockClientTracked) CreateSprite(_ context.Context, _ string, _ *sprites.SpriteConfig, _ []string) (SpriteHandle, error) {
 	return m.handle, nil
 }
 func (m *mockClientTracked) GetHandle(_ string) SpriteHandle { return m.handle }
@@ -130,4 +130,7 @@ func (m *mockClientTracked) DestroySprite(_ context.Context, _ string) error {
 		m.onDestroySprite()
 	}
 	return nil
+}
+func (m *mockClientTracked) ListSprites(_ context.Context) ([]SpriteListEntry, error) {
+	return nil, nil
 }

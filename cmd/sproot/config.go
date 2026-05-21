@@ -1,8 +1,8 @@
 package main
 
 import (
-	"github.com/justanotherspy/sproot/internal/host"
 	"github.com/justanotherspy/sproot/internal/config"
+	"github.com/justanotherspy/sproot/internal/host"
 	"github.com/spf13/cobra"
 )
 
@@ -16,18 +16,27 @@ func newConfigCmd() *cobra.Command {
 }
 
 func newConfigInitCmd() *cobra.Command {
-	return &cobra.Command{
+	var nonInteractive bool
+
+	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Write a skeleton ~/.sproot/config",
-		Long:  "init writes a skeleton host config to ~/.sproot/config with placeholder values. Returns an error if the file already exists.",
+		Long: "init writes a host config to ~/.sproot/config. " +
+			"By default it prompts for each field interactively. " +
+			"Use --non-interactive to write a skeleton file with placeholder values instead.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := config.DefaultHostConfigPath()
 			if err != nil {
 				return err
 			}
-			return host.RunConfigInit(path)
+			if nonInteractive {
+				return host.RunConfigInit(path)
+			}
+			return host.RunConfigInitInteractive(path)
 		},
 	}
+	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "write a skeleton file with placeholder values instead of prompting")
+	return cmd
 }
 
 func newConfigValidateCmd() *cobra.Command {

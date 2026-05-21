@@ -8,6 +8,11 @@ import (
 	"os"
 )
 
+var debugEnabled bool
+
+// SetDebug enables or disables debug-level output for all loggers.
+func SetDebug(v bool) { debugEnabled = v }
+
 // Logger writes structured log lines to an io.Writer.
 type Logger struct {
 	w io.Writer
@@ -46,6 +51,16 @@ func (l *Logger) Error(msg string) { l.write("x " + msg) }
 
 // Errorf prints a formatted error line: "x <msg>"
 func (l *Logger) Errorf(format string, args ...any) { l.Error(fmt.Sprintf(format, args...)) }
+
+// Debug prints a debug line: ". <msg>" when debug mode is enabled via SetDebug.
+func (l *Logger) Debug(msg string) {
+	if debugEnabled {
+		l.write(". " + msg)
+	}
+}
+
+// Debugf prints a formatted debug line when debug mode is enabled via SetDebug.
+func (l *Logger) Debugf(format string, args ...any) { l.Debug(fmt.Sprintf(format, args...)) }
 
 // write emits a single log line. Write errors are intentionally discarded;
 // a logger that fails silently is preferable to one that panics mid-run.

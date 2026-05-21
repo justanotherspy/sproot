@@ -9,10 +9,15 @@ import (
 	"runtime"
 
 	sprites "github.com/superfly/sprites-go"
+	"golang.org/x/term"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
 )
+
+// sprootLabel is attached to every sprite created by sproot new.
+// Used by sproot list to filter sprites managed by sproot.
+const sprootLabel = "sproot"
 
 // NewOptions controls the behavior of RunNew.
 type NewOptions struct {
@@ -24,11 +29,12 @@ type NewOptions struct {
 	Only       string
 	Force      bool
 	DryRun     bool
+	NoConsole  bool   // skip opening console after successful setup
 	Version    string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
-	client           SpritesClient                                                         // nil: use real client (test injection point)
-	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, error)         // nil: use readEnvBlock (test injection point)
-	binarySrcFn      func(version string) ([]byte, error)                                  // nil: auto-detect by arch (test injection point)
+	client           SpritesClient                                                 // nil: use real client (test injection point)
+	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, error) // nil: use readEnvBlock (test injection point)
+	binarySrcFn      func(version string) ([]byte, error)                          // nil: auto-detect by arch (test injection point)
 }
 
 // RunNew creates a sprite, injects the sproot binary, and runs sproot setup inside it.
@@ -39,7 +45,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := config.LoadHostConfig(cfgPath)
+	cfg, err := loadOrInitHostConfig(cfgPath)
 	if err != nil {
 		return err
 	}
@@ -91,7 +97,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	}
 
 	l.Infof("creating sprite %s", opts.Name)
-	handle, err := client.CreateSprite(ctx, opts.Name, spriteCfg)
+	handle, err := client.CreateSprite(ctx, opts.Name, spriteCfg, []string{sprootLabel})
 	if err != nil {
 		return fmt.Errorf("create sprite: %w", err)
 	}
@@ -146,12 +152,20 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	env = append(env, envBlock...)
 
 	l.Infof("running setup in sprite %s", opts.Name)
-	return handle.RunCommand("sproot", args, env, os.Stdout, os.Stderr)
+	if err := handle.RunCommand("sproot", args, env, os.Stdout, os.Stderr); err != nil {
+		return err
+	}
+
+	if !opts.NoConsole && !opts.DryRun && term.IsTerminal(int(os.Stdin.Fd())) {
+		l.Successf("setup complete; opening console for %s", opts.Name)
+		return handle.Console(nil)
+	}
+	return nil
 }
 
 // readEnvBlock clones the config repo at configRepo/configRef into a temp dir,
-// loads the sproot.yaml at configPath (or "sproot.yaml" when empty), and
-// resolves each env entry against the host environment. Returns the env slice
+// loads the sproot.yaml at configPath (or "sproot.yaml" when empty), validates it,
+// and resolves each env entry against the host environment. Returns the env slice
 // to pass to the sprite. Fails if a required variable is unset on the host.
 func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]string, error) {
 	tmpdir, err := os.MkdirTemp("", "sproot-config-*")
@@ -174,6 +188,9 @@ func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]st
 	sprootCfg, err := config.LoadSprootConfig(filepath.Join(tmpdir, yamlFile))
 	if err != nil {
 		return nil, fmt.Errorf("readEnvBlock: load sproot.yaml: %w", err)
+	}
+	if err := config.ValidateSprootConfig(sprootCfg); err != nil {
+		return nil, fmt.Errorf("readEnvBlock: validate sproot.yaml: %w", err)
 	}
 
 	var env []string

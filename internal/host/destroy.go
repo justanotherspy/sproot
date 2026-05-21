@@ -32,7 +32,7 @@ func RunDestroy(ctx context.Context, opts DestroyOptions) error {
 	if err != nil {
 		return err
 	}
-	cfg, err := config.LoadHostConfig(cfgPath)
+	cfg, err := loadOrInitHostConfig(cfgPath)
 	if err != nil {
 		return err
 	}
