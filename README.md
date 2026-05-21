@@ -64,7 +64,7 @@ See [docs/modules.md](docs/modules.md) for all module types.
 config_repo: git@github.com:yourname/sprite.git
 config_ref: main
 config_path: ""             # optional; path to sproot.yaml within the config repo
-token_env: FLY_API_TOKEN    # name of env var holding your Fly/sprites API token
+token_env: SPRITE_TOKEN     # name of env var holding your sprites API token
 gh_token_env: GITHUB_TOKEN  # name of env var holding your GitHub PAT
 default_org: ""
 ```

@@ -324,7 +324,7 @@ func TestLoadHostConfig_HappyPath(t *testing.T) {
 	if cfg.ConfigRef != "main" {
 		t.Errorf("config_ref: got %q", cfg.ConfigRef)
 	}
-	if cfg.TokenEnv != "FLY_API_TOKEN" {
+	if cfg.TokenEnv != "SPRITE_TOKEN" {
 		t.Errorf("token_env: got %q", cfg.TokenEnv)
 	}
 	if cfg.GHTokenEnv != "GITHUB_TOKEN" {
@@ -620,7 +620,7 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		return &HostConfig{
 			ConfigRepo: "git@github.com:user/repo.git",
 			ConfigRef:  "main",
-			TokenEnv:   "FLY_API_TOKEN",
+			TokenEnv:   "SPRITE_TOKEN",
 			GHTokenEnv: "GITHUB_TOKEN",
 		}
 	}
