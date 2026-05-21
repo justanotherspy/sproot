@@ -65,6 +65,9 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 10 | Cross-arch binary injection fix (download Linux/amd64 binary at runtime) (done) |
 | 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
 | 12 | SDK alignment: exec, upgrade, checkpoint, checkpoints, restore commands; checkpoint_after_setup in sproot.yaml; --storage-gb on new; status --host (done) |
+| 13 | Multi-target support (targets/extends in sproot.yaml, --target flag), local path config source, sproot push/update |
+| 14 | Intelligence: llm.txt/agent-context.md updates after setup, Claude skills for sproot usage and script conversion |
+| 15 | Operational improvements: config init org auto-select, token scope docs, valid flag values, CI required checks, module edge cases, release workflow test, code review workflow |
 
 ## Workflow
 
