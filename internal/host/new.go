@@ -9,6 +9,7 @@ import (
 	"runtime"
 
 	sprites "github.com/superfly/sprites-go"
+	"golang.org/x/term"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
@@ -155,7 +156,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		return err
 	}
 
-	if !opts.NoConsole && !opts.DryRun {
+	if !opts.NoConsole && !opts.DryRun && term.IsTerminal(int(os.Stdin.Fd())) {
 		l.Successf("setup complete; opening console for %s", opts.Name)
 		return handle.Console(nil)
 	}
