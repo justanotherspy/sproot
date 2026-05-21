@@ -15,14 +15,23 @@ func PrintStatus(statePath string, w io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("load state: %w", err)
 	}
+	return RenderStatus(state, statePath, w)
+}
 
+// RenderStatus writes a summary table for state to w. statePath is used only
+// in the "no records" message; pass an empty string if rendering from memory.
+func RenderStatus(state *phase.State, statePath string, w io.Writer) error {
 	if len(state.Phases) == 0 {
-		_, err = fmt.Fprintf(w, "no phase records found at %s\n", statePath)
+		label := statePath
+		if label == "" {
+			label = "state"
+		}
+		_, err := fmt.Fprintf(w, "no phase records found at %s\n", label)
 		return err
 	}
 
 	tw := tabwriter.NewWriter(w, 0, 0, 2, ' ', 0)
-	_, err = fmt.Fprintln(tw, "TYPE\tNAME\tSTATUS\tRAN AT\tERROR")
+	_, err := fmt.Fprintln(tw, "TYPE\tNAME\tSTATUS\tRAN AT\tERROR")
 	if err != nil {
 		return err
 	}

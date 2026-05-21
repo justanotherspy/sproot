@@ -19,8 +19,9 @@ type mockListClient struct {
 func (m *mockListClient) CreateSprite(_ context.Context, _ string, _ *sprites.SpriteConfig, _ []string) (SpriteHandle, error) {
 	return m.handle, nil
 }
-func (m *mockListClient) GetHandle(_ string) SpriteHandle               { return m.handle }
-func (m *mockListClient) DestroySprite(_ context.Context, _ string) error { return nil }
+func (m *mockListClient) GetHandle(_ string) SpriteHandle                           { return m.handle }
+func (m *mockListClient) DestroySprite(_ context.Context, _ string) error           { return nil }
+func (m *mockListClient) UpgradeSprite(_ context.Context, _ string) error           { return nil }
 func (m *mockListClient) ListSprites(_ context.Context) ([]SpriteListEntry, error) {
 	return m.entries, m.listErr
 }

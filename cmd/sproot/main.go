@@ -41,6 +41,11 @@ func newRootCmd() *cobra.Command {
 		newValidateCmd(),
 		newConsoleCmd(),
 		newListCmd(),
+		newExecCmd(),
+		newUpgradeCmd(),
+		newCheckpointCmd(),
+		newCheckpointsCmd(),
+		newRestoreCmd(),
 	)
 	return root
 }

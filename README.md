@@ -30,6 +30,8 @@ identity:
   git_default_branch: main
   gh_username: yourname
 
+checkpoint_after_setup: true   # optional; creates a checkpoint after setup completes
+
 phases:
   - type: apt
     packages: [shellcheck, jq]
@@ -80,11 +82,18 @@ sproot config init
 | Command | Where | Description |
 |---------|-------|-------------|
 | `sproot new <name>` | host | Create and provision a sprite |
-| `sproot destroy <name>` | host | Destroy a sprite |
-| `sproot status <name>` | host | Show setup state for a sprite |
-| `sproot config init` | host | Write a skeleton ~/.sproot/config |
-| `sproot config validate` | host | Validate ~/.sproot/config only |
-| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates ~/.sproot/config) |
+| `sproot destroy <name>` | host | Destroy a sprite and remove its GitHub SSH keys |
+| `sproot status <name>` | host | Show setup state (exec into sprite); `--host` reads state without exec |
+| `sproot console <name>` | host | Open an interactive shell in a sprite |
+| `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output |
+| `sproot list` | host | List sproot-managed sprites (`--all` shows every sprite) |
+| `sproot upgrade <name>` | host | Upgrade a sprite to the latest version |
+| `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
+| `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
+| `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
+| `sproot config init` | host | Interactive `~/.sproot/config` setup (`--non-interactive` for scripting) |
+| `sproot config validate` | host | Validate `~/.sproot/config` only |
+| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config`) |
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 

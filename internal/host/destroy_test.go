@@ -134,3 +134,4 @@ func (m *mockClientTracked) DestroySprite(_ context.Context, _ string) error {
 func (m *mockClientTracked) ListSprites(_ context.Context) ([]SpriteListEntry, error) {
 	return nil, nil
 }
+func (m *mockClientTracked) UpgradeSprite(_ context.Context, _ string) error { return nil }
