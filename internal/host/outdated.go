@@ -75,7 +75,7 @@ func RunOutdated(ctx context.Context, opts OutdatedOptions) error {
 		if target == "" {
 			target = "(default)"
 		}
-		fmt.Fprintf(os.Stdout, "%-30s %-12s %-14s %s\n", e.Name, target, meta.SHA, status)
+		_, _ = fmt.Fprintf(os.Stdout, "%-30s %-12s %-14s %s\n", e.Name, target, meta.SHA, status)
 		shown++
 	}
 
