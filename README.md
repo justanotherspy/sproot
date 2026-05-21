@@ -8,8 +8,8 @@ sproot bootstraps [sprite.dev](https://sprite.dev) sprites from a user-owned con
 sproot new my-sprite
 ```
 
-1. Reads `~/.sproot/config` for your config repo URL and token env var names
-2. Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config` (`token_env` and `gh_token_env`)
+1. Reads `~/.sproot/config.yaml` for your config repo URL and token env var names
+2. Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config.yaml` (`token_env` and `gh_token_env`)
 3. Creates a new sprite via the sprites-go SDK
 4. Injects the sproot binary into the sprite at `/usr/local/bin/sproot`
 5. Runs `sproot setup` inside the sprite with `GH_TOKEN` forwarded, which clones your config repo and executes each phase
@@ -58,7 +58,7 @@ See [docs/modules.md](docs/modules.md) for all module types.
 └── config           # YAML: config_repo, token_env, gh_token_env
 ```
 
-`~/.sproot/config` format:
+`~/.sproot/config.yaml` format:
 
 ```yaml
 config_repo: git@github.com:yourname/sprite.git
@@ -91,9 +91,9 @@ sproot config init
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
-| `sproot config init` | host | Interactive `~/.sproot/config` setup (`--non-interactive` for scripting) |
-| `sproot config validate` | host | Validate `~/.sproot/config` only |
-| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config`) |
+| `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
+| `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
+| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`) |
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
@@ -105,7 +105,7 @@ sproot config init
 sproot config init
 ```
 
-Edit `~/.sproot/config` and fill in your config repo URL and token env var names.
+Edit `~/.sproot/config.yaml` and fill in your config repo URL and token env var names.
 
 **2. Validate your config:**
 

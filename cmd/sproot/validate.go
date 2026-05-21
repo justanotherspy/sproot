@@ -12,7 +12,7 @@ func newValidateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "validate",
 		Short: "Validate a sproot.yaml file",
-		Long:  "validate loads a sproot.yaml and reports any missing or invalid fields. Defaults to the config_path from ~/.sproot/config, or sproot.yaml in the current directory.",
+		Long:  "validate loads a sproot.yaml and reports any missing or invalid fields. Defaults to the config_path from ~/.sproot/config.yaml, or sproot.yaml in the current directory.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if path == "" {
 				path = resolveDefaultSprootPath()
@@ -21,7 +21,7 @@ func newValidateCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&path, "path", "", "path to sproot.yaml (default: config_path from ~/.sproot/config, or sproot.yaml)")
+	cmd.Flags().StringVar(&path, "path", "", "path to sproot.yaml (default: config_path from ~/.sproot/config.yaml, or sproot.yaml)")
 	return cmd
 }
 

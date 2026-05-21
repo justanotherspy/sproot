@@ -721,8 +721,8 @@ func TestDefaultHostConfigPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.HasSuffix(path, ".sproot/config") {
-		t.Errorf("path %q does not end with .sproot/config", path)
+	if !strings.HasSuffix(path, ".sproot/config.yaml") && !strings.HasSuffix(path, ".sproot/config") {
+		t.Errorf("path %q does not end with .sproot/config.yaml or .sproot/config", path)
 	}
 }
 

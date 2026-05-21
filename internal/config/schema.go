@@ -32,7 +32,7 @@ type Identity struct {
 	GHUsername       string `yaml:"gh_username"`
 }
 
-// HostConfig is the struct for ~/.sproot/config, the per-machine host file.
+// HostConfig is the struct for ~/.sproot/config.yaml, the per-machine host file.
 // TokenEnv and GHTokenEnv hold environment variable *names*, not token values.
 // At runtime sproot reads os.Getenv(TokenEnv) to obtain the actual token.
 type HostConfig struct {

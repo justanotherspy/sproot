@@ -9,7 +9,7 @@ import (
 func newConfigCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config",
-		Short: "Manage the host config file (~/.sproot/config)",
+		Short: "Manage the host config file (~/.sproot/config.yaml)",
 	}
 	cmd.AddCommand(newConfigInitCmd(), newConfigValidateCmd())
 	return cmd
@@ -20,8 +20,8 @@ func newConfigInitCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "init",
-		Short: "Write a skeleton ~/.sproot/config",
-		Long: "init writes a host config to ~/.sproot/config. " +
+		Short: "Write a skeleton ~/.sproot/config.yaml",
+		Long: "init writes a host config to ~/.sproot/config.yaml. " +
 			"By default it prompts for each field interactively. " +
 			"Use --non-interactive to write a skeleton file with placeholder values instead.",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -42,8 +42,8 @@ func newConfigInitCmd() *cobra.Command {
 func newConfigValidateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "validate",
-		Short: "Validate ~/.sproot/config",
-		Long:  "validate loads ~/.sproot/config and reports any missing or invalid fields.",
+		Short: "Validate ~/.sproot/config.yaml",
+		Long:  "validate loads ~/.sproot/config.yaml and reports any missing or invalid fields.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := config.DefaultHostConfigPath()
 			if err != nil {

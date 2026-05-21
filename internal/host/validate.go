@@ -9,7 +9,7 @@ import (
 )
 
 // RunValidateSprootConfig loads and validates the sproot.yaml at path.
-// It also validates ~/.sproot/config when that file exists.
+// It also validates ~/.sproot/config.yaml when that file exists.
 func RunValidateSprootConfig(path string) error {
 	l := log.Stderr()
 

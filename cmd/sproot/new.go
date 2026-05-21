@@ -11,7 +11,7 @@ func newNewCmd() *cobra.Command {
 		Use:   "new <name>",
 		Short: "Create a new sprite and run sproot setup inside it",
 		Long: "new creates a sprite, injects the sproot binary, and runs sproot setup " +
-			"using the config repo from ~/.sproot/config. After successful setup it opens " +
+			"using the config repo from ~/.sproot/config.yaml. After successful setup it opens " +
 			"an interactive console. Use --skip-console to skip that step.",
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

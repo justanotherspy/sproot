@@ -23,7 +23,7 @@ func LoadSprootConfig(path string) (*SprootConfig, error) {
 }
 
 // LoadHostConfig reads and parses the host config file at the given path.
-// Use DefaultHostConfigPath to get the canonical ~/.sproot/config location.
+// Use DefaultHostConfigPath to get the canonical ~/.sproot/config.yaml location.
 func LoadHostConfig(path string) (*HostConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -40,12 +40,21 @@ func LoadHostConfig(path string) (*HostConfig, error) {
 }
 
 // DefaultHostConfigPath returns the canonical path for the host config file.
+// The canonical path is ~/.sproot/config.yaml. If that file does not exist but
+// the legacy ~/.sproot/config does, the legacy path is returned for backward compat.
 func DefaultHostConfigPath() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("finding home directory: %w", err)
 	}
-	return filepath.Join(home, ".sproot", "config"), nil
+	canonical := filepath.Join(home, ".sproot", "config.yaml")
+	if _, err := os.Stat(canonical); os.IsNotExist(err) {
+		legacy := filepath.Join(home, ".sproot", "config")
+		if _, lerr := os.Stat(legacy); lerr == nil {
+			return legacy, nil
+		}
+	}
+	return canonical, nil
 }
 
 // ExpandTilde replaces a leading ~ with the user's home directory.

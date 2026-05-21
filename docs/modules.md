@@ -255,7 +255,7 @@ Generates a fresh ed25519 keypair and registers it with GitHub.
 
 - Generates `~/.ssh/id_ed25519` and `~/.ssh/id_ed25519.pub` if absent
 - Sets permissions on the private key (0600)
-- Registers the public key with GitHub as both an authentication key and a signing key using `GH_TOKEN` (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config`)
+- Registers the public key with GitHub as both an authentication key and a signing key using `GH_TOKEN` (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config.yaml`)
 - Runs `ssh-keyscan -H github.com` and appends to `~/.ssh/known_hosts`
 - Appends the user's key to `~/.ssh/allowed_signers` with the `namespaces="git"` constraint
 
@@ -275,7 +275,7 @@ Authenticates `gh` (GitHub CLI) by persisting credentials from `GH_TOKEN`.
 - type: gh_token
 ```
 
-Reads `GH_TOKEN` from the environment (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config`) and pipes it to `gh auth login --hostname github.com --git-protocol ssh --with-token`. After this runs, `gh` works from stored credentials in `~/.config/gh/hosts.yml` without needing `GH_TOKEN` set in future sessions.
+Reads `GH_TOKEN` from the environment (forwarded via the `env` block in `sproot.yaml` or via `gh_token_env` in `~/.sproot/config.yaml`) and pipes it to `gh auth login --hostname github.com --git-protocol ssh --with-token`. After this runs, `gh` works from stored credentials in `~/.config/gh/hosts.yml` without needing `GH_TOKEN` set in future sessions.
 
 **Idempotency:** checks `gh auth status -h github.com` exits 0 and the logged-in user matches `identity.gh_username`.
 
