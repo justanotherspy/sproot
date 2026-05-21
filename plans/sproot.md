@@ -244,23 +244,30 @@ Merged PR #22 on 2026-05-21.
 
 ---
 
-### Phase 12: Sprite wrapping and SDK alignment
+### Phase 12: Sprite wrapping and SDK alignment (DONE)
 
-#### 12a. Wrap more sprite CLI commands
+Merged PR #23 on 2026-05-21.
 
-Review the sprites-go SDK and expose useful subcommands so users do not need the `sprite` CLI separately. Minimum set: `console`, `list`, `status`. Stretch: `checkpoint`, `restore`, `exec`.
+**12a: Additional host command wrappers (done).**
+- `sproot exec <name> <cmd> [args...]`: runs a one-off command in a sprite and streams stdout/stderr.
+- `sproot upgrade <name>`: upgrades a sprite to the latest version via SDK `UpgradeSprite`.
+- `sproot checkpoint <name> [--comment text]`: creates a checkpoint, streams progress to stdout.
+- `sproot checkpoints <name> [--include-auto]`: lists checkpoints in a table.
+- `sproot restore <name> <id>`: restores a sprite from a checkpoint, streams progress to stdout.
 
-#### 12b. Remove things not supported by sprites-go SDK
+**12b: SDK audit (done).**
+- Audited all sprites-go SDK methods against sproot usage. All calls map to real SDK methods.
+- Added `--storage-gb` to `sproot new` (maps to `SpriteConfig.StorageGB`).
+- Added `Upgrade`, `Checkpoint`, `ListCheckpoints`, `Restore` to `SpriteHandle` interface and `realHandle`.
+- Added `UpgradeSprite` to `SpritesClient` interface and `realClient`.
 
-Audit each place sproot calls the SDK. If a feature is documented but not present in the installed SDK version, either remove the call or gate it on a runtime check.
+**12c: Checkpointing integration (done).**
+- `SprootConfig.CheckpointAfterSetup bool` added to `internal/config/schema.go`.
+- `RunNew` calls `handle.Checkpoint(ctx, "sproot setup", ...)` after successful setup when `checkpoint_after_setup: true` in `sproot.yaml`. Checkpoint failure is a warning, not a fatal error.
 
-#### 12c. Checkpointing integration
-
-`sproot.yaml` should be able to declare `checkpoint_after_setup: true`. After setup phases complete, `sproot new` creates a checkpoint. Doing it before setup is pointless (checkpoint of the base image only). Expose `sproot checkpoint <name>` and `sproot restore <name>` wrappers.
-
-#### 12d. Accessible setup state from host
-
-`sproot status <name>` already streams the in-sprite state table. Improve: show a summary of what is installed vs. outstanding, surface any phase errors, and make it readable without connecting to the sprite (cache state on the host or expose it via sprite filesystem).
+**12d: Host-readable phase state (done).**
+- `sproot status <name> --host` reads `/root/.config/sproot/state.json` from the sprite filesystem via `ReadFile` and renders the phase table locally without exec'ing into the sprite.
+- Default (no `--host`) retains the original behavior: runs `sproot setup --status` inside the sprite.
 
 ---
 

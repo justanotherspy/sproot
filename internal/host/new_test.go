@@ -13,6 +13,7 @@ import (
 
 	sprites "github.com/superfly/sprites-go"
 
+	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
 )
 
@@ -30,21 +31,22 @@ func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.Sprite
 	return m.handle, nil
 }
 
-func (m *mockClient) GetHandle(_ string) SpriteHandle { return m.handle }
-
-func (m *mockClient) DestroySprite(_ context.Context, _ string) error { return m.destroyErr }
-
-func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error) { return nil, nil }
+func (m *mockClient) GetHandle(_ string) SpriteHandle                              { return m.handle }
+func (m *mockClient) DestroySprite(_ context.Context, _ string) error             { return m.destroyErr }
+func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error)    { return nil, nil }
+func (m *mockClient) UpgradeSprite(_ context.Context, _ string) error             { return nil }
 
 // mockHandle records calls for assertions.
 type mockHandle struct {
-	writtenFiles map[string][]byte
-	readFiles    map[string][]byte
-	readErr      error
-	lastCmdName  string
-	lastCmdArgs  []string
-	lastCmdEnv   []string
-	runErr       error
+	writtenFiles   map[string][]byte
+	readFiles      map[string][]byte
+	readErr        error
+	lastCmdName    string
+	lastCmdArgs    []string
+	lastCmdEnv     []string
+	runErr         error
+	checkpointErr  error
+	checkpointDone bool
 }
 
 func newMockHandle() *mockHandle {
@@ -79,9 +81,24 @@ func (h *mockHandle) RunCommand(name string, args, env []string, _, _ io.Writer)
 
 func (h *mockHandle) Console(_ []string) error { return h.runErr }
 
-// noopEnvBlock is an envBlockReaderFn that always returns an empty slice.
+func (h *mockHandle) Upgrade(_ context.Context) error { return nil }
+
+func (h *mockHandle) Checkpoint(_ context.Context, _ string, _ io.Writer) error {
+	h.checkpointDone = true
+	return h.checkpointErr
+}
+
+func (h *mockHandle) ListCheckpoints(_ context.Context, _ bool) ([]CheckpointEntry, error) {
+	return nil, nil
+}
+
+func (h *mockHandle) Restore(_ context.Context, _ string, _ io.Writer) error { return nil }
+
+// noopEnvBlock is an envBlockReaderFn that always returns an empty slice and nil config.
 // Used in tests that don't exercise env block logic.
-func noopEnvBlock(_, _, _ string, _ *log.Logger) ([]string, error) { return nil, nil }
+func noopEnvBlock(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
+	return nil, nil, nil
+}
 
 func writeHostConfig(t *testing.T, dir, content string) string {
 	t.Helper()
@@ -344,8 +361,8 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, error) {
-		return []string{"APP_SECRET=top-secret"}, nil
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
+		return []string{"APP_SECRET=top-secret"}, nil, nil
 	}
 
 	err := RunNew(context.Background(), NewOptions{
@@ -381,8 +398,8 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &mockClient{handle: handle}
 
-	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, error) {
-		return nil, fmt.Errorf("required env var MISSING_VAR (mapped as DEST_VAR) is not set on host")
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
+		return nil, nil, fmt.Errorf("required env var MISSING_VAR (mapped as DEST_VAR) is not set on host")
 	}
 
 	err := RunNew(context.Background(), NewOptions{
@@ -484,4 +501,65 @@ func contains(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func TestRunNew_CheckpointAfterSetup(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	cfgWithCheckpoint := &config.SprootConfig{CheckpointAfterSetup: true}
+	stubEnv := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, error) {
+		return nil, cfgWithCheckpoint, nil
+	}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "test-sprite",
+		client:           client,
+		envBlockReaderFn: stubEnv,
+		binarySrcFn:      func(_ string) ([]byte, error) { return []byte("bin"), nil },
+		NoConsole:        true,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if !handle.checkpointDone {
+		t.Error("expected checkpoint to be created after setup when checkpoint_after_setup is true")
+	}
+}
+
+func TestRunNew_NoCheckpointWhenFlagFalse(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &mockClient{handle: handle}
+
+	err := RunNew(context.Background(), NewOptions{
+		Name:             "test-sprite",
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
+		binarySrcFn:      func(_ string) ([]byte, error) { return []byte("bin"), nil },
+		NoConsole:        true,
+	})
+	if err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+	if handle.checkpointDone {
+		t.Error("expected no checkpoint when checkpoint_after_setup is false")
+	}
 }

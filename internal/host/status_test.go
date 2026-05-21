@@ -2,9 +2,13 @@ package host
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/justanotherspy/sproot/internal/phase"
 )
 
 func TestRunStatus_RunsSetupStatusInSprite(t *testing.T) {
@@ -34,6 +38,66 @@ gh_token_env: MY_GH_TOKEN
 	}
 	if !contains(handle.lastCmdArgs, "--status") {
 		t.Errorf("--status flag missing: %v", handle.lastCmdArgs)
+	}
+}
+
+func TestRunStatus_HostFlag_ReadsStateFromFilesystem(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	state := phase.State{
+		SchemaVersion: 1,
+		UpdatedAt:     time.Now(),
+		Phases: []phase.PhaseRecord{
+			{Type: "apt", Name: "apt", LastRunAt: time.Now(), DidWork: true},
+		},
+	}
+	stateJSON, _ := json.Marshal(state)
+
+	handle := newMockHandle()
+	handle.readFiles[spriteStatePath] = stateJSON
+	client := &mockClient{handle: handle}
+
+	err := RunStatus(context.Background(), StatusOptions{
+		Name:   "my-sprite",
+		Host:   true,
+		client: client,
+	})
+	if err != nil {
+		t.Fatalf("RunStatus --host: %v", err)
+	}
+	// --host should NOT exec into the sprite
+	if handle.lastCmdName != "" {
+		t.Errorf("expected no command execution, got %q", handle.lastCmdName)
+	}
+}
+
+func TestRunStatus_HostFlag_MissingState(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle() // readFiles empty -> ErrNotExist
+	client := &mockClient{handle: handle}
+
+	err := RunStatus(context.Background(), StatusOptions{
+		Name:   "my-sprite",
+		Host:   true,
+		client: client,
+	})
+	if err == nil || !strings.Contains(err.Error(), "read state") {
+		t.Errorf("expected read state error, got %v", err)
 	}
 }
 

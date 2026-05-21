@@ -17,10 +17,11 @@ type EnvVar struct {
 
 // SprootConfig is the top-level struct for sproot.yaml, found in the config repo.
 type SprootConfig struct {
-	SchemaVersion int           `yaml:"schema_version"`
-	Identity      Identity      `yaml:"identity"`
-	Env           []EnvVar      `yaml:"env"`
-	Phases        []PhaseConfig `yaml:"phases"`
+	SchemaVersion      int           `yaml:"schema_version"`
+	Identity           Identity      `yaml:"identity"`
+	Env                []EnvVar      `yaml:"env"`
+	Phases             []PhaseConfig `yaml:"phases"`
+	CheckpointAfterSetup bool        `yaml:"checkpoint_after_setup"`
 }
 
 // Identity holds user identity fields referenced by multiple modules.

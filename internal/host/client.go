@@ -2,9 +2,11 @@ package host
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
+	"time"
 
 	sprites "github.com/superfly/sprites-go"
 	"golang.org/x/term"
@@ -17,6 +19,14 @@ type SpriteListEntry struct {
 	Labels []string
 }
 
+// CheckpointEntry holds the subset of checkpoint info needed for list output.
+type CheckpointEntry struct {
+	ID         string
+	CreateTime time.Time
+	Comment    string
+	IsAuto     bool
+}
+
 // SpriteHandle abstracts per-sprite operations, enabling test mocking.
 type SpriteHandle interface {
 	WriteFile(path string, data []byte, perm fs.FileMode) error
@@ -24,6 +34,16 @@ type SpriteHandle interface {
 	RunCommand(name string, args, env []string, stdout, stderr io.Writer) error
 	// Console opens an interactive TTY shell on the sprite.
 	Console(env []string) error
+	// Upgrade upgrades the sprite to the latest version.
+	Upgrade(ctx context.Context) error
+	// Checkpoint creates a checkpoint with an optional comment, streaming
+	// progress messages to w.
+	Checkpoint(ctx context.Context, comment string, w io.Writer) error
+	// ListCheckpoints returns the checkpoints for this sprite.
+	// When includeAuto is true, auto-created checkpoints are included.
+	ListCheckpoints(ctx context.Context, includeAuto bool) ([]CheckpointEntry, error)
+	// Restore restores the sprite from a checkpoint, streaming progress to w.
+	Restore(ctx context.Context, checkpointID string, w io.Writer) error
 }
 
 // SpritesClient abstracts sprite lifecycle operations, enabling test mocking.
@@ -32,6 +52,8 @@ type SpritesClient interface {
 	GetHandle(name string) SpriteHandle
 	DestroySprite(ctx context.Context, name string) error
 	ListSprites(ctx context.Context) ([]SpriteListEntry, error)
+	// UpgradeSprite upgrades the named sprite to the latest version.
+	UpgradeSprite(ctx context.Context, name string) error
 }
 
 // NewClient constructs a real SpritesClient from an API token.
@@ -55,6 +77,10 @@ func (r *realClient) GetHandle(name string) SpriteHandle {
 
 func (r *realClient) DestroySprite(ctx context.Context, name string) error {
 	return r.c.DestroySprite(ctx, name)
+}
+
+func (r *realClient) UpgradeSprite(ctx context.Context, name string) error {
+	return r.c.UpgradeSprite(ctx, name)
 }
 
 func (r *realClient) ListSprites(ctx context.Context) ([]SpriteListEntry, error) {
@@ -118,4 +144,57 @@ func (h *realHandle) Console(env []string) error {
 		defer func() { _ = term.Restore(int(os.Stdin.Fd()), oldState) }()
 	}
 	return cmd.Run()
+}
+
+func (h *realHandle) Upgrade(ctx context.Context) error {
+	return h.s.Upgrade(ctx)
+}
+
+func (h *realHandle) Checkpoint(ctx context.Context, comment string, w io.Writer) error {
+	stream, err := h.s.CreateCheckpointWithComment(ctx, comment)
+	if err != nil {
+		return err
+	}
+	return stream.ProcessAll(func(msg *sprites.StreamMessage) error {
+		if msg.Data != "" {
+			_, _ = fmt.Fprintln(w, msg.Data)
+		}
+		if msg.Error != "" {
+			_, _ = fmt.Fprintln(w, "error: "+msg.Error)
+		}
+		return nil
+	})
+}
+
+func (h *realHandle) ListCheckpoints(ctx context.Context, includeAuto bool) ([]CheckpointEntry, error) {
+	raw, err := h.s.ListCheckpointsWithOptions(ctx, sprites.ListCheckpointsOptions{IncludeAuto: includeAuto})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]CheckpointEntry, len(raw))
+	for i, c := range raw {
+		out[i] = CheckpointEntry{
+			ID:         c.ID,
+			CreateTime: c.CreateTime,
+			Comment:    c.Comment,
+			IsAuto:     c.IsAuto,
+		}
+	}
+	return out, nil
+}
+
+func (h *realHandle) Restore(ctx context.Context, checkpointID string, w io.Writer) error {
+	stream, err := h.s.RestoreCheckpoint(ctx, checkpointID)
+	if err != nil {
+		return err
+	}
+	return stream.ProcessAll(func(msg *sprites.StreamMessage) error {
+		if msg.Data != "" {
+			_, _ = fmt.Fprintln(w, msg.Data)
+		}
+		if msg.Error != "" {
+			_, _ = fmt.Fprintln(w, "error: "+msg.Error)
+		}
+		return nil
+	})
 }

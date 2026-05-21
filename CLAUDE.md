@@ -64,6 +64,7 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 9 | Bug fixes (rc_block, binary_release, ssh_setup, cloneOrPull) (done) |
 | 10 | Cross-arch binary injection fix (download Linux/amd64 binary at runtime) (done) |
 | 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
+| 12 | SDK alignment: exec, upgrade, checkpoint, checkpoints, restore commands; checkpoint_after_setup in sproot.yaml; --storage-gb on new; status --host (done) |
 
 ## Workflow
 
