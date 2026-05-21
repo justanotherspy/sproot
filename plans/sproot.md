@@ -349,6 +349,14 @@ Run the goreleaser release pipeline against a test tag (e.g. `v0.0.0-test`) to c
 
 Establish a repeatable code review process for PRs. The `/ultrareview` skill in Claude Code on the web can run a multi-agent review of the current branch. Document the step in `CLAUDE.md` or the PR template.
 
+#### 15h. Audit `sproot new` config flags against the real API
+
+The sprites-go SDK defines `SpriteConfig{RamMB, CPUs, Region, StorageGB}` and sends these fields in the `POST /v1/sprites` request body. However, the SDK README labels sprite creation as "future functionality" and is at a pre-release version (`v0.0.0-...`). Whether the sprites.dev API actually respects these fields is unverified.
+
+**Action:** test `sproot new` with each flag (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) and verify the created sprite reflects the requested config. For any flag the API silently ignores, either remove the flag from `sproot new` or add a clear warning in the help text (e.g. "passed to API; support depends on your account tier"). A silently no-op flag is worse than no flag at all.
+
+Also audit the `org` handling: `CreateSpriteWithOrg` stores org on the returned `Sprite` struct but does NOT include it in the request body or URL. If org-scoped sprite creation is unsupported by the API, remove the `default_org` forwarding or document the limitation.
+
 ---
 
 ### Phase 14: Intelligence and agent context
