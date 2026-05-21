@@ -4,16 +4,18 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/justanotherspy/sproot/internal/config"
 )
 
 // ExecOptions controls the behavior of RunExec.
 type ExecOptions struct {
-	Name    string
-	Cmd     string
-	Args    []string
-	client  SpritesClient // nil: constructed from token at runtime
+	Name   string
+	Cmd    string
+	Args   []string
+	Env    string        // comma-separated KEY=value pairs (e.g. "FOO=bar,BAZ=qux")
+	client SpritesClient // nil: constructed from token at runtime
 }
 
 // RunExec runs a command in the named sprite and streams stdout/stderr to the host.
@@ -40,6 +42,11 @@ func RunExec(ctx context.Context, opts ExecOptions) error {
 		client = NewClient(token)
 	}
 
+	var env []string
+	if opts.Env != "" {
+		env = strings.Split(opts.Env, ",")
+	}
+
 	handle := client.GetHandle(opts.Name)
-	return handle.RunCommand(opts.Cmd, opts.Args, nil, os.Stdout, os.Stderr)
+	return handle.RunCommand(opts.Cmd, opts.Args, env, os.Stdout, os.Stderr)
 }

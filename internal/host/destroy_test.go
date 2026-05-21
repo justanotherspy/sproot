@@ -98,6 +98,39 @@ gh_token_env: MY_GH_TOKEN
 	}
 }
 
+func TestRunDestroy_ForceSkipsConfirmation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+gh_token_env: MY_GH_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+	t.Setenv("MY_GH_TOKEN", "gh-tok")
+
+	handle := newMockHandle()
+	handle.readErr = os.ErrNotExist
+	destroyCalled := false
+	client := &mockClientTracked{
+		handle:          handle,
+		onDestroySprite: func() { destroyCalled = true },
+	}
+
+	err := RunDestroy(context.Background(), DestroyOptions{
+		Name:   "my-sprite",
+		Force:  true,
+		client: client,
+	})
+	if err != nil {
+		t.Fatalf("RunDestroy --force: %v", err)
+	}
+	if !destroyCalled {
+		t.Error("expected DestroySprite to be called with --force")
+	}
+}
+
 func TestRunDestroy_TokenEnvUnset(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -134,4 +167,3 @@ func (m *mockClientTracked) DestroySprite(_ context.Context, _ string) error {
 func (m *mockClientTracked) ListSprites(_ context.Context) ([]SpriteListEntry, error) {
 	return nil, nil
 }
-func (m *mockClientTracked) UpgradeSprite(_ context.Context, _ string) error { return nil }

@@ -81,13 +81,13 @@ sproot config init
 
 | Command | Where | Description |
 |---------|-------|-------------|
-| `sproot new <name>` | host | Create and provision a sprite |
-| `sproot destroy <name>` | host | Destroy a sprite and remove its GitHub SSH keys |
+| `sproot new <name>` | host | Create and provision a sprite (`--skip-console` to skip opening a shell) |
+| `sproot destroy <name>` | host | Destroy a sprite and remove its GitHub SSH keys (`--force` skips confirmation) |
 | `sproot status <name>` | host | Show setup state (exec into sprite); `--host` reads state without exec |
 | `sproot console <name>` | host | Open an interactive shell in a sprite |
-| `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output |
-| `sproot list` | host | List sproot-managed sprites (`--all` shows every sprite) |
-| `sproot upgrade <name>` | host | Upgrade a sprite to the latest version |
+| `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output (`--env KEY=val,K2=v2`) |
+| `sproot list` | host | List sproot-managed sprites (`--all` shows every sprite, `--prefix` filters by name, `--watch` refreshes live) |
+| `sproot upgrade <name>` | host | Upgrade the sprite CLI inside a sprite |
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |

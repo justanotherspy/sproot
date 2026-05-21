@@ -6,6 +6,7 @@ import (
 )
 
 func newExecCmd() *cobra.Command {
+	var envStr string
 	cmd := &cobra.Command{
 		Use:   "exec <name> <cmd> [args...]",
 		Short: "Run a command in a sprite and stream output",
@@ -16,8 +17,10 @@ func newExecCmd() *cobra.Command {
 				Name: args[0],
 				Cmd:  args[1],
 				Args: args[2:],
+				Env:  envStr,
 			})
 		},
 	}
+	cmd.Flags().StringVar(&envStr, "env", "", "environment variables to set (KEY=value,KEY2=value2)")
 	return cmd
 }

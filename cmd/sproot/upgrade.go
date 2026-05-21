@@ -8,7 +8,7 @@ import (
 func newUpgradeCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "upgrade <name>",
-		Short: "Upgrade a sprite to the latest version",
+		Short: "Upgrade the sprite CLI inside a sprite",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return host.RunUpgrade(cmd.Context(), host.UpgradeOptions{Name: args[0]})

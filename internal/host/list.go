@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
@@ -12,14 +14,15 @@ import (
 // ListOptions controls the behavior of RunList.
 type ListOptions struct {
 	All    bool          // show all sprites, not just sproot-managed ones
+	Prefix string        // filter sprites by name prefix (empty means no filter)
+	Watch  bool          // poll and refresh every 2 seconds
 	client SpritesClient // nil: constructed from token at runtime
 }
 
 // RunList lists sprites. Without --all, only sprites tagged with the sproot
-// label (created by sproot new) are shown.
+// label (created by sproot new) are shown. --prefix filters by name prefix.
+// --watch polls and refreshes every 2 seconds until the context is cancelled.
 func RunList(ctx context.Context, opts ListOptions) error {
-	l := log.Stderr()
-
 	cfgPath, err := config.DefaultHostConfigPath()
 	if err != nil {
 		return err
@@ -42,6 +45,25 @@ func RunList(ctx context.Context, opts ListOptions) error {
 		client = NewClient(token)
 	}
 
+	if opts.Watch {
+		for {
+			fmt.Print("\033[H\033[2J")
+			if err := printList(ctx, client, opts); err != nil {
+				return err
+			}
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(2 * time.Second):
+			}
+		}
+	}
+	return printList(ctx, client, opts)
+}
+
+func printList(ctx context.Context, client SpritesClient, opts ListOptions) error {
+	l := log.Stderr()
+
 	entries, err := client.ListSprites(ctx)
 	if err != nil {
 		return fmt.Errorf("list sprites: %w", err)
@@ -50,6 +72,9 @@ func RunList(ctx context.Context, opts ListOptions) error {
 	var shown int
 	for _, e := range entries {
 		if !opts.All && !hasLabel(e.Labels, sprootLabel) {
+			continue
+		}
+		if opts.Prefix != "" && !strings.HasPrefix(e.Name, opts.Prefix) {
 			continue
 		}
 		_, _ = fmt.Fprintf(os.Stdout, "%-30s %s\n", e.Name, e.Status)

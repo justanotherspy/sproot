@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"runtime"
 
-	sprites "github.com/superfly/sprites-go"
 	"golang.org/x/term"
 
 	"github.com/justanotherspy/sproot/internal/config"
@@ -21,17 +20,13 @@ const sprootLabel = "sproot"
 
 // NewOptions controls the behavior of RunNew.
 type NewOptions struct {
-	Name       string
-	RamMB      int
-	CPUs       int
-	Region     string
-	StorageGB  int    // storage in GB for the sprite (0 uses default)
-	ConfigPath string // path to config file within the repo; overrides host config; empty uses host config or "sproot.yaml"
-	Only       string
-	Force      bool
-	DryRun     bool
-	NoConsole  bool   // skip opening console after successful setup
-	Version    string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
+	Name        string
+	ConfigPath  string // path to config file within the repo; overrides host config; empty uses host config or "sproot.yaml"
+	Only        string
+	Force       bool
+	DryRun      bool
+	SkipConsole bool   // skip opening console after successful setup
+	Version     string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
 	client           SpritesClient                                                                     // nil: use real client (test injection point)
 	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, error) // nil: use readEnvBlock (test injection point)
@@ -86,22 +81,8 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		client = NewClient(token)
 	}
 
-	spriteCfg := &sprites.SpriteConfig{}
-	if opts.RamMB > 0 {
-		spriteCfg.RamMB = opts.RamMB
-	}
-	if opts.CPUs > 0 {
-		spriteCfg.CPUs = opts.CPUs
-	}
-	if opts.Region != "" {
-		spriteCfg.Region = opts.Region
-	}
-	if opts.StorageGB > 0 {
-		spriteCfg.StorageGB = opts.StorageGB
-	}
-
 	l.Infof("creating sprite %s", opts.Name)
-	handle, err := client.CreateSprite(ctx, opts.Name, spriteCfg, []string{sprootLabel})
+	handle, err := client.CreateSprite(ctx, opts.Name, nil, []string{sprootLabel})
 	if err != nil {
 		return fmt.Errorf("create sprite: %w", err)
 	}
@@ -169,7 +150,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		}
 	}
 
-	if !opts.NoConsole && !opts.DryRun && term.IsTerminal(int(os.Stdin.Fd())) {
+	if !opts.SkipConsole && !opts.DryRun && term.IsTerminal(int(os.Stdin.Fd())) {
 		l.Successf("setup complete; opening console for %s", opts.Name)
 		return handle.Console(nil)
 	}
