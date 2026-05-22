@@ -5,9 +5,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"go.yaml.in/yaml/v3"
 )
+
+// GitOpTimeout bounds a single git network operation (clone, fetch, checkout) so
+// a hung remote cannot block setup, new, push, or outdated indefinitely.
+const GitOpTimeout = 3 * time.Minute
 
 // LoadSprootConfig reads and parses a sproot.yaml from the given path.
 func LoadSprootConfig(path string) (*SprootConfig, error) {

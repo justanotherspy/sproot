@@ -2,6 +2,7 @@ package sprite
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -147,21 +148,35 @@ func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 }
 
 // runGit runs git with the given arguments, streaming stdout and stderr directly
-// to the process's own stdout/stderr so progress is visible.
+// to the process's own stdout/stderr so progress is visible. Each call is bounded
+// by config.GitOpTimeout so a hung remote cannot block indefinitely.
 func runGit(args ...string) error {
-	cmd := exec.Command("git", args...)
+	ctx, cancel := context.WithTimeout(context.Background(), config.GitOpTimeout)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("git %s timed out after %s: %w", strings.Join(args, " "), config.GitOpTimeout, ctx.Err())
+		}
+		return err
+	}
+	return nil
 }
 
-// gitOutput runs git and returns its trimmed stdout.
+// gitOutput runs git and returns its trimmed stdout, bounded by config.GitOpTimeout.
 func gitOutput(args ...string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), config.GitOpTimeout)
+	defer cancel()
 	var buf bytes.Buffer
-	cmd := exec.Command("git", args...)
+	cmd := exec.CommandContext(ctx, "git", args...)
 	cmd.Stdout = &buf
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return "", fmt.Errorf("git %s timed out after %s: %w", strings.Join(args, " "), config.GitOpTimeout, ctx.Err())
+		}
 		return "", err
 	}
 	return buf.String(), nil
