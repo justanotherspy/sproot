@@ -1,0 +1,45 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Language/tooling installer modules exercised by the integration workflow, one
+# phase per CI job via --only <type>. The base sprite image ships Node, Rust, Go,
+# and Python toolchains (see sprites-artefacts/llm-dev.txt), so these run without
+# bootstrapping a language first.
+#
+# Deliberately omitted here:
+#   - gh_token / ssh_setup: require a user-scoped GitHub PAT and mutate the GitHub
+#     account (key registration / scope checks). The default Actions token cannot
+#     satisfy gh_token's verify (gh api user != gh_username), so they cannot run
+#     unattended in CI.
+#   - cargo_install: compiles crates from source, which is too slow/flaky for the
+#     fast per-job integration matrix.
+phases:
+  - type: uv_tool
+    tools:
+      - name: ruff
+
+  - type: corepack
+    managers: [pnpm]
+
+  - type: rust_components
+    components: [clippy]
+
+  - type: go_install
+    tools:
+      - pkg: golang.org/x/tools/cmd/goimports
+        version: latest
+
+  # dir points at the npm fixture inside the cloned config repo (config_source:
+  # git clones into ~/.sproot/config-repo on the sprite before phases run).
+  - type: npm
+    dir: ~/.sproot/config-repo/testdata/integration/files/npm
+
+  - type: sprite_service
+    service: sproot-test-svc
+    cmd: /bin/sleep
+    args: ["86400"]

@@ -76,6 +76,48 @@ func runCmdIn(dir string, l *log.Logger, name string, args ...string) error {
 	return nil
 }
 
+// runCmdEnv is like runCmd but appends extra "KEY=value" entries to the process
+// environment for this command only (e.g. GOBIN for go install).
+func runCmdEnv(env []string, l *log.Logger, name string, args ...string) error {
+	l.Debugf("exec (env %s): %s %s", strings.Join(env, " "), name, strings.Join(args, " "))
+	cmd := exec.Command(name, args...) // nosemgrep
+	cmd.Env = append(os.Environ(), env...)
+	pr, pw, err := pipeOf(cmd)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	if err := cmd.Start(); err != nil {
+		_ = pw.Close()
+		_ = pr.Close()
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	_ = pw.Close()
+	scanner := bufio.NewScanner(pr)
+	for scanner.Scan() {
+		l.Info(scanner.Text())
+	}
+	_ = pr.Close()
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	return nil
+}
+
+// userLocalBin returns ~/.local/bin (expanded), creating it if needed. It is the
+// install target for tools whose default location is not on the sprite's PATH
+// (go install -> GOPATH/bin, corepack-managed pnpm/yarn -> node bin dir);
+// ~/.local/bin is on the default PATH, so installed tools become invocable.
+func userLocalBin() (string, error) {
+	dir, err := expandTilde("~/.local/bin")
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
 // pipeOf wires a single pipe to cmd stdout+stderr and returns the read end.
 func pipeOf(cmd *exec.Cmd) (io.ReadCloser, io.WriteCloser, error) {
 	pr, pw, err := os.Pipe()

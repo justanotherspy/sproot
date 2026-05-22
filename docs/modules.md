@@ -92,6 +92,8 @@ Installs Go tools via `go install`.
 
 **Idempotency:** for semver versions, checks that the binary is on PATH and `go version -m` reports the expected module path. `latest` always re-runs.
 
+**Install location:** binaries are installed into `~/.local/bin` (via `GOBIN`) so they are on the default PATH inside a sprite, rather than the default `GOPATH/bin`.
+
 **Requires:** `go` on PATH.
 
 ---
@@ -207,6 +209,8 @@ Enables corepack and pre-activates the listed package managers.
 - `managers`: list of package manager names to prepare (e.g. `pnpm`, `yarn`)
 
 **Idempotency:** checks that each listed manager binary is on PATH.
+
+**Install location:** manager shims are installed into `~/.local/bin` (via `corepack enable --install-directory`) so they are on the default PATH inside a sprite, rather than next to the active node binary.
 
 **Requires:** `corepack` on PATH (ships with Node.js 16+).
 

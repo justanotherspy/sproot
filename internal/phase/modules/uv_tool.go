@@ -48,8 +48,9 @@ func (p *uvToolPhase) ShouldRun(_ *phase.Context) (bool, error) {
 
 func (p *uvToolPhase) Run(ctx *phase.Context) error {
 	if _, err := exec.LookPath("uv"); err != nil {
+		// --retry makes the installer fetch resilient to transient network blips.
 		if err := runCmd(ctx.Log, "sh", "-c",
-			"curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin sh"); err != nil {
+			"curl -LsSf --retry 3 --retry-connrefused https://astral.sh/uv/install.sh | UV_INSTALL_DIR=/usr/local/bin sh"); err != nil {
 			return fmt.Errorf("uv_tool: install uv: %w", err)
 		}
 	}

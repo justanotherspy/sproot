@@ -313,8 +313,13 @@ func readEnvBlock(configRepo, configRef, configPath string, l *log.Logger) ([]st
 
 	l.Infof("cloning config repo to resolve env block")
 	cloneArgs := []string{"clone", "--depth", "1", "--branch", configRef, configRepo, tmpdir}
-	out, err := exec.Command("git", cloneArgs...).CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), config.GitOpTimeout)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "git", cloneArgs...).CombinedOutput()
 	if err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return nil, nil, "", fmt.Errorf("readEnvBlock: git clone timed out after %s: %w", config.GitOpTimeout, ctx.Err())
+		}
 		return nil, nil, "", fmt.Errorf("readEnvBlock: git clone: %w\n%s", err, out)
 	}
 
