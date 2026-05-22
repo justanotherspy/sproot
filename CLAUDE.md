@@ -75,6 +75,8 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 - Run `make check` before every push (vet + test + lint must all pass).
 - When behavior changes, update the relevant docs in the same PR: `docs/modules.md` for module changes, `README.md` for user-facing command or config changes, `CLAUDE.md` phase table for phase completion, and `plans/sproot.md` for design decisions and phase summaries.
 - Every new CLI command or config feature must have corresponding integration test coverage: unit tests under `internal/host/` or `internal/sprite/`, a dry-run path in `internal/phase/modules/integration_test.go` if a new module type is added, and an entry in `integration.yml` (matrix or separate job) that exercises the feature against a real sprite. When reviewing or implementing a phase, explicitly check that all new functionality is covered end-to-end.
+- Sprites spin up in 1-2 seconds. Integration tests do not need artificial sleep or retry loops; commands can run immediately after sprite creation.
+- When adding integration tests for config-source functionality, cover BOTH `config_source: git` (standard git clone path) and `config_source: local` (local directory uploaded to sprite). The two code paths are distinct and both must be exercised.
 
 ## CI
 

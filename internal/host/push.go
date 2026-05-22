@@ -102,7 +102,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, cfg.ConfigPath, l),
 			}
 		}(i, entry)
 	}
@@ -125,7 +125,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 
 // pushOne runs setup on a single sprite, optionally checkpointing first,
 // then updates the sprite's metadata labels.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, base ConfigMeta, l *log.Logger) error {
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, base ConfigMeta, configPath string, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -136,6 +136,25 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	}
 
 	args := []string{"setup", "--force"}
+	// Pass the config source so the in-sprite setup command knows where to fetch config.
+	if base.Source == "local" && base.Repo != "" {
+		// For local config, upload the host directory to the sprite before running setup,
+		// then point setup at the in-sprite copy (the host path is unreachable inside the sprite).
+		const spriteLocalConfigDir = "/tmp/sproot-local-config"
+		l.Infof("[%s] uploading local config from %s", name, base.Repo)
+		if err := uploadDirectory(handle, base.Repo, spriteLocalConfigDir); err != nil {
+			return fmt.Errorf("[%s] upload local config: %w", name, err)
+		}
+		args = append(args, "--local-config", spriteLocalConfigDir)
+	} else if base.Repo != "" {
+		args = append(args, "--config-repo", base.Repo)
+		if base.Ref != "" {
+			args = append(args, "--ref", base.Ref)
+		}
+	}
+	if configPath != "" {
+		args = append(args, "--config-path", configPath)
+	}
 	if opts.Target != "" {
 		args = append(args, "--target", opts.Target)
 	}

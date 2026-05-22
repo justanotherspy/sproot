@@ -1,8 +1,8 @@
 schema_version: 1
 identity:
-  name: sproot CI
-  email: ci@sproot.dev
-  branch: main
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
   gh_username: justanotherspy
 
 targets:
