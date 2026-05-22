@@ -1,0 +1,76 @@
+name-template: 'v$RESOLVED_VERSION'
+tag-template: 'v$RESOLVED_VERSION'
+
+categories:
+  - title: 'Features'
+    labels:
+      - 'feature'
+      - 'enhancement'
+  - title: 'Bug Fixes'
+    labels:
+      - 'fix'
+      - 'bug'
+  - title: 'Documentation'
+    labels:
+      - 'documentation'
+      - 'docs'
+  - title: 'Maintenance'
+    labels:
+      - 'chore'
+      - 'ci'
+      - 'refactor'
+      - 'test'
+  - title: 'Dependencies'
+    labels:
+      - 'dependencies'
+
+change-template: '- $TITLE (#$NUMBER) @$AUTHOR'
+change-title-escapes: '\<*_&'
+
+version-resolver:
+  major:
+    labels:
+      - 'major'
+      - 'breaking'
+  minor:
+    labels:
+      - 'minor'
+      - 'feature'
+      - 'enhancement'
+  patch:
+    labels:
+      - 'patch'
+      - 'fix'
+      - 'bug'
+  default: patch
+
+exclude-labels:
+  - 'skip-changelog'
+
+# Maps conventional-commit PR title prefixes to labels. Only takes effect if
+# the workflow is also triggered on pull_request events (it is push-to-main
+# only today, so categorize merged PRs by adding these labels manually).
+autolabeler:
+  - label: 'documentation'
+    title:
+      - '/^docs(\(.+\))?:/i'
+  - label: 'fix'
+    title:
+      - '/^fix(\(.+\))?:/i'
+  - label: 'feature'
+    title:
+      - '/^feat(\(.+\))?:/i'
+  - label: 'chore'
+    title:
+      - '/^chore(\(.+\))?:/i'
+  - label: 'ci'
+    title:
+      - '/^ci(\(.+\))?:/i'
+  - label: 'dependencies'
+    title:
+      - '/^build\(deps\):/i'
+
+template: |
+  ## Changes
+
+  $CHANGES

@@ -1,0 +1,23 @@
+name: release-drafter
+
+# Maintains a rolling draft release. Drafting runs only on push to main:
+# each merge updates the next release's notes. goreleaser publishes the
+# actual release later when a v* tag is pushed.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  update-release-draft:
+    name: update release draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write      # create and update the draft release
+      pull-requests: read  # read merged PRs for the changelog
+    steps:
+      - uses: release-drafter/release-drafter@c2e2804cc59f45f57076a99af580d0fedb697927 # v7.3.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
