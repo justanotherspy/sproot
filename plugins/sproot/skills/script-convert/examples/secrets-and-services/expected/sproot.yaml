@@ -1,0 +1,25 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+# $GH_TOKEN is forwarded via the env block instead of being inlined (review the
+# host variable name). gh auth -> gh_token; the daemon.json write folds into the
+# docker module; the backgrounded dockerd becomes a sprite_service (sprites have
+# no systemd).
+env:
+  - from: GH_TOKEN
+    as: GH_TOKEN
+    required: true
+
+phases:
+  - type: gh_token
+  - type: docker
+    daemon_json:
+      storage-driver: overlay2
+  - type: sprite_service
+    service: dockerd
+    cmd: /usr/bin/dockerd

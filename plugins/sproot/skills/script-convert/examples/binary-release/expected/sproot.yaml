@@ -1,0 +1,18 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+# binary_release tracks the repo's latest release. The asset name uses {tag_no_v}
+# because cosign's .deb drops the leading v (cosign_2.4.1_amd64.deb for tag v2.4.1),
+# and {arch} resolves to the Go arch (amd64 / arm64).
+phases:
+  - type: binary_release
+    name: cosign
+    repo: sigstore/cosign
+    asset: "cosign_{version}_{arch}.deb"
+    install: dpkg
+    version: "{tag_no_v}"

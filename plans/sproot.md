@@ -195,10 +195,28 @@ The sprites-go SDK exposes no org-listing method (only `CreateSpriteWithOrg` and
 4. Delete the test tag and release
 5. Fix `.goreleaser.yaml` or `release.yml` if anything fails
 
-#### Deferred intelligence items (Phase 14)
+#### Phase 14: Intelligence (skills) — DONE
 
-- **14b.** Claude skill for sproot usage: generate `sproot.yaml` from description, validate/explain configs, suggest modules.
-- **14c.** Script-to-`sproot.yaml` converter skill: map apt-get install -> apt, pip install -> uv_tool, curl-pipe-sh -> binary_release or cmd, git config -> git_identity, etc.
+Shipped as a Claude Code plugin marketplace inside this repo (`.claude-plugin/marketplace.json`)
+with one plugin (`plugins/sproot/`) holding two skills, rather than baking conversion into the
+binary: bash is too irregular for a deterministic parser, so the skills give Claude a playbook +
+an authoritative module map and let it do the semantic translation, then validate the result with
+the real `sproot validate`.
+
+- **14c. `script-convert`**: turns a setup bash script into a `sproot.yaml` plus companion files.
+  Coalesces (one `apt`, one `repo_clone`, one `rc_block`), extracts heredoc/`cat >`/`tee` bodies
+  into a `files/` layout (`file_template`), folds shell-rc appends into one `rc_block` companion,
+  forwards secrets via the `env` block (never inline), drops `git config user.name/email`
+  (covered by `identity`), and falls back to `cmd` (with a `check:`) only when nothing structured
+  fits. Decision table lives in `plugins/sproot/reference/module-map.md`.
+- **14b. `author-config`**: generate from a description, explain phase-by-phase, interpret/fix
+  `sproot validate` errors, suggest modules. Shares the reference docs.
+- **Shared reference**: `reference/module-map.md` (idiom -> module) and `reference/module-schema.md`
+  (exact flat field shapes) mirror `docs/modules.md` + `internal/config/schema.go`; the
+  CLAUDE.md workflow now requires keeping them in sync when modules change.
+- **Verification**: seven golden fixtures under `skills/script-convert/examples/` (input.sh +
+  expected/), each passing `sproot validate`. CI (`plugins.yml`) runs `claude plugin validate
+  --strict` on the marketplace and plugin, and `sproot validate` on every fixture.
 
 ---
 

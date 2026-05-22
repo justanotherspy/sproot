@@ -1,0 +1,24 @@
+schema_version: 1
+
+# git_user_name / git_user_email / git_default_branch were extracted from the
+# `git config --global` lines, so those commands are dropped. gh_username is not
+# derivable from the script and is left as a placeholder.
+identity:
+  git_user_name: "Ada Lovelace"
+  git_user_email: "ada@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+phases:
+  - type: git_identity
+    config:
+      pull.rebase: "true"
+  - type: repo_clone
+    base_dir: ~/repos
+    repos:
+      # github.com repos cloned under ~/repos use the short SSH form
+      - justanotherspy/garlic
+      - justanotherspy/sproot
+      # other hosts / destinations use the long form
+      - url: https://gitlab.com/group/project.git
+        dest: ~/code/project

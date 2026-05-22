@@ -1,0 +1,27 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+phases:
+  - type: uv_tool
+    tools:
+      - name: ruff
+      - name: pre-commit
+  - type: go_install
+    tools:
+      - pkg: golang.org/x/tools/cmd/goimports
+        version: latest
+  - type: cargo_install
+    tools:
+      - name: ripgrep
+      - name: cargo-nextest
+        version: "0.9.72"
+        locked: true
+  - type: rust_components
+    components: [clippy, rustfmt]
+  - type: corepack
+    managers: [pnpm]
