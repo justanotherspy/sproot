@@ -1,0 +1,137 @@
+name: refresh-artefacts
+
+# Recaptures the fresh-sprite baseline snapshots under sprites-artefacts/ by
+# creating a bare sprite (no sproot setup) and reading the platform context
+# files it ships with. Opens a PR only when the captured files drift from what
+# is committed. Runs monthly and on demand.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 06:00 UTC on the 1st of every month.
+    - cron: "0 6 1 * *"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh:
+    name: recapture sprite baseline
+    runs-on: ubuntu-latest
+    # Only meaningful on the canonical repo, where SPRITES_TOKEN exists.
+    if: github.repository == 'justanotherspy/sproot'
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      SPRITE_NAME: sproot-recon-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: install sprite CLI
+        run: |
+          curl -fsSL https://sprites.dev/install.sh | sh
+          # The installer's target dir is not guaranteed, so find the binary and
+          # put its directory on PATH for later steps (GITHUB_PATH applies to the
+          # steps that follow, not this one).
+          for d in "$HOME/.sprite/bin" "$HOME/.local/bin" "$HOME/bin" /usr/local/bin; do
+            if [ -x "$d/sprite" ]; then
+              echo "$d" >> "$GITHUB_PATH"
+              echo "found sprite at $d/sprite"
+              exit 0
+            fi
+          done
+          found="$(command -v sprite || true)"
+          if [ -n "$found" ]; then
+            echo "sprite already on PATH at $found"
+            exit 0
+          fi
+          echo "could not locate the sprite binary after install" >&2
+          exit 1
+
+      - name: authenticate
+        run: sprite auth setup --token "$SPRITES_TOKEN"
+
+      - name: create fresh sprite
+        run: sprite create --skip-console "$SPRITE_NAME"
+
+      - name: capture baseline context files
+        run: |
+          set -u
+          # Read a path from the sprite and write it locally only if the read
+          # succeeds and returns content. Never overwrite a committed file with
+          # an empty capture, so a transient failure cannot manufacture a diff.
+          capture() {
+            remote="$1"; dest="$2"
+            tmp="$(mktemp)"
+            if sprite exec -s "$SPRITE_NAME" -- cat "$remote" > "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+              mkdir -p "$(dirname "$dest")"
+              mv "$tmp" "$dest"
+              echo "captured $dest ($(wc -c < "$dest") bytes)"
+            else
+              rm -f "$tmp"
+              echo "WARN: could not capture $remote, keeping existing $dest" >&2
+            fi
+          }
+
+          capture /.sprite/llm.txt           sprites-artefacts/llm.txt
+          capture /.sprite/llm-dev.txt       sprites-artefacts/llm-dev.txt
+          capture /.sprite/version.txt       sprites-artefacts/version.txt
+          capture /.sprite/docs/agent-context.md sprites-artefacts/docs/agent-context.md
+          capture /.sprite/docs/docker.md        sprites-artefacts/docs/docker.md
+          capture /.sprite/docs/services.md      sprites-artefacts/docs/services.md
+
+          ls -la sprites-artefacts sprites-artefacts/docs
+
+      - name: detect drift
+        id: drift
+        run: |
+          # Consider only the captured content files; the README is metadata we
+          # refresh below, so it must not by itself count as drift.
+          if git status --porcelain -- sprites-artefacts \
+              | grep -v 'sprites-artefacts/README.md' \
+              | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Captured baseline differs from committed snapshot."
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "Captured baseline matches committed snapshot, nothing to do."
+          fi
+
+      - name: refresh README metadata
+        if: steps.drift.outputs.changed == 'true'
+        run: |
+          VERSION="$(tr -d '[:space:]' < sprites-artefacts/version.txt)"
+          TODAY="$(date -u +%Y-%m-%d)"
+          sed -i -E \
+            "s#^Captured from a \`sprite create\` sprite on .*#Captured from a \`sprite create\` sprite on ${TODAY}.#" \
+            sprites-artefacts/README.md
+          sed -i -E \
+            "s#^Sprite client/image version \(\`/.sprite/version.txt\`\): \`.*#Sprite client/image version (\`/.sprite/version.txt\`): \`${VERSION}\`.#" \
+            sprites-artefacts/README.md
+
+      - name: open pull request
+        if: steps.drift.outputs.changed == 'true'
+        run: |
+          BRANCH="automation/sprites-artefacts-$(date -u +%Y-%m)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add sprites-artefacts
+          git commit -m "chore: refresh sprites-artefacts baseline snapshot"
+          # Dedicated automation branch: force so monthly re-runs update in place.
+          git push -u origin "$BRANCH" --force
+          if gh pr view "$BRANCH" >/dev/null 2>&1; then
+            echo "PR for $BRANCH already open, updated its branch."
+          else
+            gh pr create \
+              --base main \
+              --head "$BRANCH" \
+              --title "chore: refresh sprites-artefacts baseline snapshot" \
+              --body "Automated recapture of the fresh-sprite baseline context files (see sprites-artefacts/README.md). The committed snapshot drifted from a freshly created sprite, so these files were re-read via \`sprite exec\` and the README capture date and version were refreshed. Triggered by the refresh-artefacts workflow (${{ github.event_name }})."
+          fi
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        run: sprite destroy --force "$SPRITE_NAME"
