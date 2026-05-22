@@ -27,5 +27,6 @@ func newNewCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "re-run phases even if already complete")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")
 	cmd.Flags().BoolVar(&opts.SkipConsole, "skip-console", false, "skip opening a console after setup completes")
+	cmd.Flags().BoolVar(&opts.SkipVerify, "skip-verify", false, "skip the built-in verify phase")
 	return cmd
 }

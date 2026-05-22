@@ -16,6 +16,7 @@ const StateVersion = 1
 type State struct {
 	SchemaVersion int           `json:"schema_version"`
 	UpdatedAt     time.Time     `json:"updated_at"`
+	OnlyFilter    string        `json:"only_filter,omitempty"` // --only value from last run; empty = all phases ran
 	Phases        []PhaseRecord `json:"phases"`
 }
 

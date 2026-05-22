@@ -22,5 +22,6 @@ func newPushCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.Only, "only", "", "pass --only to sproot setup (run only the named phase type)")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")
 	cmd.Flags().BoolVar(&opts.NoCheckpoint, "no-checkpoint", false, "skip pre-push checkpoint")
+	cmd.Flags().BoolVar(&opts.SkipVerify, "skip-verify", false, "skip the built-in verify phase")
 	return cmd
 }

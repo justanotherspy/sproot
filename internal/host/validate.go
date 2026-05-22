@@ -10,7 +10,8 @@ import (
 
 // RunValidateSprootConfig loads and validates the sproot.yaml at path.
 // It also validates ~/.sproot/config.yaml when that file exists.
-func RunValidateSprootConfig(path string) error {
+// When strict is false, a missing sproot.yaml is a warning rather than an error.
+func RunValidateSprootConfig(path string, strict bool) error {
 	l := log.Stderr()
 
 	hostPath, err := config.DefaultHostConfigPath()
@@ -35,6 +36,14 @@ func RunValidateSprootConfig(path string) error {
 	}
 	cfg, err := config.LoadSprootConfig(expanded)
 	if err != nil {
+		if os.IsNotExist(err) || errors.Is(err, os.ErrNotExist) {
+			if strict {
+				l.Errorf("load: %v", err)
+				return err
+			}
+			l.Warnf("%s not found (use --strict to treat this as an error)", path)
+			return nil
+		}
 		l.Errorf("load: %v", err)
 		return err
 	}

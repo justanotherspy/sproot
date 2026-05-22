@@ -1,0 +1,29 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Local-config-safe multi-target config. Uses only phases that have no
+# config-relative file dependencies (no file_template or rc_block src paths),
+# so this config works when uploaded via local config source without path issues.
+targets:
+  base:
+    phases:
+      - type: apt
+        packages: [curl]
+      - type: git_identity
+      - type: cmd
+        name: base-verify
+        run: "git config --global user.email | grep ci@example.com"
+        check: "git config --global user.email | grep -q ci@example.com"
+
+  web:
+    extends: base
+    phases:
+      - type: cmd
+        name: web-verify
+        run: "which curl && git config --global user.email | grep ci@example.com"
+        check: "which curl && git config --global user.email | grep -q ci@example.com"

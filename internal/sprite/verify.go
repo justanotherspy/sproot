@@ -26,33 +26,73 @@ func (v *verifyPhase) Name() string                              { return "verif
 func (v *verifyPhase) ShouldRun(_ *phase.Context) (bool, error) { return true, nil }
 func (v *verifyPhase) Verify(_ *phase.Context) error            { return nil }
 
+// phaseForTool maps a command name to the phase type that installs it.
+// An empty phaseType means the tool is always checked (e.g. git is a baseline).
+var phaseForTool = []struct {
+	cmd       string
+	phaseType string
+}{
+	{"git", ""},
+	{"gh", "gh_token"},
+	{"go", "go_install"},
+	{"cargo", "cargo_install"},
+	{"uv", "uv_tool"},
+	{"docker", "docker"},
+	{"node", "corepack"},
+	{"pnpm", "corepack"},
+	{"rustup", "rust_components"},
+}
+
+// phaseRelevant reports whether a check associated with phaseType should run.
+// When only is empty (no --only filter) every check runs. When only is set,
+// only checks whose phaseType matches the filter (or is empty) are performed.
+func phaseRelevant(only, phaseType string) bool {
+	if only == "" || phaseType == "" {
+		return true
+	}
+	return only == phaseType
+}
+
 // Run checks commands on PATH, SSH key permissions, RC block presence, gh auth,
-// and SSH connectivity to github.com. All checks are attempted; failures are
-// collected and returned together.
+// and SSH connectivity to github.com. When --only was set (ctx.OnlyFilter non-empty),
+// only checks relevant to the filtered phase type are performed so that a partial
+// run does not fail on tools that the skipped phases would have installed.
 func (v *verifyPhase) Run(ctx *phase.Context) error {
+	only := ctx.OnlyFilter
 	var errs []error
 
-	for _, cmd := range []string{"git", "gh", "go", "cargo", "uv", "docker", "node", "pnpm", "rustup"} {
-		if _, err := exec.LookPath(cmd); err != nil {
-			ctx.Log.Errorf("verify: %s not found on PATH", cmd)
-			errs = append(errs, fmt.Errorf("%s not on PATH", cmd))
+	for _, tc := range phaseForTool {
+		if !phaseRelevant(only, tc.phaseType) {
+			continue
+		}
+		if _, err := exec.LookPath(tc.cmd); err != nil {
+			ctx.Log.Errorf("verify: %s not found on PATH", tc.cmd)
+			errs = append(errs, fmt.Errorf("%s not on PATH", tc.cmd))
 		} else {
-			ctx.Log.Successf("verify: %s ok", cmd)
+			ctx.Log.Successf("verify: %s ok", tc.cmd)
 		}
 	}
 
 	home, err := os.UserHomeDir()
 	if err == nil {
-		errs = append(errs, v.checkSSHKey(ctx, home)...)
-		errs = append(errs, v.checkRCBlocks(ctx, home)...)
+		if phaseRelevant(only, "ssh_setup") {
+			errs = append(errs, v.checkSSHKey(ctx, home)...)
+		}
+		if phaseRelevant(only, "rc_block") {
+			errs = append(errs, v.checkRCBlocks(ctx, home)...)
+		}
 	}
 
-	if err := v.checkGHAuth(ctx); err != nil {
-		errs = append(errs, err)
+	if phaseRelevant(only, "gh_token") {
+		if err := v.checkGHAuth(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
-	if err := v.checkSSHGitHub(ctx); err != nil {
-		errs = append(errs, err)
+	if phaseRelevant(only, "ssh_setup") {
+		if err := v.checkSSHGitHub(ctx); err != nil {
+			errs = append(errs, err)
+		}
 	}
 
 	return errors.Join(errs...)

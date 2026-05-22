@@ -36,7 +36,7 @@ Each phase is a discrete deliverable. Phases are roughly in dependency order.
 
 ### Phase 0: Scaffold (DONE)
 
-- `go.mod` (Go 1.23), cobra, Makefile (build/test/check/lint/tidy)
+- `go.mod` (Go 1.25), cobra, Makefile (build/test/check/lint/tidy)
 - Full directory layout, CI (`build-and-test` + `lint`)
 - `cmd/sproot/main.go` wired to cobra
 
@@ -379,6 +379,45 @@ Establish a repeatable code review process for PRs. The `/ultrareview` skill in 
 Resolved: the sprite CLI (v0.0.1-rc43) `create` command was enumerated. It exposes only `--skip-console` and `--label`. All four resource sizing flags (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) are absent from the CLI, confirming they are not supported. They were removed from `sproot new`. `--no-console` was renamed `--skip-console` to match the sprite CLI. Additionally, `--force` was added to `destroy`, `--env` to `exec`, `--prefix` and `--watch` to `list`, and `upgrade` was changed to run `sprite upgrade` inside the sprite rather than calling the SDK VM upgrade method.
 
 Deferred exec flags (`--dir`, `--tty`, `--file`, `--http-post`) require changes to the `SpriteHandle.RunCommand` interface; tracked for a future PR after SDK investigation.
+
+---
+
+### Phase 16: Integration depth and documentation fixes (DONE)
+
+**PR**: claude/lucid-cori-SYKG9
+
+#### 16a. Documentation fixes (done)
+
+- `README.md`: Added `sproot outdated` to command table; added `--skip-verify` mention for `sproot new`.
+- `CLAUDE.md`: Fixed Phase 12 entry (replaced `--storage-gb on new` with `--skip-console on new`); added Phase 16 row.
+- `plans/sproot.md`: Fixed Go version reference in Phase 0 from 1.23 to 1.25 to match `go.mod`.
+
+#### 16b. New test configs (done)
+
+- `testdata/integration/sproot_complex.yaml`: 5-phase flat config (apt, git_identity, file_template, rc_block, cmd) for git-based multi-phase CI. The final cmd phase verifies outputs of prior phases.
+- `testdata/integration/sproot_local_complex.yaml`: Same 5 phases but with `files/`-relative src paths, for local-config multi-phase CI (local config uses the uploaded dir as the config root).
+- `testdata/integration/sproot_targets.yaml`: Updated from trivial echo-only to real module phases (apt, git_identity, cmd in base; file_template, rc_block, cmd in web). Exercises extends inheritance across 5 total phases.
+- `testdata/integration/sproot_local_targets.yaml`: Local-config-safe multi-target config (no file src deps). Exercises extends with apt, git_identity, cmd phases.
+
+#### 16c. CI integration tests (done)
+
+Added 5 new jobs to `integration.yml` and fixed assertions on existing outdated jobs:
+
+| Job | Config | Flags | Tests |
+|-----|--------|-------|-------|
+| `multi-phase` | sproot_complex.yaml | (no --only), --skip-verify | Full 5-phase sequential git run |
+| `multi-target-full` | sproot_targets.yaml | --target web, --skip-verify | 5-phase extends run via git |
+| `local-config-multi-phase` | sproot_local_complex.yaml | (no --only), --skip-verify | 5-phase sequential local config run |
+| `local-config-multi-target` | sproot_local_targets.yaml | --target web, --skip-verify | 4-phase extends run via local config |
+| `push-multi-target` | sproot_targets.yaml | --target web, push --target web | Push with multi-target labels update |
+
+Changed `./sproot outdated` to `./sproot outdated | tee /dev/stderr | grep "current"` in all jobs that call it, making label staleness a hard failure.
+
+#### 16d. --skip-verify flag (done)
+
+Added `--skip-verify` to `sproot new`, `sproot setup`, and `sproot push`. When set, the built-in verify phase (tool PATH checks, rc block sentinel, gh auth, SSH) is not appended. Needed for integration tests with minimal configs that don't install uv, docker, pnpm, or rc_block. Also added `TestRunSetup_SkipVerify` unit test.
+
+**Bug found:** the built-in verify phase runs unconditionally when `--only` is absent, causing any multi-phase test that doesn't include the full tool suite (uv, docker, pnpm, ssh_setup, rc_block) to fail. `--skip-verify` is the fix.
 
 ---
 

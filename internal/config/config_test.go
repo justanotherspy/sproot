@@ -318,11 +318,11 @@ func TestLoadHostConfig_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if cfg.ConfigRepo != "git@github.com:justanotherspy/sprite.git" {
-		t.Errorf("config_repo: got %q", cfg.ConfigRepo)
+	if cfg.SprootConfigRepo != "git@github.com:justanotherspy/sprite.git" {
+		t.Errorf("sproot_config_repo: got %q", cfg.SprootConfigRepo)
 	}
-	if cfg.ConfigRef != "main" {
-		t.Errorf("config_ref: got %q", cfg.ConfigRef)
+	if cfg.SprootConfigRef != "main" {
+		t.Errorf("sproot_config_ref: got %q", cfg.SprootConfigRef)
 	}
 	if cfg.TokenEnv != "SPRITES_TOKEN" {
 		t.Errorf("token_env: got %q", cfg.TokenEnv)
@@ -618,8 +618,8 @@ func TestValidateSprootConfig_MultipleErrors(t *testing.T) {
 func TestValidateHostConfig_Errors(t *testing.T) {
 	base := func() *HostConfig {
 		return &HostConfig{
-			ConfigRepo: "git@github.com:user/repo.git",
-			ConfigRef:  "main",
+			SprootConfigRepo: "git@github.com:user/repo.git",
+			SprootConfigRef:  "main",
 			TokenEnv:   "SPRITES_TOKEN",
 			GHTokenEnv: "GITHUB_TOKEN",
 		}
@@ -630,8 +630,8 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		mutate  func(*HostConfig)
 		wantErr string
 	}{
-		{"missing_config_repo", func(c *HostConfig) { c.ConfigRepo = "" }, "config_repo is required"},
-		{"missing_config_ref", func(c *HostConfig) { c.ConfigRef = "" }, "config_ref is required"},
+		{"missing_config_repo", func(c *HostConfig) { c.SprootConfigRepo = "" }, "sproot_config_repo is required"},
+		{"missing_config_ref", func(c *HostConfig) { c.SprootConfigRef = "" }, "sproot_config_ref is required"},
 		{"missing_token_env", func(c *HostConfig) { c.TokenEnv = "" }, "token_env is required"},
 	}
 
@@ -652,8 +652,8 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 
 func TestValidateHostConfig_EmptyGHTokenEnvIsValid(t *testing.T) {
 	cfg := &HostConfig{
-		ConfigRepo: "git@github.com:user/repo.git",
-		ConfigRef:  "main",
+		SprootConfigRepo: "git@github.com:user/repo.git",
+		SprootConfigRef:  "main",
 		TokenEnv:   "SPRITES_TOKEN",
 		GHTokenEnv: "",
 	}
@@ -665,7 +665,7 @@ func TestValidateHostConfig_EmptyGHTokenEnvIsValid(t *testing.T) {
 func TestLoadHostConfig_TokenEnvDefault(t *testing.T) {
 	dir := t.TempDir()
 	path := dir + "/config"
-	if err := writeFile(t, path, "config_repo: git@github.com:u/r.git\nconfig_ref: main\n"); err != nil {
+	if err := writeFile(t, path, "sproot_config_repo: git@github.com:u/r.git\nsproot_config_ref: main\n"); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := LoadHostConfig(path)
@@ -924,8 +924,8 @@ func TestValidateSprootConfig_TargetDanglingExtends(t *testing.T) {
 
 func TestValidateHostConfig_LocalSource(t *testing.T) {
 	cfg := &HostConfig{
-		ConfigSource:    "local",
-		ConfigLocalPath: "~/my-config",
+		SprootConfigSource:    "local",
+		SprootConfigLocalPath: "~/my-config",
 		TokenEnv:        "SPRITES_TOKEN",
 	}
 	if err := ValidateHostConfig(cfg); err != nil {
@@ -935,21 +935,21 @@ func TestValidateHostConfig_LocalSource(t *testing.T) {
 
 func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
 	cfg := &HostConfig{
-		ConfigSource: "local",
+		SprootConfigSource: "local",
 		TokenEnv:     "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
-	if !strings.Contains(err.Error(), "config_local_path is required") {
+	if !strings.Contains(err.Error(), "sproot_config_local_path is required") {
 		t.Errorf("error %q missing expected message", err.Error())
 	}
 }
 
 func TestValidateHostConfig_InvalidSource(t *testing.T) {
 	cfg := &HostConfig{
-		ConfigSource: "ftp",
+		SprootConfigSource: "ftp",
 		TokenEnv:     "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)

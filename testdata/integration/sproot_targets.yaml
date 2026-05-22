@@ -1,21 +1,38 @@
 schema_version: 1
+
 identity:
   git_user_name: "sproot CI"
   git_user_email: "ci@example.com"
   git_default_branch: main
   gh_username: justanotherspy
 
+# Multi-target integration test config. The web target extends base, producing
+# a 5-phase run that exercises extends inheritance across real module types.
+#
+# Cmd phases use sentinel-file checks so they work both in the matrix job
+# (--only cmd --target web, without prior phases) and in the full multi-target
+# run (all 5 phases in sequence).
 targets:
   base:
     phases:
+      - type: apt
+        packages: [curl]
+      - type: git_identity
       - type: cmd
-        name: base-echo
-        run: "echo 'base target ok'"
-        check: "true"
+        name: base-verify
+        run: "echo 'base ok' > /tmp/sproot-base-ok.txt"
+        check: "test -f /tmp/sproot-base-ok.txt"
+
   web:
     extends: base
     phases:
+      - type: file_template
+        src: testdata/integration/files/hello.sh
+        dest: /tmp/sproot-test-hello.sh
+        mode: "0755"
+      - type: rc_block
+        src: testdata/integration/files/rc_block.sh
       - type: cmd
-        name: web-echo
-        run: "echo 'web target ok'"
-        check: "true"
+        name: web-verify
+        run: "echo 'web ok' > /tmp/sproot-web-ok.txt"
+        check: "test -f /tmp/sproot-web-ok.txt"

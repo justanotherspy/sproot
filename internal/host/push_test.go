@@ -38,8 +38,8 @@ func TestRunPush_AllSprites(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -84,8 +84,8 @@ func TestRunPush_WithCheckpoint(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -115,8 +115,8 @@ func TestRunPush_SpecificSprite(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -144,8 +144,8 @@ func TestRunPush_SpriteNotFound(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -175,8 +175,8 @@ func TestRunPush_WithTarget(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -214,8 +214,8 @@ func TestRunPush_NoSprites(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -241,8 +241,8 @@ func TestRunPush_DryRun(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -284,8 +284,8 @@ func TestRunPush_LabelsUpdated(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
