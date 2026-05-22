@@ -19,6 +19,7 @@ func newPushCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&opts.SpriteName, "name", "", "push to a single named sprite (default: all sproot-managed sprites)")
 	cmd.Flags().StringVar(&opts.Target, "target", "", "pass --target to sproot setup")
+	cmd.Flags().StringVar(&opts.Only, "only", "", "pass --only to sproot setup (run only the named phase type)")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")
 	cmd.Flags().BoolVar(&opts.NoCheckpoint, "no-checkpoint", false, "skip pre-push checkpoint")
 	return cmd

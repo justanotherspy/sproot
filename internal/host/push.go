@@ -16,6 +16,7 @@ import (
 type PushOptions struct {
 	SpriteName   string // empty = all sproot-managed sprites
 	Target       string // passed as --target to sproot setup
+	Only         string // passed as --only to sproot setup
 	DryRun       bool
 	NoCheckpoint bool   // skip the pre-push checkpoint
 	client       SpritesClient
@@ -113,7 +114,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.ConfigRepo, cfg.ConfigRef, cfg.ConfigPath, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.ConfigRepo, cfg.ConfigRef, cfg.ConfigPath, cfg.ConfigSource, l),
 			}
 		}(i, entry)
 	}
@@ -137,10 +138,11 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 // pushOne runs setup on a single sprite, optionally checkpointing first,
 // then updates the sprite's metadata labels.
 //
-// setupLocalDir, setupRepo, setupRef, configPath are sourced from the host config
-// (always available). labelMeta is sourced from shaFn (may be zero value when SHA
-// computation failed); it is used only for label updates, not for setup args.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath string, l *log.Logger) error {
+// setupLocalDir, setupRepo, setupRef, configPath, configSource are sourced from
+// the host config (always available). labelMeta is sourced from shaFn (may be
+// zero value when SHA computation failed); it is used only for label updates,
+// not for setup args.
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource string, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -168,6 +170,9 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	}
 	if opts.Target != "" {
 		args = append(args, "--target", opts.Target)
+	}
+	if opts.Only != "" {
+		args = append(args, "--only", opts.Only)
 	}
 	if opts.DryRun {
 		args = append(args, "--dry-run")
