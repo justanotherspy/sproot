@@ -60,6 +60,67 @@ func TestSprootConfig_EnvBlock(t *testing.T) {
 	}
 }
 
+func TestPhaseConfig_BinaryReleaseNewFields(t *testing.T) {
+	yaml := `schema_version: 1
+identity:
+  git_user_name: a
+  git_user_email: b@c.d
+  git_default_branch: main
+  gh_username: x
+phases:
+  - type: binary_release
+    name: trufflehog
+    repo: trufflesecurity/trufflehog
+    version: "{tag_no_v}"
+    asset: "trufflehog_{version}_linux_{arch}.tar.gz"
+    arch_map:
+      amd64: x86_64
+      arm64: arm64
+    checksum_asset: "trufflehog_{version}_checksums.txt"
+    install: tar+install
+    cosign:
+      blob: "trufflehog_{version}_checksums.txt"
+      signature: "trufflehog_{version}_checksums.txt.sig"
+      certificate: "trufflehog_{version}_checksums.txt.pem"
+      certificate_oidc_issuer: "https://token.actions.githubusercontent.com"
+      certificate_identity_regexp: "https://github.com/trufflesecurity/.*"
+  - type: claude
+    upgrade: true
+    settings:
+      theme: dark
+    claude_md: files/CLAUDE.md
+`
+	dir := t.TempDir()
+	path := dir + "/sproot.yaml"
+	if err := os.WriteFile(path, []byte(yaml), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadSprootConfig(path)
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if err := ValidateSprootConfig(cfg); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	br := cfg.Phases[0].BinaryRelease
+	if br == nil {
+		t.Fatal("BinaryRelease is nil")
+	}
+	if br.Version != "{tag_no_v}" {
+		t.Errorf("version: got %q", br.Version)
+	}
+	if br.ArchMap["amd64"] != "x86_64" || br.ArchMap["arm64"] != "arm64" {
+		t.Errorf("arch_map: got %v", br.ArchMap)
+	}
+	if br.Cosign == nil || br.Cosign.Blob == "" || br.Cosign.Signature == "" || br.Cosign.Certificate == "" {
+		t.Errorf("cosign: got %+v", br.Cosign)
+	}
+	cl := cfg.Phases[1].Claude
+	if cl == nil || !cl.Upgrade || cl.ClaudeMD != "files/CLAUDE.md" || cl.Settings["theme"] != "dark" {
+		t.Errorf("claude: got %+v", cl)
+	}
+}
+
 func TestPhaseConfig_AptFields(t *testing.T) {
 	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
 	if err != nil {
@@ -570,6 +631,42 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 				c.Phases = []PhaseConfig{{Type: "cmd", Cmd: &CmdConfig{}}}
 			},
 			"phases[0] (cmd): run is required",
+		},
+		{
+			"binary_release_arch_alias_without_map",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "binary_release", BinaryRelease: &BinaryReleaseConfig{
+					Name: "hadolint", Repo: "h/h", Asset: "hadolint-linux-{arch_alias}",
+				}}}
+			},
+			"asset uses {arch_alias} but arch_map is not set",
+		},
+		{
+			"binary_release_cosign_missing_blob",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "binary_release", BinaryRelease: &BinaryReleaseConfig{
+					Name: "t", Repo: "t/t", Asset: "t.tar.gz",
+					Cosign: &CosignConfig{
+						CertificateIdentityRegexp: "x", CertificateOIDCIssuer: "y",
+						Signature: "s", Certificate: "c",
+					},
+				}}}
+			},
+			"binary_release.cosign): blob is required",
+		},
+		{
+			"claude_nothing_set",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "claude", Claude: &ClaudeConfig{}}}
+			},
+			"set at least one of settings, upgrade, or claude_md",
+		},
+		{
+			"claude_settings_is_now_unknown",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "claude_settings"}}
+			},
+			`"claude_settings" is not a known module type`,
 		},
 	}
 

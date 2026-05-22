@@ -64,6 +64,7 @@ plans/                - design docs, not shipped
 | 15-16 | Operational improvements, integration depth, make e2e (done) |
 | 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md; module additions (repo_clone URLs, npm, sprite_service http_port/needs) (done) |
 | 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d deferred) |
+| 19 | Module gaps to drain cmd blocks: binary_release `version`/`arch_map`/cosign; merge `claude upgrade`+`claude_settings` into a `claude` module (settings/upgrade/CLAUDE.md); sprite-env-aware docker daemon.json merge; apt symlink ~ expansion + mkdir; sprites-artefacts reference snapshot (done) |
 
 ## Workflow
 
@@ -78,7 +79,7 @@ plans/                - design docs, not shipped
 
 Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
 
-`integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs: six module-type matrix entries (apt, git_identity, file_template, rc_block, claude_settings, cmd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path).
+`integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs include module-type matrix entries (apt, git_identity, file_template, rc_block, claude, cmd, binary-release), a docker-daemon job (docker daemon.json merge + sprite_service dockerd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path).
 
 When a CI job fails, always fetch the full logs using the gh CLI before diagnosing:
 

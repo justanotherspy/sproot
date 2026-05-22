@@ -90,7 +90,7 @@ func TestRCBlock_ShouldRunWhenOnlyZshrcStale(t *testing.T) {
 
 	p := newRCBlockPhase("rc.sh")
 	// Write the block only to .bashrc; leave .zshrc absent.
-	if err := applyRCBlock(filepath.Join(home, ".bashrc"), src); err != nil {
+	if err := applyManagedBlock(filepath.Join(home, ".bashrc"), src, rcBegin, rcEnd); err != nil {
 		t.Fatal(err)
 	}
 

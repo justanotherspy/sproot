@@ -14,7 +14,7 @@ Map common bash idioms to sproot module types:
 | `git config --global ...` | `git_identity` |
 | Template a config file from env vars | `file_template` |
 | Add a block to `.bashrc` / `.zshrc` | `rc_block` |
-| Configure Claude Code settings | `claude_settings` |
+| Configure Claude Code (settings, upgrade, CLAUDE.md) | `claude` |
 | Pull in a dotfiles repo | `git` |
 | Install and start Docker | `docker` |
 | Set GitHub token for `gh` CLI | `gh_token` |
@@ -50,37 +50,70 @@ Use the `pkg` field when the PyPI package name differs from the installed binary
       pkg: garlic   # PyPI package to install
 ```
 
-### binary_release: tools with non-standard arch strings
+### binary_release: tools with non-standard versions and arch strings
 
-Use `{x64_arch}` or `{x86_64_arch}` for tools that name their assets differently from Go's `amd64`:
+Use `version` for tools whose asset names drop the leading `v`, and `arch_map` +
+`{arch_alias}` for arch naming that the built-in vars do not cover:
 
 ```yaml
-# gitleaks uses x64 (not amd64)
+# gitleaks: tag is v8.30.1 but the asset is gitleaks_8.30.1_... (no v); arch is x64
 - type: binary_release
   name: gitleaks
-  repo: zricethezav/gitleaks
+  repo: gitleaks/gitleaks
+  version: "{tag_no_v}"
   asset: "gitleaks_{version}_linux_{x64_arch}.tar.gz"
   install: tar+install
 
-# hadolint uses x86_64 (not amd64)
+# hadolint: x86_64 on amd64 but arm64 on arm64 (no single built-in var fits)
 - type: binary_release
   name: hadolint
   repo: hadolint/hadolint
-  asset: "hadolint-Linux-{x86_64_arch}"
+  arch_map:
+    amd64: x86_64
+    arm64: arm64
+  asset: "hadolint-linux-{arch_alias}"
   install: raw
+```
+
+### binary_release: cosign-verified installs
+
+For tools whose install scripts verify a Sigstore keyless signature (e.g. trufflehog),
+use the `cosign` block instead of a `cmd` shell-out. Install cosign in an earlier phase:
+
+```yaml
+- type: binary_release
+  name: trufflehog
+  repo: trufflesecurity/trufflehog
+  version: "{tag_no_v}"
+  asset: "trufflehog_{version}_linux_{arch}.tar.gz"
+  checksum_asset: "trufflehog_{version}_checksums.txt"
+  install: tar+install
+  cosign:
+    blob: "trufflehog_{version}_checksums.txt"
+    signature: "trufflehog_{version}_checksums.txt.sig"
+    certificate: "trufflehog_{version}_checksums.txt.pem"
+    certificate_oidc_issuer: "https://token.actions.githubusercontent.com"
+    certificate_identity_regexp: "https://github.com/trufflesecurity/trufflehog/.github/workflows/.*"
 ```
 
 ### docker: daemon configuration
 
-Use `daemon_json` to configure the Docker daemon at install time:
+Use `daemon_json` to configure the Docker daemon at install time. It is deep-merged
+into any existing file. On sprites, include `storage-driver: overlay2` and start dockerd
+via a following `sprite_service` phase (no systemd restart happens on a sprite):
 
 ```yaml
 - type: docker
   daemon_json:
+    storage-driver: overlay2
     log-driver: json-file
     log-opts:
       max-size: 10m
       max-file: "3"
     insecure-registries:
       - registry.local:5000
+
+- type: sprite_service
+  service: dockerd
+  cmd: /usr/bin/dockerd
 ```

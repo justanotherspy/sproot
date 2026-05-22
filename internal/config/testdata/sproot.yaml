@@ -55,7 +55,7 @@ phases:
   - type: git_identity
   - type: ssh_setup
   - type: gh_token
-  - type: claude_settings
+  - type: claude
     settings:
       theme: dark
   - type: cmd

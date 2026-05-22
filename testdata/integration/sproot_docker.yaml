@@ -1,0 +1,22 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Exercises the docker module's daemon.json merge (sprite-env aware: no systemd
+# restart) followed by sprite_service starting dockerd with the merged config.
+phases:
+  - type: docker
+    daemon_json:
+      storage-driver: overlay2
+      log-driver: json-file
+      log-opts:
+        max-size: 10m
+        max-file: "3"
+
+  - type: sprite_service
+    service: dockerd
+    cmd: /usr/bin/dockerd

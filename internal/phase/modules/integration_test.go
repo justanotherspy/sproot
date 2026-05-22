@@ -19,6 +19,7 @@ func TestDryRunAllModules(t *testing.T) {
 	repoDir := t.TempDir()
 	_ = os.WriteFile(filepath.Join(repoDir, "file.txt"), []byte("hello\n"), 0o644)
 	_ = os.WriteFile(filepath.Join(repoDir, "rc.sh"), []byte("export X=1\n"), 0o644)
+	_ = os.WriteFile(filepath.Join(repoDir, "CLAUDE.md"), []byte("# Project notes\n"), 0o644)
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -41,9 +42,16 @@ func TestDryRunAllModules(t *testing.T) {
 		{Type: "cargo_install", CargoInstall: &config.CargoInstallConfig{
 			Tools: []config.CargoTool{{Name: "ripgrep"}},
 		}},
-		// binary_release: x64_arch / x86_64_arch template vars
+		// binary_release: version field ({tag_no_v}) + x64_arch template var
 		{Type: "binary_release", BinaryRelease: &config.BinaryReleaseConfig{
-			Name: "gitleaks", Repo: "gitleaks/gitleaks", Asset: "gitleaks_{version}_linux_{x64_arch}.tar.gz", Install: "tar+install",
+			Name: "gitleaks", Repo: "gitleaks/gitleaks", Version: "{tag_no_v}",
+			Asset: "gitleaks_{version}_linux_{x64_arch}.tar.gz", Install: "tar+install",
+		}},
+		// binary_release: arch_map + {arch_alias} (hadolint-style naming)
+		{Type: "binary_release", BinaryRelease: &config.BinaryReleaseConfig{
+			Name: "hadolint", Repo: "hadolint/hadolint",
+			ArchMap: map[string]string{"amd64": "x86_64", "arm64": "arm64"},
+			Asset:   "hadolint-linux-{arch_alias}", Install: "raw",
 		}},
 		{Type: "corepack", Corepack: &config.CorepackConfig{Managers: []string{"pnpm", "yarn"}}},
 		{Type: "rust_components", RustComponents: &config.RustComponentsConfig{Components: []string{"clippy", "rustfmt"}}},
@@ -70,8 +78,10 @@ func TestDryRunAllModules(t *testing.T) {
 				{URL: "https://github.com/org/project.git", Dest: filepath.Join(home, "project")},
 			},
 		}},
-		{Type: "claude_settings", ClaudeSettings: &config.ClaudeSettingsConfig{
+		// claude: settings deep-merge + managed CLAUDE.md block from the config repo
+		{Type: "claude", Claude: &config.ClaudeConfig{
 			Settings: map[string]any{"theme": "dark"},
+			ClaudeMD: "CLAUDE.md",
 		}},
 		// npm: installs node_modules in a project dir
 		{Type: "npm", Npm: &config.NpmConfig{Dir: npmDir}},

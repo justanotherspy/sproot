@@ -43,7 +43,7 @@ All phases through 16 are done and merged.
 | 0 | Scaffold: go.mod (Go 1.25), cobra, Makefile, CI (build-and-test + lint) |
 | 1 | Config schema: `SprootConfig`, `HostConfig`, all phase config structs, custom YAML unmarshaling |
 | 2 | Phase engine: `Phase` interface, runner (`--only`, `--force`), state file, registry |
-| 3 | 17 module types: apt, uv_tool, go_install, cargo_install, binary_release, corepack, rust_components, docker, sprite_service, git_identity, ssh_setup, gh_token, file_template, rc_block, repo_clone, claude_settings, cmd |
+| 3 | 18 module types: apt, uv_tool, go_install, cargo_install, binary_release, corepack, rust_components, docker, sprite_service, git_identity, ssh_setup, gh_token, file_template, rc_block, repo_clone, claude, npm, cmd (claude replaced claude_settings in Phase 19; npm added in Phase 17) |
 | 4 | `sproot setup` in-sprite: clone config repo, load sproot.yaml, run phases, verify |
 | 5 | Host CLI: new, destroy, status, config, validate; sprites-go SDK client interfaces |
 | 6 | justanotherspy/sprite converted to a config repo (separate repo; ongoing) |
@@ -199,6 +199,48 @@ The sprites-go SDK exposes no org-listing method (only `CreateSpriteWithOrg` and
 
 - **14b.** Claude skill for sproot usage: generate `sproot.yaml` from description, validate/explain configs, suggest modules.
 - **14c.** Script-to-`sproot.yaml` converter skill: map apt-get install -> apt, pip install -> uv_tool, curl-pipe-sh -> binary_release or cmd, git config -> git_identity, etc.
+
+---
+
+### Phase 19: Module gaps to drain `cmd` blocks — DONE
+
+Motivated by auditing the (out-of-date) `justanotherspy/sprite` `sproot.yaml`, whose `cmd`
+blocks worked around missing module features. A fresh-sprite recon confirmed: no default
+`/etc/docker/daemon.json` (dir absent), the platform recommends `storage-driver: overlay2`
+and runs dockerd as a sprite service (no systemd), `uv tool` binaries land in `~/.local/bin`
+which is already on PATH (so uv_tool needs no fix), and apt installs `bat`/`fd` as
+`batcat`/`fdfind`. Captured the platform `/.sprite/llm.txt`, `llm-dev.txt`, and
+`docs/{agent-context,docker,services}.md` into `sprites-artefacts/` for reference.
+
+- **binary_release `version`**: optional template for the `{version}` token (default raw tag);
+  new `{tag}`/`{tag_no_v}` vars. The download URL path always uses the raw tag. Drains the
+  gitleaks `cmd` (and fixes cosign, whose `.deb` also drops the leading `v`).
+- **binary_release `arch_map` + `{arch_alias}`**: covers any arch naming the fixed vars miss
+  (hadolint: `x86_64` on amd64, `arm64` on arm64). Static validation requires `arch_map` when
+  `{arch_alias}` is used; the per-GOARCH key is a runtime check (host arch may differ from sprite).
+- **binary_release `cosign`**: keyless `cosign verify-blob` of a signed checksums file, then
+  verifies the asset against it. Drains the trufflehog `cmd`. Hard-errors if cosign is absent;
+  the cosign-installing phase must precede phases using a `cosign:` block (runner is list-ordered).
+- **`claude` module replaces `claude_settings`**: settings deep-merge + `upgrade` + a managed
+  CLAUDE.md block (HTML-comment sentinels) sourced from a config-repo file (optional Go template).
+  Drains the `claude upgrade` `cmd` and folds in settings. Shared `deepMerge`/`jsonStr` moved to
+  `jsonmerge.go`; `rc_block` block helpers generalized to take begin/end sentinels.
+- **docker daemon.json**: deep-merges into any existing file (absent file -> empty start; corrupt ->
+  error); sprite-env-aware (no `systemctl restart` on a sprite; `sprite_service` starts dockerd with
+  the merged config). Drains the daemon.json `cmd`.
+- **apt symlinks**: `~` expansion + parent `mkdir`, so the bat/fd shims move off `cmd`.
+- **privilege fix (`runPrivileged`)**: `sproot setup` runs as the unprivileged `sprite` user, so
+  `apt-get install` and `dpkg -i` failed (superuser required) — the apt phase only "worked" in CI
+  because the test packages were pre-installed. Added a shared `runPrivileged` that prepends `sudo -n`
+  when not root (sudo is passwordless on sprites); applied to `apt-get install` and the `dpkg` install.
+  Verified end-to-end on a real sprite: cosign (dpkg), gitleaks (version), hadolint (arch_map),
+  trufflehog (cosign verify-blob "Verified OK"), claude (settings deep-merge preserved the platform's
+  hooks/permissions; CLAUDE.md template-rendered block), and docker (daemon.json merged with
+  storage-driver overlay2, systemctl skipped under sprite-env, dockerd registered via sprite_service).
+
+Follow-up (user-owned, separate repo): rewrite `justanotherspy/sprite/sproot.yaml` to use these
+features (examples in `docs/modules.md` and `MIGRATION.md`). Remaining legitimate `cmd` blocks:
+flyctl install, `garlic setup --defaults`, and shell-completion generation.
 
 ---
 

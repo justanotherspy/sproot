@@ -1,6 +1,6 @@
 # Module Reference
 
-Each phase in `sproot.yaml` is driven by a module type. This document describes all 17 types.
+Each phase in `sproot.yaml` is driven by a module type. This document describes all 18 types.
 
 ---
 
@@ -41,9 +41,11 @@ Installs system packages via `apt-get` and optionally creates post-install symli
 
 **Fields:**
 - `packages`: list of apt package names
-- `symlinks`: optional list of `{from, to}` pairs; `from` is the source path, `to` is the symlink path to create (uses `ln -sf`)
+- `symlinks`: optional list of `{from, to}` pairs; `from` is the source path, `to` is the symlink path to create (uses `ln -sf`). Both paths support `~` expansion, and the parent directory of `to` is created if missing (so `~/.local/bin/bat` works without a separate `mkdir`).
 
 **Idempotency:** checks `dpkg -s <pkg>` for each package and `stat <to>` for each symlink; skips the phase if all are satisfied.
+
+**Privilege:** `apt-get install` requires root. When sproot runs as a non-root user (the usual case inside a sprite, where setup runs as the unprivileged sprite user), it prepends `sudo -n`. Symlink creation runs as the current user.
 
 **Platform:** Linux with apt.
 
@@ -132,8 +134,11 @@ Downloads and installs a binary from a GitHub release.
   repo: sigstore/cosign
   asset: "cosign_{version}_{arch}.deb"
   install: dpkg
+  version: ""          # optional: template for the {version} token (default: raw tag)
+  arch_map: {}         # optional: GOARCH -> custom arch token, exposed as {arch_alias}
   checksum: ""         # optional: sha256 hex of the downloaded asset
   checksum_asset: ""   # optional: asset name template for a checksums file
+  # cosign: {}         # optional: keyless signature verification (see below)
 ```
 
 **Fields:**
@@ -141,21 +146,49 @@ Downloads and installs a binary from a GitHub release.
 - `repo`: `owner/repo` on GitHub
 - `asset`: asset filename template (see template variables below)
 - `install`: one of `dpkg`, `tar+install`, or `raw`
+- `version`: optional template for the `{version}` token. Defaults to the raw release tag. Set it to `"{tag_no_v}"` for projects whose asset names drop the leading `v` (e.g. gitleaks: tag `v8.30.1`, asset `gitleaks_8.30.1_...`). The download URL path always uses the raw tag regardless.
+- `arch_map`: optional map from `GOARCH` (`amd64`, `arm64`) to a custom arch token, resolved as `{arch_alias}`. Use it when a project's arch naming matches none of the built-in vars (e.g. hadolint uses `x86_64` on amd64 but `arm64` on arm64).
 - `checksum`: optional sha256 hex string; verified against the downloaded asset before install
 - `checksum_asset`: optional asset name template (e.g. `{name}_{version}_checksums.txt`) for a goreleaser-style checksums file; sproot downloads it, finds the matching line, and verifies
+- `cosign`: optional keyless cosign signature verification (see below)
 
 **Asset template variables:**
-- `{version}`: latest release tag (e.g. `v2.4.1`)
+- `{version}`: the resolved version token (defaults to the raw tag; see `version`)
+- `{tag}`: the raw release tag (e.g. `v2.4.1`)
+- `{tag_no_v}`: the tag with one leading `v`/`V` stripped (e.g. `2.4.1`)
 - `{arch}`: `amd64` or `arm64`
 - `{goos}`: `linux` or `darwin`
 - `{dpkg_arch}`: Debian arch name (`amd64`, `arm64`)
 - `{x64_arch}`: x64-style arch (`x64` on amd64, `arm64` on arm64)
 - `{x86_64_arch}`: x86_64-style arch (`x86_64` on amd64, `aarch64` on arm64)
+- `{arch_alias}`: `arch_map[GOARCH]` (requires `arch_map`; errors if the current arch has no entry)
 
 **Install methods:**
-- `dpkg`: runs `dpkg -i <file>`; idempotency via `dpkg -s <name>`
+- `dpkg`: runs `dpkg -i <file>` (prepends `sudo -n` when not root, since dpkg requires root); idempotency via `dpkg -s <name>`
 - `tar+install`: extracts tarball, copies the single executable to `/usr/local/bin/<name>`
 - `raw`: marks the downloaded file executable and copies to `/usr/local/bin/<name>`
+
+**cosign verification (keyless):**
+
+```yaml
+- type: binary_release
+  name: trufflehog
+  repo: trufflesecurity/trufflehog
+  version: "{tag_no_v}"
+  asset: "trufflehog_{version}_linux_{arch}.tar.gz"
+  checksum_asset: "trufflehog_{version}_checksums.txt"
+  install: tar+install
+  cosign:
+    blob: "trufflehog_{version}_checksums.txt"
+    signature: "trufflehog_{version}_checksums.txt.sig"
+    certificate: "trufflehog_{version}_checksums.txt.pem"
+    certificate_oidc_issuer: "https://token.actions.githubusercontent.com"
+    certificate_identity_regexp: "https://github.com/trufflesecurity/trufflehog/.github/workflows/.*"
+```
+
+When the `cosign` block is set, sproot downloads `blob` (typically a checksums file), its `signature`, and its `certificate`, then runs `cosign verify-blob --certificate <cert> --signature <sig> --certificate-identity-regexp <re> --certificate-oidc-issuer <issuer> <blob>`. On success it verifies the main asset against the (now trusted) checksums blob. All five sub-fields are required. `blob`/`signature`/`certificate` are asset-name templates (same variables as `asset`).
+
+Requirements and ordering: needs `cosign` v2+ on PATH. Install cosign via an earlier `binary_release` phase; the runner executes phases in list order, so the cosign-installing phase must precede any phase with a `cosign:` block. If cosign is not on PATH, the phase fails (it does not silently skip verification).
 
 **Idempotency:** for `dpkg` checks `dpkg -s <name>`; for others checks binary on PATH.
 
@@ -201,7 +234,7 @@ Also sets `rustup default stable`.
 
 ## docker
 
-Installs Docker via the official install script. Optionally writes `/etc/docker/daemon.json`.
+Installs Docker via the official install script. Optionally deep-merges `daemon_json` into `/etc/docker/daemon.json`.
 
 ```yaml
 - type: docker
@@ -209,6 +242,7 @@ Installs Docker via the official install script. Optionally writes `/etc/docker/
 # with daemon configuration:
 - type: docker
   daemon_json:
+    storage-driver: overlay2   # recommended on sprites (see /.sprite/docs/docker.md)
     log-driver: json-file
     log-opts:
       max-size: 10m
@@ -218,9 +252,11 @@ Installs Docker via the official install script. Optionally writes `/etc/docker/
 ```
 
 **Fields:**
-- `daemon_json`: optional map written to `/etc/docker/daemon.json` after install; docker is restarted to apply it
+- `daemon_json`: optional map deep-merged into `/etc/docker/daemon.json` after install. An existing file (e.g. a platform default) is preserved and merged with; nested maps merge recursively, while lists and scalars are replaced wholesale (e.g. `insecure-registries` is replaced, not appended).
 
-**Idempotency:** checks `docker --version` exits 0; if `daemon_json` is set, also checks that `/etc/docker/daemon.json` exists.
+**Restart behavior:** on a systemd host, docker is restarted (`systemctl restart docker`) to apply the merged config. On a sprite (detected by the presence of `sprite-env`) there is no systemd, so sproot does not restart; instead, a later `sprite_service: dockerd` phase starts dockerd with the merged config. Order the `docker` phase before the `sprite_service` phase.
+
+**Idempotency:** checks `docker --version` exits 0; if `daemon_json` is set, also checks whether merging it would change the on-disk file (so an updated `daemon_json` is re-applied even when the file already exists).
 
 **Platform:** Linux. Requires root or sudo.
 
@@ -386,25 +422,31 @@ Clones repositories into configured destinations.
 
 ---
 
-## claude_settings
+## claude
 
-Deep-merges settings into `~/.claude/settings.json`.
+Configures Claude Code. All three capabilities are optional; set at least one.
 
 ```yaml
-- type: claude_settings
-  settings:
+- type: claude
+  upgrade: true              # run `claude upgrade`
+  settings:                  # deep-merged into ~/.claude/settings.json
     theme: dark
     autoApprove: true
     env:
       ANTHROPIC_SMALL_FAST_MODEL: claude-haiku-4-5-20251001
+  claude_md: files/CLAUDE.md # managed block inserted into ~/.claude/CLAUDE.md
+  template: true             # render claude_md as a Go template against the identity
 ```
 
 **Fields:**
-- `settings`: arbitrary map of keys and values to merge into the settings file
+- `settings`: arbitrary map deep-merged into `~/.claude/settings.json`. Existing keys not listed are preserved; nested maps merge recursively.
+- `upgrade`: when `true`, runs `claude upgrade`. Because there is no cheap idempotency check for an upgrade, setting this makes the phase run on every invocation. Order this after whatever installs Claude Code.
+- `claude_md`: a config-repo-relative path (resolved like `file_template`'s `src`, so it works for both `config_source: git` and `local`). Its contents are inserted into `~/.claude/CLAUDE.md` as a managed block delimited by HTML-comment sentinels (`<!-- BEGIN SPROOT MANAGED BLOCK -->` / `<!-- END SPROOT MANAGED BLOCK -->`, invisible in rendered markdown). Other content in the file is preserved; the block is replaced (not duplicated) on re-run.
+- `template`: when `true`, `claude_md` is rendered as a Go template against the identity (`{{.GitUserName}}`, `{{.GitUserEmail}}`, `{{.GitDefaultBranch}}`, `{{.GHUsername}}`).
 
-Existing keys not listed in `settings` are preserved. Nested maps are merged recursively.
+**Idempotency:** `settings` checks that all specified keys already match; `claude_md` compares the managed block's content hash. `upgrade` always runs when set.
 
-**Idempotency:** checks that all specified keys already match target values.
+> Replaces the former `claude_settings` module. Move `claude_settings` phases to `claude` (the `settings` field is unchanged).
 
 ---
 
