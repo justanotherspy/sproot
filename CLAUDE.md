@@ -34,7 +34,9 @@ internal/phase/       - Phase interface, runner, state, registry
 internal/phase/modules/ - one file per module type (apt, uv_tool, etc.)
 internal/host/        - host-side command implementations (new, destroy, status)
 internal/sprite/      - in-sprite command implementations (setup)
-pkg/log/              - structured logger (+/-/!/x visual conventions)
+pkg/log/              - structured logger (+/-/!/x visual conventions, TTY-aware color)
+pkg/table/            - box-drawing table renderer (terminal-fit, ANSI styling)
+pkg/tty/              - terminal/color detection shared by log, table consumers
 docs/                 - user-facing docs (modules.md)
 testdata/integration/ - integration test config used by integration.yml
 plans/                - design docs, not shipped

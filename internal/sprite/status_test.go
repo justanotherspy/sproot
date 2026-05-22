@@ -57,6 +57,31 @@ func TestPrintStatus_Table(t *testing.T) {
 	}
 }
 
+func TestRenderStatusTable_FancyBoxAndColors(t *testing.T) {
+	state := &phase.State{
+		SchemaVersion: phase.StateVersion,
+		UpdatedAt:     time.Now(),
+		Phases: []phase.PhaseRecord{
+			{Type: "apt", Name: "apt packages", DidWork: true, LastRunAt: time.Now()},
+			{Type: "cmd", Name: "cmd", Error: "exit status 1", LastRunAt: time.Now()},
+		},
+	}
+	var buf bytes.Buffer
+	if err := renderStatusTable(state, &buf, 100); err != nil {
+		t.Fatalf("renderStatusTable: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "┌") || !strings.Contains(out, "TYPE") {
+		t.Errorf("expected a header box: %q", out)
+	}
+	if !strings.Contains(out, "\x1b[32m") { // done -> green
+		t.Errorf("expected green for the done phase: %q", out)
+	}
+	if !strings.Contains(out, "\x1b[31m") { // failed -> red
+		t.Errorf("expected red for the failed phase: %q", out)
+	}
+}
+
 func TestPrintStatus_ErrorTruncation(t *testing.T) {
 	tmpDir := t.TempDir()
 	statePath := tmpDir + "/state.json"
