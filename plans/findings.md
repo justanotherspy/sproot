@@ -1,3 +1,5 @@
+> SUPERSEDED: This file documents round-2 findings. All items have been incorporated into Phase 17 of plans/sproot.md and plans/todo.md. The findings.md file is kept as a historical record.
+
 # sproot doc and code review findings (round 2)
 
 Handoff document for Claude Code. A fresh review of the sproot repo on main, cross-checking `docs/`, `plans/`, `README.md`, `CLAUDE.md`, `MIGRATION.md`, and the code in `internal/`, `cmd/`, and the testdata against each other.

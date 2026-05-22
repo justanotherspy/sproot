@@ -2,7 +2,7 @@
 
 Items marked DONE are implemented and merged. Items with a phase reference are tracked in plans/sproot.md.
 
-## Done (phases 8-12)
+## Done (phases 8-16)
 
 - update docs to explain sproot.yaml validation (DONE: Phase 8)
 - update config file format (DONE: YAML, decided in Phase 1)
@@ -20,23 +20,37 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 - make checkpoint_after_setup in sproot.yaml (DONE: Phase 12c)
 - make sure state is readable from the host (DONE: Phase 12d)
 - validate sproot.yaml before spawning a sprite (DONE: Phase 11h)
+- multi-target support in sproot.yaml with extends (DONE: Phase 13a)
+- add a way to pass in a sproot.yaml file from the host instead of a git repo (DONE: Phase 13b)
+- have a sproot push command that pushes changes to all sproot-labeled sprites (DONE: Phase 13c)
+- multi-phase and multi-target CI jobs, --skip-verify flag, smart verify, make e2e (DONE: Phase 16)
+- HostConfig field rename to sproot_config_* prefix (DONE: Phase 16j)
+- remove unsupported flags (--ram-mb, --cpus, --region, --storage-gb) (DONE: Phase 15c/15h)
 
-## Planned (tracked in plans/sproot.md)
+## Planned (Phase 17 - code quality and bug fixes)
 
-- create a claude skill to convert a script into a sproot.yaml (Phase 14c)
-- add a way to pass in a sproot.yaml file from the host instead of a git repo (Phase 13b)
-- add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md (Phase 14a)
-- have a sproot push command that pushes changes to all sproot-labeled sprites (Phase 13c)
-- multi-target support in sproot.yaml with extends (Phase 13a)
+- fix sproot push silently dropping env block and GH_TOKEN forwarding - CRITICAL (Phase 17a)
+- add HTTP timeouts to deleteGHKey and postGHKey (Phase 17b)
+- consolidate sprootLabel and labelBase duplicate constants (Phase 17c)
+- ConfigSHA format optimization: fmt.Sprintf("%x", h[:6]) (Phase 17d)
+- omit empty labelTarget from Labels() (Phase 17e)
+- add --only flag to README push row (Phase 17f)
+- expand module improvement items from MIGRATION.md: apt symlinks, uv_tool auto-install and pkg field, binary_release arch template vars, docker daemon_json (Phase 17g)
+- mark plans/findings.md as superseded (Phase 17h)
+
+## Planned (Phase 18 - intelligence)
+
+- add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (Phase 18a)
+- have a detailed explanation of what scopes are needed on the gh token (Phase 18b)
+- on config init inspect sprite config for an org and offer to select one automatically (Phase 18c)
+- test out the release workflow end-to-end (Phase 18d)
+
+## Deferred
+
 - inter-sproot URL templating to pass connection strings between sprites (Phase 13a future direction)
+- create a claude skill to convert a script into a sproot.yaml (Phase 14c)
 - if we can better align our tool with the sdk, create a skill for sproot usage (Phase 14b)
-
-## Planned (new, tracked as Phase 15)
-
-- on config init inspect sprite config for an org and offer to select one automatically (Phase 15a)
-- have a detailed explanation of what scopes are needed on the gh token (Phase 15b)
-- what values are allowed for ram-mb and region? document them (Phase 15c)
-- update required checks to have specific ones before merging so auto merge works (Phase 15d)
-- update modules to better handle different cases (fewer cmd fallbacks) (Phase 15e)
-- test out the release workflow (Phase 15f)
+- update required checks to have specific CI jobs required before merging so auto-merge works (Phase 15d, GitHub settings change)
 - consider a claude code review workflow (Phase 15g)
+- currentConfigSHA re-clones the git repo on every sproot outdated call (Phase 17i, deferred until users complain)
+- RunNew clones the git config repo twice end-to-end (Phase 17j, deferred until startup time is a complaint)

@@ -56,28 +56,14 @@ plans/                - design docs, not shipped
 
 ## Phase plan
 
-Phases are implemented in order. Each phase has unit tests before the next one starts.
-
 | Phase | Description |
 |-------|-------------|
-| 0 | Scaffold: module, cobra wiring, CI (done) |
-| 1 | Config schema: sproot.yaml and ~/.sproot/config.yaml structs + loaders (done) |
-| 2 | Phase engine: runner, state file, registry (done) |
-| 3 | Module implementations (apt, uv_tool, file_template, etc.) (done) |
-| 4 | `sproot setup` (in-sprite command) (done) |
-| 5 | Host CLI commands (new, destroy, status, config) (done) |
-| 6 | Convert justanotherspy/sprite into a config repo |
-| 7 | Release pipeline (goreleaser, sigstore signing) (done) |
-| 8 | Doc accuracy fixes + Q1-Q5 code improvements (done) |
-| 9 | Bug fixes (rc_block, binary_release, ssh_setup, cloneOrPull) (done) |
-| 10 | Cross-arch binary injection fix (download Linux/amd64 binary at runtime) (done) |
-| 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
-| 12 | SDK alignment: exec, upgrade, checkpoint, checkpoints, restore commands; checkpoint_after_setup in sproot.yaml; --skip-console on new; status --host (done) |
-| 13 | Multi-target support (targets/extends in sproot.yaml, --target flag), local path config source, sproot push/update (done) |
+| 0-7 | Foundation: scaffold, config schema, phase engine, 17 modules, sproot setup, host CLI, sprite config repo, release pipeline (done) |
+| 8-13 | Hardening: doc fixes, bug fixes, cross-arch binary, UX, SDK alignment, multi-target/push (done) |
 | 14 | Intelligence: Claude skills for sproot usage and script conversion (deferred) |
-| 15 | Operational improvements: config init org auto-select, token scope docs, valid flag values, CI required checks, module edge cases, release workflow test, code review workflow, audit sproot new flags vs real API |
-| 16 | Integration depth: multi-phase and multi-target CI jobs (no --only), labels end-to-end verification, --skip-verify flag, smart verify, validate --strict, HostConfig field rename, make e2e (done) |
-| 17 | Intelligence and completion: llm.txt/agent-context.md after setup, token scope docs, config init org auto-select, release workflow test |
+| 15-16 | Operational improvements, integration depth, make e2e (done) |
+| 17 | Code quality and bug fixes: push env forwarding (CRITICAL), HTTP timeouts, label/SHA cleanup, README gaps (next) |
+| 18 | Intelligence and completion: llm.txt/agent-context.md after setup, token scope docs, config init org auto-select, release workflow test |
 
 ## Workflow
 

@@ -12,10 +12,12 @@ Replaces the current bash-based `sprite` repo with a generic, reusable tool.
 
 ```
 ~/.sproot/
-└── config           # YAML: config_repo, config_ref, token_env, gh_token_env, default_org
+└── config.yaml      # YAML: sproot_config_source, sproot_config_repo, sproot_config_ref,
+                     #       sproot_config_path, sproot_config_local_path, token_env,
+                     #       gh_token_env, default_org
 ```
 
-(The original plan showed a `private/id_ed25519` key here; that model was dropped. Each sprite generates its own keypair via `ssh_setup`.)
+Canonical field reference: `internal/config/schema.go` `HostConfig` struct.
 
 ## End-to-end flow
 
@@ -28,524 +30,163 @@ sproot new my-sprite
   └─ in-sprite: clone config repo, read sproot.yaml, run phases, verify
 ```
 
-## Phases (for execution)
+---
 
-Each phase is a discrete deliverable. Phases are roughly in dependency order.
+## Completed phases (0-16)
+
+All phases through 16 are done and merged.
+
+### Foundation (phases 0-7)
+
+| Phase | What was built |
+|-------|---------------|
+| 0 | Scaffold: go.mod (Go 1.25), cobra, Makefile, CI (build-and-test + lint) |
+| 1 | Config schema: `SprootConfig`, `HostConfig`, all phase config structs, custom YAML unmarshaling |
+| 2 | Phase engine: `Phase` interface, runner (`--only`, `--force`), state file, registry |
+| 3 | 17 module types: apt, uv_tool, go_install, cargo_install, binary_release, corepack, rust_components, docker, sprite_service, git_identity, ssh_setup, gh_token, file_template, rc_block, repo_clone, claude_settings, cmd |
+| 4 | `sproot setup` in-sprite: clone config repo, load sproot.yaml, run phases, verify |
+| 5 | Host CLI: new, destroy, status, config, validate; sprites-go SDK client interfaces |
+| 6 | justanotherspy/sprite converted to a config repo (separate repo; ongoing) |
+| 7 | Release pipeline: goreleaser, sigstore signing, install.sh |
+
+### Hardening and features (phases 8-16)
+
+| Phase | Key changes | PR |
+|-------|-------------|-----|
+| 8 | Doc accuracy; env block forwarding in `sproot new`; `template: true` opt-in; cmd `name` field; binary checksum fields; `validate` also checks host config | #17 |
+| 9 | rc_block dual-shell idempotency; binary_release GitHub API auth + HTTP timeouts; ssh_setup idempotency gap; cloneOrPull handles changed remote URL | #18 |
+| 10 | Cross-arch injection: downloads Linux/amd64 release tarball at runtime on non-Linux hosts (`internal/host/fetch.go`) | #21 |
+| 11 | Interactive config init; console command; list command; auto-setup prompt; `--debug` flag; pre-flight sproot.yaml validation | #22 |
+| 12 | exec, upgrade, checkpoint/checkpoints/restore; `checkpoint_after_setup`; `status --host`. Note: `Upgrade` on `SpriteHandle` and `UpgradeSprite` on `SpritesClient` were added here but later removed in Phase 15 when `sproot upgrade` switched to running `sprite upgrade` inside the sprite. | #23 |
+| 13 | Multi-target (targets/extends with inheritance + cycle detection); local path config source (`config_source: local`); `sproot push` with parallel execution and pre-push checkpointing | #28 |
+| 15 | Remove unsupported create flags (--ram-mb, --cpus, --region, --storage-gb); `upgrade` runs `sprite upgrade` inside sprite; exec `--env`; HostConfig fields renamed to `sproot_config_*` prefix; `--skip-console` renamed from `--no-console` | various |
+| 16 | Multi-phase + multi-target CI jobs; `--skip-verify`; `validate --strict`; config init source-first UX; smart verify (skips checks for tools whose phase wasn't in `--only`); `state.OnlyFilter`; `make e2e` | various |
+
+### Key decisions from completed phases
+
+- `sproot.yaml` uses flat phase format (not nested sub-keys as earlier docs showed)
+- Flat `phases:` list is treated as implicit `default` target (backward compat; Q7 resolved)
+- Idempotency is per-phase; state file is for `--status` and forensics only
+- Host config stores env var **names**, not token values; tokens stay in the shell environment
+- Single binary; `sproot` routes by subcommand; no separate host/sprite binaries
+- `file_template` rendering is opt-in via `template: true` (Q2 resolved)
+- Each sprite generates its own SSH keypair; `sproot destroy` removes it from GitHub
+- `upgrade` runs `sprite upgrade` inside the sprite (SDK VM upgrade method not supported)
+- Binary injection for non-Linux hosts downloads Linux/amd64 release tarball at runtime (Q6 resolved)
+- `sproot push` always uses `--force`; checkpoints before pushing by default (`--no-checkpoint` to skip)
 
 ---
 
-### Phase 0: Scaffold (DONE)
+### Phase 17: Code quality and bug fixes (findings round 2) — NEXT
 
-- `go.mod` (Go 1.25), cobra, Makefile (build/test/check/lint/tidy)
-- Full directory layout, CI (`build-and-test` + `lint`)
-- `cmd/sproot/main.go` wired to cobra
+Second-pass review findings. Three PRs recommended; ship in order A, B, C.
 
----
+#### PR A: CRITICAL — push env forwarding (own PR, ship first)
 
-### Phase 1: Config schema (DONE)
+**17a.** `internal/host/push.go` `pushOne` passes `nil` for env to `RunCommand`. The `env:` block from `sproot.yaml` and `gh_token_env` from `~/.sproot/config.yaml` are both silently dropped. `ssh_setup` and `gh_token` phases run without `GH_TOKEN` and degrade to warnings instead of errors.
 
-- `internal/config/schema.go`: `SprootConfig`, `HostConfig`, `Identity`, `PhaseConfig` and all typed phase config structs
-- `PhaseConfig.UnmarshalYAML`: two-pass custom unmarshaler (reads `type`, decodes into concrete struct using flat form)
-- `internal/config/load.go`, `validate.go`
-- `internal/config/testdata/sproot.yaml` + `testdata/host_config.yaml`
-- 35 unit tests
+**Fix:**
+1. Extract `buildSpriteEnv(ghToken string, envBlock []string) []string` helper from `new.go`.
+2. In `pushOne`, resolve `ghToken` from `cfg.GHTokenEnv` and call `buildSpriteEnv` before `RunCommand`.
+3. Add `TestRunPush_ForwardsEnvBlock` and `TestRunPush_ForwardsGHToken` mirroring `new_test.go`.
 
-**`sproot.yaml`** shape (flat; the nested sub-key form shown in `docs/modules.md` is wrong):
+Cross-reference: `TestRunNew_EnvBlockForwarded` and `TestRunNew_InjectsBinaryAndForwardsGHToken` in `internal/host/new_test.go` show the expected test pattern.
 
-```yaml
-schema_version: 1
-identity:
-  git_user_name: "Daniel Schwartz"
-  git_user_email: "danielschwar@gmail.com"
-  git_default_branch: main
-  gh_username: justanotherspy
+#### PR B: HTTP timeouts (own PR)
 
-phases:
-  - type: apt
-    packages: [shellcheck, jq]
-  - type: binary_release
-    name: cosign
-    repo: sigstore/cosign
-    asset: "cosign_{version}_{arch}.deb"
-    install: dpkg
-  - type: file_template
-    src: files/statusline.py
-    dest: ~/.claude/statusline.py
-    mode: "0755"
-  - type: rc_block
-    src: files/rc_additions.sh
-  - type: repo_clone
-    base_dir: ~/repos
-    repos:
-      - justanotherspy/garlic
-```
+**17b.** `internal/host/destroy.go` `deleteGHKey` and `internal/phase/modules/ssh_setup.go` `postGHKey` both use `http.DefaultClient` with no timeout. If GitHub's API hangs, these commands hang indefinitely.
 
-**`~/.sproot/config.yaml`** shape:
+**Fix:** Add `var ghAPIClient = &http.Client{Timeout: 30 * time.Second}` to each file (consistent with `tagClient` in `binary_release.go`) and replace `http.DefaultClient.Do(req)` with `ghAPIClient.Do(req)` in both.
 
-```yaml
-config_repo: git@github.com:justanotherspy/sprite.git
-config_ref: main
-config_path: ""        # optional; path to config file within repo; defaults to sproot.yaml
-token_env: SPRITES_TOKEN
-gh_token_env: GITHUB_TOKEN
-default_org: ""
-```
+#### PR C: Quick wins bundle
+
+**17c.** Consolidate duplicate `"sproot"` constant: remove `sprootLabel` from `internal/host/new.go`; update new.go, list.go, push.go, outdated.go to use `labelBase` from `labels.go`.
+
+**17d.** `ConfigSHA` in `internal/host/labels.go` formats full 64-char hex then slices. Replace with `fmt.Sprintf("%x", h[:6])` for the same 12-char result.
+
+**17e.** `Labels()` in `internal/host/labels.go` always emits `sproot-target=` even when `Target` is empty. Move `labelTarget` to the conditional block (matching `Repo` and `Ref` handling); update `labels_test.go`.
+
+**17f.** README commands table for `sproot push` is missing `--only <type>`. Add it to the push row description.
+
+**17g.** Expand MIGRATION.md module gaps into concrete improvement items (cross-reference `MIGRATION.md` "Known cmd workarounds"):
+- **17g1** `apt`: add `symlinks` field for post-install symlinks (e.g. bat/fd)
+- **17g2** `uv_tool`: auto-install uv when absent (currently fails if uv not present)
+- **17g3** `uv_tool`: add `pkg` field for cases where package name differs from binary name (e.g. garlic)
+- **17g4** `binary_release`: add `{x64_arch}` and `{x86_64_arch}` template variables (gitleaks uses `x64`, hadolint uses `x86_64`)
+- **17g5** `docker`: add `daemon_json` config field for configuring the Docker daemon
+
+**17h.** Housekeeping: mark `plans/findings.md` as superseded (add `> SUPERSEDED` header); remove stale Phase 13 done-items from `plans/todo.md`.
+
+#### Deferred (OPEN QUESTIONS)
+
+**17i.** `currentConfigSHA` in `internal/host/push.go` does `git clone --depth 1` into a temp dir on every `sproot outdated` call. Add a TODO comment in the function. Options if it becomes a complaint: cache SHA + timestamp in `~/.cache/sproot/sha-cache.json`, or use `git ls-remote` for a cheap commit SHA check before cloning.
+
+**17j.** For git config sources, `sproot new` clones twice: host-side in `readEnvBlock` (to resolve env vars) and in-sprite in `RunSetup`. The in-sprite clone is unavoidable. The host clone is hard to skip without `git archive` support (GitHub HTTPS does not support `git archive --remote`). Defer unless startup time becomes a complaint.
 
 ---
 
-### Phase 2: Phase engine (DONE)
+### Phase 18: Intelligence and completion
 
-- `internal/phase/phase.go`: `Phase` interface + `Context` struct
-- `internal/phase/runner.go`: orchestrates phases, tracks did-work/skipped/failed, `--only`, `--force`
-- `internal/phase/state.go`: reads/writes `~/.config/sproot/state.json`
-- `internal/phase/registry.go`: `Register` + `Build` with `init()`-based registration
-- `pkg/log/log.go`: `+`/`-`/`!`/`x` visual conventions
+#### 18a. llm.txt and agent-context.md after setup
 
----
+After `sproot setup` completes inside a sprite, write a summary of what ran to `/.sprite/llm.txt` and `/.sprite/docs/agent-context.md`. Gives Claude Code instant context about the environment.
 
-### Phase 3: Module implementations (DONE)
+**Implementation:** New `internal/sprite/llmtxt.go` exports `writeLLMContext(l *log.Logger, state *phase.State) error`. Iterates `state.Phases`, collects `DidWork=true` records, writes a timestamped block using a module-description table keyed by phase `Type`. Hook after `runner.Run(ctx)` in `internal/sprite/setup.go` (non-fatal if write fails). Unit test in `internal/sprite/llmtxt_test.go`; integration test step verifies non-empty output via `sproot exec <name> cat /.sprite/llm.txt`.
 
-All 17 modules in `internal/phase/modules/`. Each registered via `init()`:
-`apt`, `uv_tool`, `go_install`, `cargo_install`, `binary_release`, `corepack`, `rust_components`, `docker`, `sprite_service`, `git_identity`, `ssh_setup`, `gh_token`, `file_template`, `rc_block`, `repo_clone`, `claude_settings`, `cmd`.
+#### 18b. Token scope documentation
 
-- `exec.go`: shared `runCmd` helper
-- `modules.go`: blank-import of all module packages
-- Unit tests for each module, plus `integration_test.go` (all 17 types under `--dry-run`)
-- `docs/modules.md`: module reference (has doc accuracy bugs, see Phase 8)
+Add a "Required GitHub token scopes" callout to `docs/modules.md` under `gh_token` and `ssh_setup` sections. Add a brief note to `README.md` prerequisites.
 
----
+- `gh_token`: no minimum scope required by sproot; match whatever the user wants `gh` to do (typically `repo`, `read:org`)
+- `ssh_setup`: requires `admin:public_key` and `admin:ssh_signing_key` on a classic PAT
 
-### Phase 4: `sproot setup` (in-sprite command) (DONE)
+#### 18c. Config init org auto-select
 
-- `cmd/sproot/setup.go`: cobra command with `--config-repo`, `--ref`, `--config-path`, `--only`, `--force`, `--dry-run`, `--status`
-- `internal/sprite/setup.go`: `RunSetup` clones/pulls config repo, loads+validates `sproot.yaml`, runs phases
-- `internal/sprite/verify.go`: built-in verify phase (PATH tools, SSH permissions, rc block, gh auth, SSH connectivity)
-- `internal/sprite/status.go`: `PrintStatus` renders phase state table
-
----
-
-### Phase 5: Host CLI commands (DONE)
-
-- `internal/host/client.go`: `SpritesClient` and `SpriteHandle` interfaces wrapping `sprites-go`
-- `internal/host/new.go`: `RunNew`
-- `internal/host/destroy.go`: `RunDestroy` (reads key IDs from sprite, deletes from GitHub, destroys sprite)
-- `internal/host/status.go`: `RunStatus`
-- `internal/host/config.go`: `RunConfigInit`, `RunConfigValidate`
-- `internal/host/validate.go`: `RunValidate` (validates `sproot.yaml` only)
-- `cmd/sproot/`: cobra wiring for all commands
-
----
-
-### Phase 6: Convert `justanotherspy/sprite` into a config repo
-
-Status: lives in a separate repo, not visible here.
-
-**Deliverables:**
-- `sproot.yaml`: full translation of every `setup.sh` phase into module invocations
-- `files/`: statusline.py, ps1.sh, rc_additions.sh, gitignore_global, pre-commit-config.template.yaml, claude-settings.json
-- `README.md`: explain this is a config example, point at sproot for the tool
-- Archive `setup.sh`, `post.sh`, `pre.sh`, `_lib_verify.sh`
-
-**Acceptance:** `sproot new test-sprite` against this repo produces a sprite equivalent to `setup.sh`.
-
----
-
-### Phase 7: Release pipeline (DONE)
-
-- `.goreleaser.yaml`: linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64; tar.gz/zip; checksums + sigstore signing
-- `.github/workflows/release.yml`: triggers on `v*` tags
-- `install.sh`: one-line installer; detects OS/arch, verifies SHA256, drops binary in `/usr/local/bin` or `~/.local/bin`
-- `README.md`: install instructions, quickstart
-
----
-
-### Phase 8: Doc accuracy fixes and Q1-Q5 code improvements (DONE)
-
-Merged PR #17 on 2026-05-20.
-
-**Q1 (env block): Implemented (option 1).** `RunNew` now clones the config repo before creating the sprite, reads the `env` block from `sproot.yaml`, resolves each `from` var via `os.Getenv`, fails hard if `required: true` and the var is unset, and appends resolved vars to the env slice forwarded to `sproot setup`. The existing `gh_token_env` forwarding is preserved as a baseline.
-
-**Q2 (file_template opt-in): Added `Template bool` (option 2).** Go template rendering is now opt-in via `template: true` in the phase config. Without it the file is copied as-is. Prevents silent substitution of unintended `{{...}}` patterns.
-
-**Q3 (cmd name field): Added (option 1).** `CmdConfig` gains `name: string`. `Name()` returns `cmd(foo)` when set, making multiple `cmd` phases distinguishable in status output.
-
-**Q4 (binary_release checksums): Both options shipped.** `BinaryReleaseConfig` gains `checksum` (direct sha256 hex) and `checksum_asset` (goreleaser-style checksums file template, e.g. `{repo}_{version}_checksums.txt`). Both are optional; either is verified after download and before install.
-
-**Q5 (validate commands): Partially combined.** `sproot validate` now also validates `~/.sproot/config.yaml` when the file exists, in addition to `sproot.yaml`. The README commands table was corrected to distinguish `config validate` (host config only) from `validate` (sproot.yaml + host config if present).
-
-Doc fixes shipped (8a-8j):
-- All 15 nested YAML examples in `docs/modules.md` rewritten to flat form
-- `admin:public_key`/`admin:ssh_signing_key` scopes moved from `gh_token` to `ssh_setup` section
-- `GH_TOKEN` env reference corrected in `gh_token` and `ssh_setup` sections
-- `gh auth login` example updated with `--hostname github.com`
-- README commands table fixed, `config_path` added to host config example
-- `CLAUDE.md` phase table, CI section, and directory layout updated
-
----
-
-### Phase 9: Bug fixes (DONE)
-
-Merged PR #18 on 2026-05-20. All six items fixed with unit tests added for each.
-
-**9a. `rc_block` `ShouldRun` checks both shells.** `ShouldRun` now iterates `.bashrc` and `.zshrc` and returns true if either is missing or has a stale hash, matching the two-file write in `Run`. Previously only `.bashrc` was checked, causing `Verify` to fail on `.zshrc` after `ShouldRun` returned false.
-
-**9b. `rc_block` trailing newline normalised.** `applyRCBlock` ensures `src` ends with `\n` before composing the block, so the end sentinel always appears on its own line regardless of source file content.
-
-**9c. `binary_release` GitHub API auth.** `githubLatestTag` now sends `Authorization: Bearer $GH_TOKEN` when the var is set, avoiding the 60 req/hr anonymous rate limit on shared runners.
-
-**9d. `binary_release` HTTP timeouts.** Two module-level `*http.Client` values replace bare `http.Get` calls: `tagClient` (30s) for API and checksums requests, `downloadClient` (5m) for asset downloads.
-
-**9e. `ssh_setup` idempotency gap closed.** `ShouldRun` now also returns true when `~/.ssh/allowed_signers` does not contain the local pubkey, or when `GH_TOKEN` is set but `~/.config/sproot/github_keys.json` is absent (key was generated but GitHub registration was skipped on a prior run without the token).
-
-**9f. `cloneOrPull` handles changed remote URL.** Before fetching, `cloneOrPull` compares `git remote get-url origin` against the requested URL. If they differ it runs `git remote set-url origin <new>` so a changed `config_repo` takes effect without requiring `--force` or a manual re-clone.
-
----
-
-### Phase 10: Binary injection cross-arch fix (DONE)
-
-Merged PR #21 on 2026-05-20.
-
-`RunNew` now auto-detects the host platform at runtime:
-
-- **Linux/amd64**: reads and injects its own executable (unchanged from before).
-- **Any other platform** (macOS arm64, etc.): downloads the matching Linux/amd64 release tarball from GitHub using the running binary's version, extracts the `sproot` binary, and injects that.
-
-Key details:
-- `internal/host/fetch.go`: `fetchLinuxAmd64Binary(version)` and `extractSprootFromTarGz(r)`.
-  - Returns a clear error when `version == "dev"` (no release to download).
-  - Handles binary at tarball top level or inside a goreleaser-style prefixed directory.
-- `NewOptions.binarySrcFn` injection point (`func(version string) ([]byte, error)`) lets tests override binary sourcing without platform detection.
-- `NewOptions.Version` carries the build version from `main.version` (set by goreleaser ldflags).
-- Q6 resolved: option 2 (download at runtime).
-
----
-
-### Phase 11: UX improvements (DONE)
-
-Merged PR #22 on 2026-05-21.
-
-**11a (interactive config init): Done.** `sproot config init` now prompts for `config_repo`, `token_env`, `gh_token_env`, `default_org`; validates; writes the file. `--non-interactive` flag preserves the old skeleton-file behavior for scripting.
-
-**11b (token scope docs): Deferred.** Low-priority doc-only change; can be added alongside Phase 12 SDK docs.
-
-**11c (`sproot new` opens console): Done.** After `sproot setup` completes successfully, `RunNew` opens an interactive TTY shell. `--skip-console` and `--dry-run` both skip the console step.
-
-**11d (`sproot console <name>`): Done.** `internal/host/console.go` + `cmd/sproot/console.go`. Opens `bash` with TTY on the named sprite. Terminal size is read from the host; raw mode is enabled when stdin is a TTY.
-
-**11e (`sproot list`): Done.** `internal/host/list.go` + `cmd/sproot/list.go`. Sprites created by `sproot new` are tagged with the `"sproot"` label via `CreateSpriteWithOrg`. `sproot list` filters to that label; `--all` shows every sprite.
-
-**11f (auto-setup config): Done.** `loadOrInitHostConfig` in `config.go` detects a missing `~/.sproot/config.yaml`, prints a warning, and offers the interactive init flow when stdin is a terminal. Used by `RunNew`, `RunStatus`, `RunDestroy`, `RunConsole`, `RunList`.
-
-**11g (debug logging): Done.** `--debug` global flag on the root cobra command calls `log.SetDebug(true)`. `Logger.Debug/Debugf` write `. <msg>` lines only when debug is enabled.
-
-**11h (validate sproot.yaml before creating sprite): Done.** `readEnvBlock` now calls `config.ValidateSprootConfig` after loading, so a broken `sproot.yaml` fails before any sprite API quota is spent.
-
-**11i (validate reachability): Deferred.** Would require cloning the config repo a second time in `sproot validate`; not worth the cost for a warning. Revisit if users report confusion.
-
----
-
-### Phase 12: Sprite wrapping and SDK alignment (DONE)
-
-Merged PR #23 on 2026-05-21.
-
-**12a: Additional host command wrappers (done).**
-- `sproot exec <name> <cmd> [args...]`: runs a one-off command in a sprite and streams stdout/stderr.
-- `sproot upgrade <name>`: upgrades a sprite to the latest version via SDK `UpgradeSprite`.
-- `sproot checkpoint <name> [--comment text]`: creates a checkpoint, streams progress to stdout.
-- `sproot checkpoints <name> [--include-auto]`: lists checkpoints in a table.
-- `sproot restore <name> <id>`: restores a sprite from a checkpoint, streams progress to stdout.
-
-**12b: SDK audit (done).**
-- Audited all sprites-go SDK methods against sproot usage. All calls map to real SDK methods.
-- Audited `SpriteConfig` fields against the sprite CLI; resource sizing flags were later removed in Phase 15h.
-- Added `Upgrade`, `Checkpoint`, `ListCheckpoints`, `Restore` to `SpriteHandle` interface and `realHandle`.
-- Added `UpgradeSprite` to `SpritesClient` interface and `realClient`.
-
-**12c: Checkpointing integration (done).**
-- `SprootConfig.CheckpointAfterSetup bool` added to `internal/config/schema.go`.
-- `RunNew` calls `handle.Checkpoint(ctx, "sproot setup", ...)` after successful setup when `checkpoint_after_setup: true` in `sproot.yaml`. Checkpoint failure is a warning, not a fatal error.
-
-**12d: Host-readable phase state (done).**
-- `sproot status <name> --host` reads `/root/.config/sproot/state.json` from the sprite filesystem via `ReadFile` and renders the phase table locally without exec'ing into the sprite.
-- Default (no `--host`) retains the original behavior: runs `sproot setup --status` inside the sprite.
-
----
-
-### Phase 13: Multi-target and push (DONE)
-
-#### 13a. Multiple sproot targets in one `sproot.yaml`
-
-Extend `sproot.yaml` to support named targets:
-```yaml
-targets:
-  base:
-    phases: [...]
-  web:
-    extends: base
-    phases: [...]
-```
-`sproot new my-sprite --target web` runs only the `web` target's phases. The `extends` field inherits the parent's phase list. Without a target flag, a default target (or the flat `phases:` block) is used. This enables one config repo to produce several specialized sprite flavors.
-
-**Backward compat (Q7 resolved):** flat `phases:` is treated as an implicit `default` target. A `sproot.yaml` with only `phases:` continues to work unchanged; no migration needed.
-
-**Future direction (inter-sproot templating):** Once multi-target is working, a natural extension is handing values from one sprite's setup into another sprite's config. For example: a `postgres` target completes setup, exposes its connection string via a known path or file, and the `web` target's `sproot.yaml` templates that value in before running phases. This enables fully automated multi-sprite stacks from a single config repo. This is not part of Phase 13 scope but should inform the target data model design.
-
-#### 13b. Local path as config source
-
-Currently `sproot.yaml` must live in a git repo. Add support for a local path:
-
-```yaml
-# ~/.sproot/config.yaml
-config_source: local     # "git" (default) or "local"
-config_local_path: ~/my-sprite-config/sproot.yaml
-```
-
-Or via flag: `sproot new --config-path /path/to/sproot.yaml` without a `config_repo`. Useful for development and for passing a config directly from the host without a git remote.
-
-#### 13c. `sproot push` / `sproot update`
-
-Push a config change to all sprites created by sproot (identified by the sproot label from Phase 11e):
-- `sproot push`: pull latest from `config_repo` for each sprite and re-run setup (wake sprites, run `sproot setup --force`, optionally checkpoint before updating).
-- `sproot push --target <name>`: push to a specific sprite by name.
-- Run pushes in parallel with progress output.
-
-**OPEN QUESTION resolved**: yes, `sproot push` checkpoints before updating by default. Use `--no-checkpoint` to skip.
-
-**Implementation summary (PR #28):**
-
-**13a: Multi-target (done).**
-- `TargetConfig` struct added to `internal/config/schema.go` with `Extends` and `Phases` fields.
-- `SprootConfig.Targets map[string]*TargetConfig` added alongside the existing flat `Phases` field.
-- `(*SprootConfig).ResolveTarget(name string)` resolves a named target with extends inheritance and cycle detection.
-- `ValidateSprootConfig` updated: error if both `phases` and `targets` are set; validates per-target phases using shared `validatePhase` helper; validates `extends` references exist.
-- `SetupOptions.Target` added to `internal/sprite/setup.go`; `RunSetup` calls `ResolveTarget` instead of using `cfg.Phases` directly.
-- `--target` flag added to `sproot setup` and `sproot new`. `NewOptions.Target` appended to setup args.
-- Fixture `internal/config/testdata/sproot_targets.yaml` added; 15+ unit tests cover backward compat, extends chain, cycles, ambiguous configs.
-
-**13b: Local path config source (done).**
-- `ConfigSource` and `ConfigLocalPath` added to `HostConfig`.
-- `ValidateHostConfig` handles `config_source: local` (requires `config_local_path`, relaxes `config_repo`/`config_ref`).
-- `SetupOptions.LocalConfig` added; `RunSetup` skips git clone when set, uses that directory as config repo root.
-- `--local-config` flag added to `sproot setup` and `sproot new`.
-- `readLocalEnvBlock` reads sproot.yaml from a local directory (no clone). `uploadDirectory` walks a host directory and uploads all non-hidden files to the sprite via `WriteFile`.
-- `RunNew` detects local config via `opts.LocalConfig` or `cfg.ConfigSource == "local"`, uploads the directory, and passes `--local-config` to setup.
-
-**13c: `sproot push` (done).**
-- `internal/host/push.go`: `RunPush` lists sproot-managed sprites, checkpoints each (default), then runs `sproot setup --force` in parallel using goroutines. `--name` filters to one sprite, `--target` passes through to setup.
-- `cmd/sproot/push.go`: cobra command with `--name`, `--target`, `--dry-run`, `--no-checkpoint`.
-- `prefixWriter` prepends `[sprite-name]` to all output lines for readability.
-- Unit tests in `internal/host/push_test.go` cover all combinations.
-
----
-
-### Phase 15: Operational improvements
-
-Small, independent items that do not fit a larger phase. Items 15a, 15b, and 15f moved to Phase 17 (concrete, implementable now). Remaining items below.
-
-#### 15a. Config init org auto-select (moved to Phase 17a)
-
-#### 15b. Token scope documentation (moved to Phase 17b)
-
-#### 15c. Valid values for `--ram-mb` and `--region` (DONE: removed)
-
-Resolved in the sprite CLI alignment PR: `--ram-mb`, `--cpus`, `--region`, and `--storage-gb` were removed from `sproot new` entirely. The sprite CLI `create` command exposes none of these flags, confirming the API does not support them at the create endpoint. No documentation needed.
-
-#### 15d. CI required checks for auto-merge (deferred)
-
-Configure branch protection rules for `main` so that all three CI jobs (`build-and-test`, `validate`, `lint`) are required before merging. Done in GitHub repo settings, not in code.
-
-#### 15e. Module improvements for edge cases (deferred)
-
-Audit the `justanotherspy/sprite` config repo and identify phases that fall back to `cmd` because no suitable module exists. For each pattern found, decide whether to add a new module type or improve an existing one. Goal: reduce `cmd` usage to genuinely one-off commands, not to paper over module gaps.
-
-#### 15f. Release workflow test (moved to Phase 17d)
-
-#### 15g. Code review workflow (deferred)
-
-Establish a repeatable code review process for PRs. The `/ultrareview` skill in Claude Code on the web can run a multi-agent review of the current branch. Document the step in `CLAUDE.md` or the PR template.
-
-#### 15h. Audit `sproot new` config flags against the real API (DONE)
-
-Resolved: the sprite CLI (v0.0.1-rc43) `create` command was enumerated. It exposes only `--skip-console` and `--label`. All four resource sizing flags (`--ram-mb`, `--cpus`, `--region`, `--storage-gb`) are absent from the CLI, confirming they are not supported. They were removed from `sproot new`. `--no-console` was renamed `--skip-console` to match the sprite CLI. Additionally, `--force` was added to `destroy`, `--env` to `exec`, `--prefix` and `--watch` to `list`, and `upgrade` was changed to run `sprite upgrade` inside the sprite rather than calling the SDK VM upgrade method.
-
-Deferred exec flags (`--dir`, `--tty`, `--file`, `--http-post`) require changes to the `SpriteHandle.RunCommand` interface; tracked for a future PR after SDK investigation.
-
----
-
-### Phase 16: Integration depth and documentation fixes (DONE)
-
-**PR**: claude/lucid-cori-SYKG9
-
-#### 16a. Documentation fixes (done)
-
-- `README.md`: Added `sproot outdated` to command table; added `--skip-verify` mention for `sproot new`.
-- `CLAUDE.md`: Fixed Phase 12 entry (replaced `--storage-gb on new` with `--skip-console on new`); added Phase 16 row.
-- `plans/sproot.md`: Fixed Go version reference in Phase 0 from 1.23 to 1.25 to match `go.mod`.
-
-#### 16b. New test configs (done)
-
-- `testdata/integration/sproot_complex.yaml`: 5-phase flat config (apt, git_identity, file_template, rc_block, cmd) for git-based multi-phase CI. The final cmd phase verifies outputs of prior phases.
-- `testdata/integration/sproot_local_complex.yaml`: Same 5 phases but with `files/`-relative src paths, for local-config multi-phase CI (local config uses the uploaded dir as the config root).
-- `testdata/integration/sproot_targets.yaml`: Updated from trivial echo-only to real module phases (apt, git_identity, cmd in base; file_template, rc_block, cmd in web). Exercises extends inheritance across 5 total phases.
-- `testdata/integration/sproot_local_targets.yaml`: Local-config-safe multi-target config (no file src deps). Exercises extends with apt, git_identity, cmd phases.
-
-#### 16c. CI integration tests (done)
-
-Added 5 new jobs to `integration.yml` and fixed assertions on existing outdated jobs:
-
-| Job | Config | Flags | Tests |
-|-----|--------|-------|-------|
-| `multi-phase` | sproot_complex.yaml | (no --only), --skip-verify | Full 5-phase sequential git run |
-| `multi-target-full` | sproot_targets.yaml | --target web, --skip-verify | 5-phase extends run via git |
-| `local-config-multi-phase` | sproot_local_complex.yaml | (no --only), --skip-verify | 5-phase sequential local config run |
-| `local-config-multi-target` | sproot_local_targets.yaml | --target web, --skip-verify | 4-phase extends run via local config |
-| `push-multi-target` | sproot_targets.yaml | --target web, push --target web | Push with multi-target labels update |
-
-Changed `./sproot outdated` to `./sproot outdated | tee /dev/stderr | grep "current"` in all jobs that call it, making label staleness a hard failure.
-
-#### 16d. --skip-verify flag (done)
-
-Added `--skip-verify` to `sproot new`, `sproot setup`, and `sproot push`. When set, the built-in verify phase (tool PATH checks, rc block sentinel, gh auth, SSH) is not appended. Needed for integration tests with minimal configs that don't install uv, docker, pnpm, or rc_block. Also added `TestRunSetup_SkipVerify` unit test.
-
-**Bug found:** the built-in verify phase runs unconditionally when `--only` is absent, causing any multi-phase test that doesn't include the full tool suite (uv, docker, pnpm, ssh_setup, rc_block) to fail. `--skip-verify` is the fix.
-
-#### 16e. `validate --strict` (done)
-
-`internal/host/validate.go`: a missing `sproot.yaml` is now a warning (log line, nil return) rather than a hard error. `--strict` flag on `sproot validate` restores the old behavior and fails fast on a missing file. Useful in CI where the config file is always expected, but not in local developer workflows where it may not yet exist.
-
-#### 16f. Config init source-first UX (done)
-
-`internal/host/config.go`: interactive `sproot config init` now asks `sproot_config_source` (git or local) as the first prompt, so subsequent fields (repo URL vs. local path) match the user's chosen source. Non-interactive `--non-interactive` mode gains a `--source` flag to select either the git or local skeleton. Written YAML always includes `sproot_config_source` explicitly rather than relying on the default.
-
-#### 16g. `state.OnlyFilter` recorded in state file (done)
-
-`internal/phase/state.go`: `State.OnlyFilter string` field (JSON: `only_filter`) records the `--only` value from the run that produced this state file. `internal/phase/context.go`: `Context.OnlyFilter string` carries the same value throughout phase execution so downstream phases (including verify) can inspect it.
-
-#### 16h. Smart verify (done)
-
-`internal/sprite/verify.go`: the built-in verify phase now skips checks for tools whose responsible phase was not in `--only`. A `phaseForTool` table maps each checked command to the phase type that installs it (e.g. `uv` -> `uv_tool`, `docker` -> `docker`). `git` has an empty phaseType and is always checked as a baseline. `phaseRelevant(only, phaseType)` drives the gate: when `only` is empty all checks run; when set, only checks whose phaseType matches (or is empty) run.
-
-#### 16i. `make e2e` target (done)
-
-`Makefile`: new `e2e` target authenticates via `sprite auth setup`, runs three local-config tests against real sprites (5-phase flat run, multi-target web extends, status check via `--host`), and destroys both test sprites in a cleanup step. Complements `integration.yml` with a developer-friendly local end-to-end path.
-
-#### 16j. HostConfig field rename (done)
-
-All `config_*` fields on `HostConfig` renamed to `sproot_config_*` in both YAML tags and Go struct fields: `SprootConfigRepo`, `SprootConfigRef`, `SprootConfigPath`, `SprootConfigSource`, `SprootConfigLocalPath`. Clarifies that these fields point to the sproot.yaml inside the user's config repo, not the host config file itself. All tests, `testdata/host_config.yaml`, README, and `integration.yml` echo statements updated throughout.
-
----
-
-### Phase 14: Intelligence and agent context (deferred)
-
-Items 14b and 14c require a separate design pass for the Claude skill infrastructure and are deferred. Item 14a moved to Phase 17.
-
-#### 14b. Claude skill for sproot usage (deferred)
-
-Once docs and UX are stable, create an installable skill that enables Claude Code to:
-- Generate a `sproot.yaml` from a description or from an existing setup script.
-- Validate and explain phase configurations.
-- Suggest which modules to use for a given requirement.
-
-#### 14c. Convert a script into a sproot.yaml (skill, deferred)
-
-A skill that takes an existing setup script (bash or other) as input and generates the equivalent `sproot.yaml`. Map common patterns: `apt-get install` -> `apt`, `pip install` -> `uv_tool`, curl-pipe-sh installs -> `binary_release` or `cmd`, git config -> `git_identity`, etc.
-
----
-
-### Phase 17: Intelligence and completion
-
-Combines the concrete remaining Phase 14 and Phase 15 items. Items requiring external repo access (15e), GitHub settings (15d), or further design (14b, 14c, 15g) are deferred.
-
-#### 17a. llm.txt and agent-context.md after setup
-
-After `sproot setup` completes inside a sprite, append a summary of what ran to `/.sprite/llm.txt` and `/.sprite/docs/agent-context.md`. This gives Claude Code instant context about the environment.
-
-**Implementation:**
-
-New file `internal/sprite/llmtxt.go` exports `writeLLMContext(l *log.Logger, state *phase.State) error`:
-- Iterates `state.Phases` and collects records where `DidWork=true` (successfully ran this session)
-- A module-description table (keyed by phase `Type`) provides a one-line description of what each module installs or configures
-- Writes a timestamped plain-text block to `/.sprite/llm.txt` (appends; creates if absent)
-- Writes the same content as Markdown to `/.sprite/docs/agent-context.md` (creates parent dir if absent)
-- Skips phases that were skipped, failed, or only verified (no new work this run)
-
-Hook in `internal/sprite/setup.go` after `runner.Run(ctx)`:
-```go
-if !opts.DryRun {
-    if statePath, err := phase.DefaultStatePath(); err == nil {
-        if state, err := phase.LoadState(statePath); err == nil {
-            if wErr := writeLLMContext(l, state); wErr != nil {
-                l.Warnf("could not write llm context: %v", wErr)
-            }
-        }
-    }
-}
-```
-
-`phase.LoadState()` already exists in `internal/phase/state.go`. No changes to the runner interface needed.
-
-**Test:** Unit test in `internal/sprite/llmtxt_test.go` with a fake `State`; assert file contents. Integration test: add a step to one existing job to `sproot exec <name> cat /.sprite/llm.txt` and assert non-empty output.
-
-#### 17b. Token scope documentation
-
-Add a "Required GitHub token scopes" callout to `docs/modules.md` under the `gh_token` and `ssh_setup` sections:
-- `gh_token`: the module runs `gh auth login --with-token`; scopes should match whatever the user wants `gh` to be able to do (typically `repo`, `read:org`). The module itself requires no specific minimum.
-- `ssh_setup`: requires `admin:public_key` and `admin:ssh_signing_key` on a classic PAT (or equivalent fine-grained permissions).
-
-Add a brief "GitHub token scopes" note to `README.md` in the prerequisites or quickstart section.
-
-**Files:** `docs/modules.md`, `README.md`.
-
-#### 17c. Config init org auto-select
-
-During `sproot config init` interactive mode, after the user provides `token_env`, read `os.Getenv(tokenEnv)` and check if the Sprites SDK exposes an org-listing method on `sprites.Client`. If it does:
-- Call the API to list orgs available to the token
-- If the call returns results, print a numbered list and prompt "select org (or blank to skip)"
-- On selection, set `default_org`; on blank or API failure, fall back to the existing blank prompt silently
-
-**Prerequisite:** SDK investigation. If `sprites.Client` has no org-listing method this item is dropped for Phase 17. The gap would be noted in the plan.
+After the user provides `token_env` in interactive `config init`, check if the Sprites SDK exposes an org-listing method. If it does, call the API, print results, and prompt for selection; set `default_org` on selection; fall back to blank prompt on API failure or no results. Drop this item if no method exists.
 
 **Files:** `internal/host/config.go`, `internal/host/config_test.go`.
 
-#### 17d. Release workflow test
+#### 18d. Release workflow test
 
-Run the goreleaser pipeline end-to-end to validate the full release:
-1. `goreleaser release --clean --snapshot` locally to confirm all 5 platform archives build (linux/amd64, linux/arm64, darwin/amd64, darwin/arm64, windows/amd64)
-2. Push a test tag (e.g. `v0.0.0-rc1`) to trigger the actual `.github/workflows/release.yml`, including cosign signing
-3. Verify: `checksums.txt` present, all archives created, cosign bundle in release assets
-4. Delete the test tag and release after verification
+1. `goreleaser release --clean --snapshot` to confirm all 5 platform archives build
+2. Push a test tag (e.g. `v0.0.0-rc1`) to trigger `release.yml` with cosign signing
+3. Verify: checksums.txt, all archives, cosign bundle present in release assets
+4. Delete the test tag and release
 5. Fix `.goreleaser.yaml` or `release.yml` if anything fails
 
-Primarily operational. Code changes only if issues are found.
+#### Deferred intelligence items (Phase 14)
+
+- **14b.** Claude skill for sproot usage: generate `sproot.yaml` from description, validate/explain configs, suggest modules.
+- **14c.** Script-to-`sproot.yaml` converter skill: map apt-get install -> apt, pip install -> uv_tool, curl-pipe-sh -> binary_release or cmd, git config -> git_identity, etc.
 
 ---
 
-## Open questions summary
+## Open questions
 
-| # | Area | Question | Blocks | Status |
-|---|------|----------|--------|--------|
-| Q1 | `env` block | Implement, drop, or mark as future? | 8i, arch of env forwarding | DONE: implemented (option 1) in PR #17 |
-| Q2 | `file_template` | Add `Template bool` opt-in or document always-attempt? | 8a | DONE: `Template bool` added (option 2) in PR #17 |
-| Q3 | `cmd` `name` field | Add field or drop from docs? | 8a | DONE: field added (option 1) in PR #17 |
-| Q4 | `binary_release` checksums | Add optional `checksum:` field or known tradeoff? | 9d | DONE: both `checksum` and `checksum_asset` added in PR #17 |
-| Q5 | validate commands | Keep separate or combine? | 8b | DONE: partially combined; `sproot validate` now also validates host config if present, in PR #17 |
-| Q6 | Cross-arch binary injection | Embed Linux/amd64 binary, download it at runtime, or document limitation? | Phase 10 | DONE: download at runtime (option 2) in PR #21 |
-| Q7 | Multi-target backward compat | Flat `phases:` in Phase 13a treated as implicit default target? | Phase 13a | DONE: yes, flat `phases:` = implicit default; no migration required |
+All Q1-Q7 resolved.
+
+| # | Question | Resolution |
+|---|----------|------------|
+| Q1 | env block forwarding | Implemented (option 1): resolve vars host-side, forward to `sproot setup` |
+| Q2 | file_template opt-in | `template: true` field added (option 2) |
+| Q3 | cmd name field | `name: string` field added to `CmdConfig` |
+| Q4 | binary_release checksums | Both `checksum` and `checksum_asset` fields added |
+| Q5 | validate commands | `sproot validate` also checks host config; `config validate` retained separately |
+| Q6 | cross-arch binary injection | Download at runtime (option 2) |
+| Q7 | multi-target backward compat | Flat `phases:` = implicit default target; no migration needed |
 
 ---
 
 ## Suggested order of execution
 
-1. **Phase 9 bug fixes** (no questions blocking): 9a, 9b, 9c, 9d, 9e, 9f. (DONE)
-2. **Phase 10** (cross-arch injection fix): depends on answer to Q6; affects all non-Linux users. (DONE)
-3. **Phase 11 UX** (11a through 11i): independent; can be picked off one at a time. (DONE)
-4. **Phase 12 SDK alignment** (12a-12d): review SDK docs first. (DONE)
-5. **Phase 15 operational improvements** (15a-15g): independent items, pick off in any order alongside Phase 13 or 14 work.
-6. **Phase 13 multi-target and push** (13a-13c): architecture changes; coordinate with Phase 6 (sprite config repo).
-7. **Phase 14 intelligence** (14a-14c): after everything else is stable.
-8. **Phase 17 intelligence and completion**: 17a (llm.txt), 17b (token scope docs), 17c (org auto-select), 17d (release test). Items 17b and 17d can run in parallel with 17a/17c.
+1. **Phase 17** (code quality and bug fixes, NEXT)
+   - PR A first: push env forwarding (CRITICAL)
+   - PR B: HTTP timeouts
+   - PR C: quick wins bundle
+2. **Phase 18** (intelligence and completion; 18a + 18c independent of 18b + 18d)
+3. **Phase 14 deferred** (Claude skills; after everything else is stable)
 
-After each batch of changes: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
+After each PR: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
 
 ---
 
@@ -555,6 +196,5 @@ After each batch of changes: `make check` and `./sproot validate --path internal
 - **Single binary.** `sproot` routes by subcommand. No separate host/sprite binaries.
 - **Embedding strategy.** Files referenced in `sproot.yaml` live in the config repo, not embedded in the sproot binary. The binary embeds only its own help text, version, and default schemas.
 - **Host-sprite interaction uses sprites-go SDK.** Never shell out to the `sprite` CLI from Go code.
-- **Bracket phases (pre/post sprite-env checkpoints) are a CLI concern, not a module type.** They wrap the whole setup run and never abort it.
 - **Idempotency is per-phase, not driven by the state file.** State file is for `--status` and forensics.
 - **Feature branches for PRs.** Each body of work goes on a feature branch and merges via PR. Never push directly to main.

@@ -136,7 +136,7 @@ sproot config init
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
-| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint, `--skip-verify` to skip end-of-run checks) |
+| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--only <type>` to run a single phase type, `--no-checkpoint` to skip pre-push checkpoint, `--skip-verify` to skip end-of-run checks) |
 | `sproot outdated` | host | Show which sproot-managed sprites have a stale config SHA |
 | `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
 | `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
