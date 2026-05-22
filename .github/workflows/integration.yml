@@ -60,6 +60,24 @@ jobs:
           - name: binary-release
             only: binary_release
             config_path: testdata/integration/sproot_binary.yaml
+          - name: uv-tool
+            only: uv_tool
+            config_path: testdata/integration/sproot_tooling.yaml
+          - name: corepack
+            only: corepack
+            config_path: testdata/integration/sproot_tooling.yaml
+          - name: rust-components
+            only: rust_components
+            config_path: testdata/integration/sproot_tooling.yaml
+          - name: go-install
+            only: go_install
+            config_path: testdata/integration/sproot_tooling.yaml
+          - name: npm
+            only: npm
+            config_path: testdata/integration/sproot_tooling.yaml
+          - name: sprite-service
+            only: sprite_service
+            config_path: testdata/integration/sproot_tooling.yaml
           - name: target
             only: cmd
             config_path: testdata/integration/sproot_targets.yaml

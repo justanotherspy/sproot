@@ -1,0 +1,9 @@
+{
+  "name": "sproot-integration-npm",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal fixture so the npm integration job has something to install.",
+  "dependencies": {
+    "is-number": "^7.0.0"
+  }
+}
