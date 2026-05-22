@@ -45,6 +45,7 @@ func newLocalRepoAt(t *testing.T, relPath, content string) string {
 	run("init", "-b", "main")
 	run("config", "user.email", "test@example.com")
 	run("config", "user.name", "Test")
+	run("config", "commit.gpgsign", "false")
 
 	fullPath := filepath.Join(dir, filepath.FromSlash(relPath))
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
