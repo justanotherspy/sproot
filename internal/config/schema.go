@@ -116,7 +116,7 @@ type PhaseConfig struct {
 	FileTemplate   *FileTemplateConfig   `yaml:"-"`
 	RCBlock        *RCBlockConfig        `yaml:"-"`
 	RepoClone      *RepoCloneConfig      `yaml:"-"`
-	ClaudeSettings *ClaudeSettingsConfig `yaml:"-"`
+	Claude         *ClaudeConfig         `yaml:"-"`
 	Npm            *NpmConfig            `yaml:"-"`
 	Cmd            *CmdConfig            `yaml:"-"`
 }
@@ -178,9 +178,9 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "repo_clone":
 		p.RepoClone = &RepoCloneConfig{}
 		return value.Decode(p.RepoClone)
-	case "claude_settings":
-		p.ClaudeSettings = &ClaudeSettingsConfig{}
-		return value.Decode(p.ClaudeSettings)
+	case "claude":
+		p.Claude = &ClaudeConfig{}
+		return value.Decode(p.Claude)
 	case "npm":
 		p.Npm = &NpmConfig{}
 		return value.Decode(p.Npm)
@@ -217,19 +217,46 @@ type UVToolConfig struct {
 }
 
 // BinaryReleaseConfig downloads and installs a GitHub release asset.
-// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch},
-// {x64_arch}, {x86_64_arch}.
+// Asset supports template variables: {version}, {tag}, {tag_no_v}, {arch},
+// {goos}, {dpkg_arch}, {x64_arch}, {x86_64_arch}, {arch_alias}.
 // Install methods: dpkg, tar+install, raw.
+// Version is an optional template for the {version} token. It defaults to the
+// raw release tag; set it to "{tag_no_v}" for projects whose asset names drop
+// the leading v. The download URL path always uses the raw tag regardless.
+// ArchMap maps GOARCH (amd64, arm64) to a custom arch token resolved as
+// {arch_alias}; use it when a project's arch naming matches none of the built-in
+// vars (e.g. hadolint uses x86_64 on amd64 but arm64 on arm64).
 // Checksum is an optional sha256 hex string to verify the downloaded asset.
 // ChecksumAsset is an optional asset name template for a goreleaser-style
 // checksums file; sproot downloads it, finds the matching line, and verifies.
+// Cosign, when set, verifies a Sigstore keyless signature before install.
 type BinaryReleaseConfig struct {
-	Name          string `yaml:"name"`
-	Repo          string `yaml:"repo"`
-	Asset         string `yaml:"asset"`
-	Install       string `yaml:"install"`
-	Checksum      string `yaml:"checksum"`
-	ChecksumAsset string `yaml:"checksum_asset"`
+	Name          string            `yaml:"name"`
+	Repo          string            `yaml:"repo"`
+	Asset         string            `yaml:"asset"`
+	Install       string            `yaml:"install"`
+	Version       string            `yaml:"version"`
+	ArchMap       map[string]string `yaml:"arch_map"`
+	Checksum      string            `yaml:"checksum"`
+	ChecksumAsset string            `yaml:"checksum_asset"`
+	Cosign        *CosignConfig     `yaml:"cosign"`
+}
+
+// CosignConfig configures keyless cosign signature verification of a release
+// asset (typically a checksums file). All fields are required when set.
+// Blob, Signature, and Certificate are asset-name templates (same variables as
+// BinaryReleaseConfig.Asset). The verification runs:
+//
+//	cosign verify-blob --certificate <cert> --signature <sig> \
+//	  --certificate-identity-regexp <re> --certificate-oidc-issuer <issuer> <blob>
+//
+// Requires cosign v2+ on PATH (install it via an earlier binary_release phase).
+type CosignConfig struct {
+	CertificateIdentityRegexp string `yaml:"certificate_identity_regexp"`
+	CertificateOIDCIssuer     string `yaml:"certificate_oidc_issuer"`
+	Blob                      string `yaml:"blob"`
+	Signature                 string `yaml:"signature"`
+	Certificate               string `yaml:"certificate"`
 }
 
 // CorepackConfig enables corepack and pre-activates the listed package managers.
@@ -327,9 +354,16 @@ type NpmConfig struct {
 	Dir string `yaml:"dir"`
 }
 
-// ClaudeSettingsConfig deep-merges a JSON object into ~/.claude/settings.json.
-type ClaudeSettingsConfig struct {
+// ClaudeConfig configures Claude Code: an optional deep-merge into
+// ~/.claude/settings.json, an optional `claude upgrade`, and an optional
+// managed CLAUDE.md block sourced from a config-repo file.
+// ClaudeMD is a config-repo-relative path (resolved like file_template's src).
+// Template renders ClaudeMD as a Go template against the identity when true.
+type ClaudeConfig struct {
 	Settings map[string]any `yaml:"settings"`
+	Upgrade  bool           `yaml:"upgrade"`
+	ClaudeMD string         `yaml:"claude_md"`
+	Template bool           `yaml:"template"`
 }
 
 // CmdConfig runs an arbitrary command with an optional idempotency check.

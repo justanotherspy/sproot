@@ -24,10 +24,12 @@ phases:
   - type: rc_block
     src: testdata/integration/files/rc_block.sh
 
-  - type: claude_settings
+  - type: claude
     settings:
       theme: dark
       autoUpdaterStatus: disabled
+    claude_md: testdata/integration/files/claude_md.md
+    template: true
 
   - type: cmd
     run: "echo 'integration test complete'"

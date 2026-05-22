@@ -16,6 +16,7 @@ import (
 
 func TestTemplateAsset(t *testing.T) {
 	version := "v2.4.0"
+	tag := "v2.4.0"
 	cases := []struct {
 		pattern string
 		check   func(string) bool
@@ -25,6 +26,11 @@ func TestTemplateAsset(t *testing.T) {
 			"{version}_{arch}.deb",
 			func(s string) bool { return strings.Contains(s, "v2.4.0") && strings.Contains(s, runtime.GOARCH) },
 			"version and arch substituted",
+		},
+		{
+			"{tag}_{tag_no_v}",
+			func(s string) bool { return s == "v2.4.0_2.4.0" },
+			"tag and tag_no_v substituted",
 		},
 		{
 			"{goos}_{dpkg_arch}",
@@ -64,10 +70,111 @@ func TestTemplateAsset(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		got := templateAsset(tc.pattern, version)
-		if !tc.check(got) {
-			t.Errorf("templateAsset(%q, %q) = %q: %s", tc.pattern, version, got, tc.desc)
+		got, err := templateAsset(tc.pattern, version, tag, nil)
+		if err != nil {
+			t.Errorf("templateAsset(%q): unexpected error: %v", tc.pattern, err)
+			continue
 		}
+		if !tc.check(got) {
+			t.Errorf("templateAsset(%q) = %q: %s", tc.pattern, got, tc.desc)
+		}
+	}
+}
+
+func TestTemplateAsset_ArchAlias(t *testing.T) {
+	archMap := map[string]string{"amd64": "x86_64", "arm64": "arm64"}
+	got, err := templateAsset("hadolint-linux-{arch_alias}", "1.0", "v1.0", archMap)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "hadolint-linux-" + archMap[runtime.GOARCH]
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestTemplateAsset_ArchAliasWithoutMap(t *testing.T) {
+	if _, err := templateAsset("x-{arch_alias}", "1.0", "v1.0", nil); err == nil {
+		t.Error("expected error when {arch_alias} used without arch_map")
+	}
+}
+
+func TestTemplateAsset_ArchAliasMissingKey(t *testing.T) {
+	// A map that lacks the current GOARCH key must error.
+	archMap := map[string]string{"some-other-arch": "x"}
+	if _, err := templateAsset("x-{arch_alias}", "1.0", "v1.0", archMap); err == nil {
+		t.Error("expected error when arch_map lacks current GOARCH key")
+	}
+}
+
+func TestStripLeadingV(t *testing.T) {
+	cases := map[string]string{
+		"v8.18.4": "8.18.4",
+		"V8.18.4": "8.18.4",
+		"8.18.4":  "8.18.4",
+		"":        "",
+		"vv1":     "v1", // strips only one leading v
+	}
+	for in, want := range cases {
+		if got := stripLeadingV(in); got != want {
+			t.Errorf("stripLeadingV(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
+func TestResolveVersion(t *testing.T) {
+	cases := []struct {
+		tmpl, tag, want string
+	}{
+		{"", "v8.18.4", "v8.18.4"},          // empty -> raw tag
+		{"{tag}", "v8.18.4", "v8.18.4"},     // explicit raw tag
+		{"{tag_no_v}", "v8.18.4", "8.18.4"}, // stripped
+		{"{tag_no_v}", "8.18.4", "8.18.4"},  // tag already without v
+		{"r{tag_no_v}", "v1.2", "r1.2"},     // mixed literal + var
+	}
+	for _, tc := range cases {
+		if got := resolveVersion(tc.tmpl, tc.tag); got != tc.want {
+			t.Errorf("resolveVersion(%q, %q) = %q, want %q", tc.tmpl, tc.tag, got, tc.want)
+		}
+	}
+}
+
+func TestVerifyCosign_AbsentCosignErrors(t *testing.T) {
+	// Force a PATH with no cosign so LookPath fails deterministically.
+	t.Setenv("PATH", t.TempDir())
+	p := &binaryReleasePhase{cfg: &config.BinaryReleaseConfig{
+		Name: "trufflehog", Repo: "trufflesecurity/trufflehog",
+		Cosign: &config.CosignConfig{
+			Blob: "c.txt", Signature: "c.txt.sig", Certificate: "c.txt.pem",
+			CertificateIdentityRegexp: "x", CertificateOIDCIssuer: "y",
+		},
+	}}
+	err := p.verifyCosign(testCtx(t), "v1.0.0", "1.0.0", "/tmp/asset", "asset")
+	if err == nil || !strings.Contains(err.Error(), "cosign") {
+		t.Errorf("expected cosign-absent error, got: %v", err)
+	}
+}
+
+func TestVerifyChecksumFile_Match(t *testing.T) {
+	content := []byte("fake binary content")
+	h := sha256.Sum256(content)
+	checksum := hex.EncodeToString(h[:])
+	assetName := "mytool_1.0.0_linux_amd64.tar.gz"
+
+	dir := t.TempDir()
+	checksumsPath := dir + "/checksums.txt"
+	if err := os.WriteFile(checksumsPath, []byte(fmt.Sprintf("%s  %s\naabbcc  other.tar.gz\n", checksum, assetName)), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	assetPath := dir + "/asset"
+	if err := os.WriteFile(assetPath, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyChecksumFile(assetPath, assetName, checksumsPath); err != nil {
+		t.Errorf("expected match, got: %v", err)
+	}
+	if err := verifyChecksumFile(assetPath, "missing.tar.gz", checksumsPath); err == nil {
+		t.Error("expected not-found error for missing asset")
 	}
 }
 

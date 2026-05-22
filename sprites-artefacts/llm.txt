@@ -1,0 +1,53 @@
+# Sprite Environment
+
+## CRITICAL: Security Rules
+- HTTP services you create may become PUBLIC - never expose secrets, env vars, or sensitive data
+- See /.sprite/docs/agent-context.md for full security requirements
+
+## Quick Reference
+
+### URL
+- Format: `https://<sprite-name>-<org>.sprites.dev/`
+- Check yours: `sprite-env info` or `sprite url` (from outside)
+- Auth modes: `sprite` (org members only, default) or `public` (open to internet)
+- Proxy routes HTTP to the service with `--http-port`, or port 8080 by default
+
+### Services
+- Long-running processes that persist across reboots
+- Create: `sprite-env services create <name> --cmd <command> [--http-port <port>]`
+- Only one service can have `--http-port`; it auto-starts on incoming requests
+- `--cmd` takes the binary only; pass arguments via `--args`: `--cmd python3 --args "-m,http.server,8080"`
+- Do NOT start a background process separately — the service manages the process lifecycle
+- Restart: `sprite-env services restart <name>` (do NOT use stop + start separately)
+- List/start/stop/delete: `sprite-env services <subcommand>`
+- Full help: `sprite-env services --help`
+
+### Checkpoints
+- Point-in-time snapshots of the writable filesystem overlay
+- Create before risky changes, restore to roll back
+- CLI: `sprite-env checkpoints create`, `sprite-env checkpoints list`
+
+### Lifecycle
+- Sprites run while servicing HTTP requests or while sessions generate output
+- When idle, sprites pause automatically
+- Services and sessions keep sprites alive
+- Services restart automatically on boot
+
+### Directory Layout
+```
+/.sprite/
+  bin/              # sprite-env CLI — use this to manage services and checkpoints
+  docs/             # Documentation (agent-context.md, languages.md)
+  checkpoints/      # Last 5 checkpoints mounted here
+  policy/           # Network egress policy (network.json)
+  languages/        # Per-language llm.txt files
+```
+
+## Full Documentation
+
+- /.sprite/docs/agent-context.md - Environment overview (URL, services, checkpoints, network policy)
+- /.sprite/docs/languages.md     - Language runtimes and version managers
+
+Per-language details: /.sprite/languages/<lang>/llm.txt
+
+CLI help: `sprite-env --help`

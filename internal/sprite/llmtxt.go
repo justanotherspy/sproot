@@ -47,7 +47,7 @@ var moduleDescriptions = map[string]string{
 	"file_template":   "Rendered files into place from the config repo.",
 	"rc_block":        "Added a managed block to shell rc files.",
 	"repo_clone":      "Cloned repositories.",
-	"claude_settings": "Installed Claude Code settings.",
+	"claude":          "Configured Claude Code (settings, upgrade, CLAUDE.md).",
 	"npm":             "Installed Node.js dependencies via npm install.",
 	"cmd":             "Ran custom setup commands.",
 }

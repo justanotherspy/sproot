@@ -11,6 +11,20 @@ import (
 	"github.com/justanotherspy/sproot/pkg/log"
 )
 
+// runPrivileged runs name+args with root privilege. When the current process is
+// not root (the usual case inside a sprite, where setup runs as the unprivileged
+// sprite user) and sudo is available, it prepends `sudo -n`. On a host already
+// running as root, or where sudo is absent, it runs the command directly. Use it
+// for operations that categorically require root (dpkg, apt-get install).
+func runPrivileged(l *log.Logger, name string, args ...string) error {
+	if os.Geteuid() != 0 {
+		if sudo, err := exec.LookPath("sudo"); err == nil {
+			return runCmd(l, sudo, append([]string{"-n", name}, args...)...)
+		}
+	}
+	return runCmd(l, name, args...)
+}
+
 // runCmd logs and executes name with args, streaming stdout+stderr to log line by line.
 func runCmd(l *log.Logger, name string, args ...string) error {
 	l.Debugf("exec: %s %s", name, strings.Join(args, " "))

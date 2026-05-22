@@ -2,8 +2,9 @@ package modules
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/justanotherspy/sproot/internal/config"
@@ -67,19 +68,86 @@ func TestDocker_ShouldRunWhenDaemonJSONMissing(t *testing.T) {
 	}
 }
 
-func TestWriteDaemonJSON(t *testing.T) {
-	// writeDaemonJSON targets /etc/docker/daemon.json which requires root.
-	// Test the JSON marshaling logic without actually writing the file.
+func TestMergeDaemonJSON_AbsentFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.json")
+	data := map[string]any{"storage-driver": "overlay2"}
+	if err := mergeDaemonJSONAt(path, data); err != nil {
+		t.Fatalf("mergeDaemonJSONAt: %v", err)
+	}
+	got := readJSON(t, path)
+	if got["storage-driver"] != "overlay2" {
+		t.Errorf("storage-driver not written: %v", got)
+	}
+}
+
+func TestMergeDaemonJSON_MergesExisting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.json")
+	// Pre-existing file (e.g. a platform default).
+	if err := os.WriteFile(path, []byte(`{"storage-driver":"overlay2","log-opts":{"max-size":"1m"}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	data := map[string]any{
 		"log-driver": "json-file",
-		"log-opts":   map[string]any{"max-size": "10m"},
+		"log-opts":   map[string]any{"max-file": "3"},
 	}
-	// Verify it marshals without error (logic path used by writeDaemonJSON).
-	b, err := json.MarshalIndent(data, "", "  ")
+	if err := mergeDaemonJSONAt(path, data); err != nil {
+		t.Fatalf("mergeDaemonJSONAt: %v", err)
+	}
+	got := readJSON(t, path)
+	if got["storage-driver"] != "overlay2" {
+		t.Error("existing storage-driver lost after merge")
+	}
+	if got["log-driver"] != "json-file" {
+		t.Error("new log-driver missing after merge")
+	}
+	opts, _ := got["log-opts"].(map[string]any)
+	if opts["max-size"] != "1m" || opts["max-file"] != "3" {
+		t.Errorf("nested log-opts not merged: %v", opts)
+	}
+}
+
+func TestMergeDaemonJSON_CorruptExisting(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.json")
+	if err := os.WriteFile(path, []byte("{not json"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := mergeDaemonJSONAt(path, map[string]any{"a": 1}); err == nil {
+		t.Error("expected error on corrupt existing daemon.json")
+	}
+}
+
+func TestDaemonJSONChanged(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "daemon.json")
+	data := map[string]any{"storage-driver": "overlay2"}
+
+	changed, err := daemonJSONChanged(path, data)
 	if err != nil {
-		t.Fatalf("json.MarshalIndent: %v", err)
+		t.Fatal(err)
 	}
-	if !strings.Contains(string(b), "log-driver") {
-		t.Errorf("marshaled JSON missing log-driver: %s", b)
+	if !changed {
+		t.Error("expected changed=true when file absent")
 	}
+	if err := mergeDaemonJSONAt(path, data); err != nil {
+		t.Fatal(err)
+	}
+	changed, err = daemonJSONChanged(path, data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed {
+		t.Error("expected changed=false after writing the same merged content")
+	}
+}
+
+func readJSON(t *testing.T, path string) map[string]any {
+	t.Helper()
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("unmarshal %s: %v", path, err)
+	}
+	return out
 }

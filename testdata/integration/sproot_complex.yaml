@@ -23,10 +23,17 @@ phases:
   - type: rc_block
     src: testdata/integration/files/rc_block.sh
 
+  - type: claude
+    settings:
+      theme: dark
+    claude_md: testdata/integration/files/claude_md.md
+    template: true
+
   - type: cmd
     name: verify-setup
     run: |
       jq --version
       git config --global user.email | grep ci@example.com
       test -x /tmp/sproot-test-hello.sh
-    check: "jq --version && git config --global user.email | grep -q ci@example.com && test -x /tmp/sproot-test-hello.sh"
+      grep -q "BEGIN SPROOT MANAGED BLOCK" "$HOME/.claude/CLAUDE.md"
+    check: "jq --version && git config --global user.email | grep -q ci@example.com && test -x /tmp/sproot-test-hello.sh && grep -q 'BEGIN SPROOT MANAGED BLOCK' $HOME/.claude/CLAUDE.md"

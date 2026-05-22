@@ -11,6 +11,7 @@ package modules
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"
@@ -39,7 +40,11 @@ func (p *aptPhase) ShouldRun(_ *phase.Context) (bool, error) {
 		}
 	}
 	for _, s := range p.cfg.Symlinks {
-		if _, err := os.Lstat(s.To); err != nil {
+		to, err := expandTilde(s.To)
+		if err != nil {
+			return false, err
+		}
+		if _, err := os.Lstat(to); err != nil {
 			return true, nil
 		}
 	}
@@ -49,13 +54,24 @@ func (p *aptPhase) ShouldRun(_ *phase.Context) (bool, error) {
 func (p *aptPhase) Run(ctx *phase.Context) error {
 	if len(p.cfg.Packages) > 0 {
 		args := append([]string{"install", "-y"}, p.cfg.Packages...)
-		if err := runCmd(ctx.Log, "apt-get", args...); err != nil {
+		if err := runPrivileged(ctx.Log, "apt-get", args...); err != nil {
 			return err
 		}
 	}
 	for _, s := range p.cfg.Symlinks {
-		if err := runCmd(ctx.Log, "ln", "-sf", s.From, s.To); err != nil {
-			return fmt.Errorf("apt: symlink %s -> %s: %w", s.To, s.From, err)
+		to, err := expandTilde(s.To)
+		if err != nil {
+			return err
+		}
+		from, err := expandTilde(s.From)
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(filepath.Dir(to), 0o755); err != nil {
+			return fmt.Errorf("apt: mkdir for symlink %s: %w", to, err)
+		}
+		if err := runCmd(ctx.Log, "ln", "-sf", from, to); err != nil {
+			return fmt.Errorf("apt: symlink %s -> %s: %w", to, from, err)
 		}
 	}
 	return nil
@@ -68,7 +84,11 @@ func (p *aptPhase) Verify(_ *phase.Context) error {
 		}
 	}
 	for _, s := range p.cfg.Symlinks {
-		if _, err := os.Lstat(s.To); err != nil {
+		to, err := expandTilde(s.To)
+		if err != nil {
+			return err
+		}
+		if _, err := os.Lstat(to); err != nil {
 			return fmt.Errorf("apt: symlink %q missing after install", s.To)
 		}
 	}

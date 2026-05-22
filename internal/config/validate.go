@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 // knownPhaseTypes is the full set of module types defined in Phase 3.
@@ -22,7 +23,8 @@ var knownPhaseTypes = map[string]bool{
 	"file_template":   true,
 	"rc_block":        true,
 	"repo_clone":      true,
-	"claude_settings": true,
+	"claude":          true,
+	"npm":             true,
 	"cmd":             true,
 }
 
@@ -142,6 +144,42 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 			}
 			if br.Asset == "" {
 				errs = append(errs, fmt.Errorf("%s (binary_release): asset is required", prefix))
+			}
+			// {arch_alias} requires arch_map. The per-GOARCH key is checked at
+			// runtime, since the host arch may differ from the sprite arch.
+			usesAlias := strings.Contains(br.Asset, "{arch_alias}") ||
+				strings.Contains(br.ChecksumAsset, "{arch_alias}")
+			if br.Cosign != nil {
+				usesAlias = usesAlias ||
+					strings.Contains(br.Cosign.Blob, "{arch_alias}") ||
+					strings.Contains(br.Cosign.Signature, "{arch_alias}") ||
+					strings.Contains(br.Cosign.Certificate, "{arch_alias}")
+			}
+			if usesAlias && len(br.ArchMap) == 0 {
+				errs = append(errs, fmt.Errorf("%s (binary_release): asset uses {arch_alias} but arch_map is not set", prefix))
+			}
+			if c := br.Cosign; c != nil {
+				if c.CertificateIdentityRegexp == "" {
+					errs = append(errs, fmt.Errorf("%s (binary_release.cosign): certificate_identity_regexp is required", prefix))
+				}
+				if c.CertificateOIDCIssuer == "" {
+					errs = append(errs, fmt.Errorf("%s (binary_release.cosign): certificate_oidc_issuer is required", prefix))
+				}
+				if c.Blob == "" {
+					errs = append(errs, fmt.Errorf("%s (binary_release.cosign): blob is required", prefix))
+				}
+				if c.Signature == "" {
+					errs = append(errs, fmt.Errorf("%s (binary_release.cosign): signature is required", prefix))
+				}
+				if c.Certificate == "" {
+					errs = append(errs, fmt.Errorf("%s (binary_release.cosign): certificate is required", prefix))
+				}
+			}
+		}
+	case "claude":
+		if c := phase.Claude; c != nil {
+			if len(c.Settings) == 0 && !c.Upgrade && c.ClaudeMD == "" {
+				errs = append(errs, fmt.Errorf("%s (claude): set at least one of settings, upgrade, or claude_md", prefix))
 			}
 		}
 	case "file_template":

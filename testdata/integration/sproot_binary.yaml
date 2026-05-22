@@ -1,0 +1,53 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Exercises the binary_release version/arch_map/cosign features end to end.
+# Run with --only binary_release: all phases run in list order, so cosign is
+# installed before trufflehog needs it for signature verification.
+phases:
+  # cosign: tag has a v, the .deb asset does not -> version: {tag_no_v}.
+  - type: binary_release
+    name: cosign
+    repo: sigstore/cosign
+    version: "{tag_no_v}"
+    asset: "cosign_{version}_{arch}.deb"
+    install: dpkg
+
+  # gitleaks: asset drops the leading v and uses x64/arm64 naming.
+  - type: binary_release
+    name: gitleaks
+    repo: gitleaks/gitleaks
+    version: "{tag_no_v}"
+    asset: "gitleaks_{version}_linux_{x64_arch}.tar.gz"
+    install: tar+install
+
+  # hadolint: x86_64 on amd64 but arm64 on arm64 -> arch_map + {arch_alias}.
+  - type: binary_release
+    name: hadolint
+    repo: hadolint/hadolint
+    arch_map:
+      amd64: x86_64
+      arm64: arm64
+    asset: "hadolint-linux-{arch_alias}"
+    install: raw
+
+  # trufflehog: verify the cosign-signed checksums file (keyless), then verify
+  # the tarball against it.
+  - type: binary_release
+    name: trufflehog
+    repo: trufflesecurity/trufflehog
+    version: "{tag_no_v}"
+    asset: "trufflehog_{version}_linux_{arch}.tar.gz"
+    checksum_asset: "trufflehog_{version}_checksums.txt"
+    install: tar+install
+    cosign:
+      blob: "trufflehog_{version}_checksums.txt"
+      signature: "trufflehog_{version}_checksums.txt.sig"
+      certificate: "trufflehog_{version}_checksums.txt.pem"
+      certificate_oidc_issuer: "https://token.actions.githubusercontent.com"
+      certificate_identity_regexp: "https://github.com/trufflesecurity/trufflehog/.github/workflows/.*"
