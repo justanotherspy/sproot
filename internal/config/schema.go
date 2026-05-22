@@ -188,23 +188,33 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
-// AptConfig installs apt packages.
+// AptSymlink is a post-install symlink created by the apt module.
+type AptSymlink struct {
+	From string `yaml:"from"` // source path (the installed binary, e.g. /usr/bin/batcat)
+	To   string `yaml:"to"`   // symlink path to create (e.g. /usr/local/bin/bat)
+}
+
+// AptConfig installs apt packages and optionally creates post-install symlinks.
 type AptConfig struct {
-	Packages []string `yaml:"packages"`
+	Packages []string     `yaml:"packages"`
+	Symlinks []AptSymlink `yaml:"symlinks"`
 }
 
 // UVTool installs a single tool via uv.
 type UVTool struct {
 	Name string `yaml:"name"`
+	Pkg  string `yaml:"pkg"` // optional; PyPI package name when it differs from the binary name
 }
 
 // UVToolConfig installs tools via uv tool install.
+// uv is installed automatically if not present.
 type UVToolConfig struct {
 	Tools []UVTool `yaml:"tools"`
 }
 
 // BinaryReleaseConfig downloads and installs a GitHub release asset.
-// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch}.
+// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch},
+// {x64_arch}, {x86_64_arch}.
 // Install methods: dpkg, tar+install, raw.
 // Checksum is an optional sha256 hex string to verify the downloaded asset.
 // ChecksumAsset is an optional asset name template for a goreleaser-style
@@ -229,7 +239,10 @@ type RustComponentsConfig struct {
 }
 
 // DockerConfig installs docker-ce via the official install script.
-type DockerConfig struct{}
+// DaemonJSON is an optional map written to /etc/docker/daemon.json after install.
+type DockerConfig struct {
+	DaemonJSON map[string]any `yaml:"daemon_json"`
+}
 
 // SpriteServiceConfig registers a sprite-env managed service via the internal API socket.
 // Cmd is the executable path (e.g. /usr/bin/dockerd). Args are optional.

@@ -41,3 +41,29 @@ func TestUVTool_TypeAndName(t *testing.T) {
 		t.Errorf("Name: got %q", p.Name())
 	}
 }
+
+func TestUVTool_ShouldRunWhenUVMissing(t *testing.T) {
+	if _, err := exec.LookPath("uv"); err == nil {
+		t.Skip("uv is on PATH; skip missing-uv path")
+	}
+	p := &uvToolPhase{cfg: &config.UVToolConfig{
+		Tools: []config.UVTool{{Name: "ruff"}},
+	}}
+	should, err := p.ShouldRun(testCtx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !should {
+		t.Error("expected ShouldRun=true when uv is not on PATH")
+	}
+}
+
+func TestUVTool_VerifyFailsWhenUVMissing(t *testing.T) {
+	if _, err := exec.LookPath("uv"); err == nil {
+		t.Skip("uv is on PATH")
+	}
+	p := &uvToolPhase{cfg: &config.UVToolConfig{}}
+	if err := p.Verify(testCtx(t)); err == nil {
+		t.Error("expected Verify to fail when uv is not on PATH")
+	}
+}

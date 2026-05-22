@@ -26,17 +26,24 @@ The canonical use is forwarding a GitHub PAT so that `ssh_setup` and `gh_token` 
 
 ## apt
 
-Installs system packages via `apt-get`.
+Installs system packages via `apt-get` and optionally creates post-install symlinks.
 
 ```yaml
 - type: apt
   packages:
     - git
     - curl
-    - vim
+    - bat        # installs as batcat on Ubuntu
+  symlinks:
+    - from: /usr/bin/batcat
+      to: /usr/local/bin/bat
 ```
 
-**Idempotency:** checks `dpkg -s <pkg>` for each package; skips the phase if all are already installed.
+**Fields:**
+- `packages`: list of apt package names
+- `symlinks`: optional list of `{from, to}` pairs; `from` is the source path, `to` is the symlink path to create (uses `ln -sf`)
+
+**Idempotency:** checks `dpkg -s <pkg>` for each package and `stat <to>` for each symlink; skips the phase if all are satisfied.
 
 **Platform:** Linux with apt.
 
@@ -44,7 +51,7 @@ Installs system packages via `apt-get`.
 
 ## uv_tool
 
-Installs Python tools via `uv tool install`.
+Installs Python tools via `uv tool install`. Installs `uv` automatically to `/usr/local/bin` if not already on PATH.
 
 ```yaml
 - type: uv_tool
@@ -52,11 +59,15 @@ Installs Python tools via `uv tool install`.
     - name: ruff
     - name: pyright
     - name: black
+    - name: g        # binary name
+      pkg: garlic    # PyPI package name (when it differs from the binary name)
 ```
 
-**Idempotency:** checks that each tool binary is on PATH.
+**Fields:**
+- `name`: binary name (used for PATH check and as default package name)
+- `pkg`: optional PyPI package name when it differs from the binary name
 
-**Requires:** `uv` on PATH.
+**Idempotency:** checks that `uv` and each tool binary are on PATH.
 
 ---
 
@@ -138,6 +149,8 @@ Downloads and installs a binary from a GitHub release.
 - `{arch}`: `amd64` or `arm64`
 - `{goos}`: `linux` or `darwin`
 - `{dpkg_arch}`: Debian arch name (`amd64`, `arm64`)
+- `{x64_arch}`: x64-style arch (`x64` on amd64, `arm64` on arm64)
+- `{x86_64_arch}`: x86_64-style arch (`x86_64` on amd64, `aarch64` on arm64)
 
 **Install methods:**
 - `dpkg`: runs `dpkg -i <file>`; idempotency via `dpkg -s <name>`
@@ -188,15 +201,26 @@ Also sets `rustup default stable`.
 
 ## docker
 
-Installs Docker via the official install script.
+Installs Docker via the official install script. Optionally writes `/etc/docker/daemon.json`.
 
 ```yaml
 - type: docker
+
+# with daemon configuration:
+- type: docker
+  daemon_json:
+    log-driver: json-file
+    log-opts:
+      max-size: 10m
+      max-file: "3"
+    insecure-registries:
+      - registry.local:5000
 ```
 
-Downloads and runs `https://get.docker.com`. Use `file_template` to manage `/etc/docker/daemon.json` if needed.
+**Fields:**
+- `daemon_json`: optional map written to `/etc/docker/daemon.json` after install; docker is restarted to apply it
 
-**Idempotency:** checks `docker --version` exits 0.
+**Idempotency:** checks `docker --version` exits 0; if `daemon_json` is set, also checks that `/etc/docker/daemon.json` exists.
 
 **Platform:** Linux. Requires root or sudo.
 

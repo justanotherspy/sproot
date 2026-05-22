@@ -3,10 +3,12 @@ package modules
 // binary_release downloads and installs a GitHub release asset.
 //
 // Asset name supports template variables:
-//   - {version}   — the release tag (e.g. v2.4.0)
-//   - {arch}      — Go arch (amd64, arm64)
-//   - {goos}      — Go OS   (linux, darwin)
-//   - {dpkg_arch} — Debian arch (amd64, arm64)
+//   - {version}     — the release tag (e.g. v2.4.0)
+//   - {arch}        — Go arch (amd64, arm64)
+//   - {goos}        — Go OS   (linux, darwin)
+//   - {dpkg_arch}   — Debian arch (amd64, arm64)
+//   - {x64_arch}    — x64-style arch (x64 on amd64, arm64 on arm64)
+//   - {x86_64_arch} — x86_64-style arch (x86_64 on amd64, aarch64 on arm64)
 //
 // Install methods: dpkg, tar+install, raw.
 //
@@ -157,11 +159,25 @@ func githubLatestTag(repo string) (string, error) {
 func templateAsset(pattern, version string) string {
 	arch := runtime.GOARCH
 	dpkgArch := arch // amd64/arm64 map directly for Debian
+	var x64Arch, x8664Arch string
+	switch arch {
+	case "amd64":
+		x64Arch = "x64"
+		x8664Arch = "x86_64"
+	case "arm64":
+		x64Arch = "arm64"
+		x8664Arch = "aarch64"
+	default:
+		x64Arch = arch
+		x8664Arch = arch
+	}
 	r := strings.NewReplacer(
 		"{version}", version,
 		"{arch}", arch,
 		"{goos}", runtime.GOOS,
 		"{dpkg_arch}", dpkgArch,
+		"{x64_arch}", x64Arch,
+		"{x86_64_arch}", x8664Arch,
 	)
 	return r.Replace(pattern)
 }
