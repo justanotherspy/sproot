@@ -38,6 +38,12 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 - create MIGRATION.md with known cmd workarounds (DONE: Phase 17g)
 - mark plans/findings.md as superseded (already done, skipped)
 
+## Planned (module additions)
+
+- update `repo_clone` to accept full git URLs with an explicit dest path, not just owner/repo SSH shorthand (Phase 17g6)
+- add a new `npm` module that runs `npm install` in a directory, with node_modules as the idempotency check (Phase 17g7)
+- update `sprite_service` to support `http_port` and `needs` fields in the service registration body (Phase 17g8)
+
 ## Planned (Phase 18 - intelligence)
 
 - add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (Phase 18a)
