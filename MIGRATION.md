@@ -115,5 +115,7 @@ via a following `sprite_service` phase (no systemd restart happens on a sprite):
 
 - type: sprite_service
   service: dockerd
-  cmd: /usr/bin/dockerd
+  cmd: /usr/bin/sudo      # dockerd needs root; sprite-env runs services as the sprite user
+  args:
+    - /usr/bin/dockerd
 ```

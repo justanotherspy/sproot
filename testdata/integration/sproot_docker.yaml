@@ -17,6 +17,10 @@ phases:
         max-size: 10m
         max-file: "3"
 
+  # dockerd needs root; sprite-env runs services as the sprite user, so launch
+  # via sudo (passwordless on sprites), per /.sprite/docs/docker.md.
   - type: sprite_service
     service: dockerd
-    cmd: /usr/bin/dockerd
+    cmd: /usr/bin/sudo
+    args:
+      - /usr/bin/dockerd

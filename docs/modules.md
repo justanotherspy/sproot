@@ -269,8 +269,9 @@ Registers a long-running service with the sprite-env daemon.
 ```yaml
 - type: sprite_service
   service: dockerd
-  cmd: /usr/bin/dockerd
+  cmd: /usr/bin/sudo      # dockerd needs root; sprite-env runs services as the sprite user
   args:
+    - /usr/bin/dockerd
     - --host=unix:///var/run/docker.sock
   http_port: 2375        # optional: port sprite-env monitors for health
   needs: [networking]    # optional: services that must start first

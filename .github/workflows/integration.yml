@@ -388,14 +388,15 @@ jobs:
             --skip-verify \
             --debug
 
-      - name: verify daemon.json merged with overlay2
+      - name: verify daemon.json merged with overlay2 and dockerd registered
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           NAME="spr-docker-${RUN_ID}-${RUN_ATTEMPT}"
-          ./sproot exec "$NAME" cat /etc/docker/daemon.json | tee /dev/stderr | grep "overlay2"
-          ./sproot exec "$NAME" sh -c "sprite-env services get dockerd || sprite-env services list" | tee /dev/stderr | grep -i docker
+          # Use `--` so sproot does not parse the in-sprite command's flags.
+          ./sproot exec "$NAME" -- cat /etc/docker/daemon.json | tee /dev/stderr | grep "overlay2"
+          ./sproot exec "$NAME" -- sprite-env curl /v1/services/dockerd | tee /dev/stderr | grep -i dockerd
 
       - name: destroy sprite
         if: always()
