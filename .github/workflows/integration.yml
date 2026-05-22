@@ -72,6 +72,9 @@ jobs:
           - name: go-install
             only: go_install
             config_path: testdata/integration/sproot_tooling.yaml
+          - name: cargo-install
+            only: cargo_install
+            config_path: testdata/integration/sproot_tooling.yaml
           - name: npm
             only: npm
             config_path: testdata/integration/sproot_tooling.yaml

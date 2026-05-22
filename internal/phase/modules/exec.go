@@ -118,6 +118,21 @@ func userLocalBin() (string, error) {
 	return dir, nil
 }
 
+// userLocalRoot returns ~/.local (expanded), creating it if needed. It is the
+// --root for `cargo install`, which writes binaries to <root>/bin and tracks
+// them in <root>/.crates2.json. cargo's default root (CARGO_HOME/bin) is not on
+// the sprite's PATH, whereas ~/.local/bin is, so installed crates stay invocable.
+func userLocalRoot() (string, error) {
+	dir, err := expandTilde("~/.local")
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create %s: %w", dir, err)
+	}
+	return dir, nil
+}
+
 // pipeOf wires a single pipe to cmd stdout+stderr and returns the read end.
 func pipeOf(cmd *exec.Cmd) (io.ReadCloser, io.WriteCloser, error) {
 	pr, pw, err := os.Pipe()

@@ -120,7 +120,9 @@ Installs Rust tools via `cargo install`.
 - `locked`: optional; passes `--locked`
 - `features`: optional list of Cargo features to enable
 
-**Idempotency:** checks `cargo install --list` for `<name> v<version>`.
+**Idempotency:** checks `cargo install --list` (scoped to the install root) for `<name> v<version>`.
+
+**Install location:** crates are installed into `~/.local/bin` (via `cargo install --root ~/.local`) so they are on the default PATH inside a sprite, rather than cargo's default `CARGO_HOME/bin`.
 
 **Requires:** `cargo` on PATH.
 

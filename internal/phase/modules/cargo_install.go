@@ -36,7 +36,12 @@ func (p *cargoInstallPhase) Type() string { return "cargo_install" }
 func (p *cargoInstallPhase) Name() string { return "cargo_install" }
 
 func (p *cargoInstallPhase) ShouldRun(_ *phase.Context) (bool, error) {
-	installed, err := cargoInstalledList()
+	root, err := userLocalRoot()
+	if err != nil {
+		// If we cannot resolve the install root, fall back to running.
+		return true, nil
+	}
+	installed, err := cargoInstalledList(root)
 	if err != nil {
 		// If cargo is not available, we need to run.
 		return true, nil
@@ -50,6 +55,13 @@ func (p *cargoInstallPhase) ShouldRun(_ *phase.Context) (bool, error) {
 }
 
 func (p *cargoInstallPhase) Run(ctx *phase.Context) error {
+	// Install into ~/.local (binaries land in ~/.local/bin, on the default PATH)
+	// rather than cargo's default root (CARGO_HOME/bin), which is not on PATH
+	// inside a sprite.
+	root, err := userLocalRoot()
+	if err != nil {
+		return fmt.Errorf("cargo_install: %w", err)
+	}
 	for _, t := range p.cfg.Tools {
 		args := []string{"install", t.Name}
 		if t.Version != "" {
@@ -61,6 +73,7 @@ func (p *cargoInstallPhase) Run(ctx *phase.Context) error {
 		if len(t.Features) > 0 {
 			args = append(args, "--features", strings.Join(t.Features, ","))
 		}
+		args = append(args, "--root", root)
 		if err := runCmd(ctx.Log, "cargo", args...); err != nil {
 			return err
 		}
@@ -77,9 +90,11 @@ func (p *cargoInstallPhase) Verify(_ *phase.Context) error {
 	return nil
 }
 
-// cargoInstalledList returns the output of "cargo install --list".
-func cargoInstalledList() (string, error) {
-	return outputOf("cargo", "install", "--list")
+// cargoInstalledList returns the output of "cargo install --list" scoped to the
+// given install root, so it reads the same tracking file (root/.crates2.json)
+// that Run writes to via --root.
+func cargoInstalledList(root string) (string, error) {
+	return outputOf("cargo", "install", "--list", "--root", root)
 }
 
 // cargoIsInstalled checks whether the crate is present in cargo install --list output.
