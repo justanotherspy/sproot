@@ -39,7 +39,7 @@ func LoadHostConfig(path string) (*HostConfig, error) {
 		return nil, fmt.Errorf("parsing host config: %w", err)
 	}
 	if cfg.TokenEnv == "" {
-		cfg.TokenEnv = "SPRITE_TOKEN"
+		cfg.TokenEnv = "SPRITES_TOKEN"
 	}
 	return &cfg, nil
 }

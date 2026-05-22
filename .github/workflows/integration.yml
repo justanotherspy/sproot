@@ -4,7 +4,7 @@ on:
   pull_request:
 
 # Integration jobs only run for the repo owner; they create real sprites and
-# require the SPRITE_TOKEN secret which is not available to other contributors.
+# require the SPRITES_TOKEN secret which is not available to other contributors.
 
 permissions:
   contents: read
@@ -62,7 +62,7 @@ jobs:
             config_path: testdata/integration/sproot_targets.yaml
             target: web
     env:
-      SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -83,7 +83,7 @@ jobs:
             echo "config_repo: https://github.com/$REPO.git"
             echo "config_ref: $HEAD_REF"
             echo "config_path: $CONFIG_PATH"
-            echo "token_env: SPRITE_TOKEN"
+            echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
 
@@ -121,7 +121,7 @@ jobs:
     if: github.event.pull_request.user.login == 'justanotherspy'
     runs-on: ubuntu-latest
     env:
-      SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -141,7 +141,7 @@ jobs:
             echo "config_repo: https://github.com/$REPO.git"
             echo "config_ref: $HEAD_REF"
             echo "config_path: testdata/integration/sproot.yaml"
-            echo "token_env: SPRITE_TOKEN"
+            echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
 
@@ -180,7 +180,7 @@ jobs:
     if: github.event.pull_request.user.login == 'justanotherspy'
     runs-on: ubuntu-latest
     env:
-      SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -198,7 +198,7 @@ jobs:
           {
             echo "config_source: local"
             echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
-            echo "token_env: SPRITE_TOKEN"
+            echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
 
@@ -227,7 +227,7 @@ jobs:
     if: github.event.pull_request.user.login == 'justanotherspy'
     runs-on: ubuntu-latest
     env:
-      SPRITE_TOKEN: ${{ secrets.SPRITE_TOKEN }}
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -245,7 +245,7 @@ jobs:
           {
             echo "config_source: local"
             echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
-            echo "token_env: SPRITE_TOKEN"
+            echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
 

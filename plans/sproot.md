@@ -86,7 +86,7 @@ phases:
 config_repo: git@github.com:justanotherspy/sprite.git
 config_ref: main
 config_path: ""        # optional; path to config file within repo; defaults to sproot.yaml
-token_env: SPRITE_TOKEN
+token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 default_org: ""
 ```

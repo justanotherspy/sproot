@@ -17,7 +17,7 @@ import (
 const configSkeleton = `config_repo: ""
 config_ref: main
 config_path: ""       # optional; path to sproot.yaml within the config repo
-token_env: SPRITE_TOKEN
+token_env: SPRITES_TOKEN
 gh_token_env: ""
 default_org: ""
 `
@@ -59,7 +59,7 @@ func RunConfigInitInteractive(path string) error {
 	if err != nil {
 		return err
 	}
-	tokenEnv, err := promptField(r, "token_env (env var holding your sprites API token)", "SPRITE_TOKEN")
+	tokenEnv, err := promptField(r, "token_env (env var holding your sprites API token)", "SPRITES_TOKEN")
 	if err != nil {
 		return err
 	}
