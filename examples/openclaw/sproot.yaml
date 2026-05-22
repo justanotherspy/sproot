@@ -1,0 +1,69 @@
+schema_version: 1
+
+# OpenClaw Sprite Builder, expressed as a sproot.yaml.
+#
+# The original builder (https://github.com/theoctopusperson/openclaw-sprite-builder,
+# linked from the OpenClaw deploy page on sprite.dev) ships a setup.sh you clone
+# and run by hand inside a sprite. Its job: stand up the builder web app (an
+# Express server that provisions further sprites running OpenClaw) and keep it
+# serving on port 8080.
+#
+# This config does the same work the sproot way: clone the builder, install its
+# npm deps, drop the start script, and register it as a sprite-env managed
+# service. The original setup.sh also did a stop / PUT / start service dance with
+# a sleep to re-register on every run; sprite_service is declarative and
+# idempotent, so re-running setup just reconciles the service and that plumbing
+# is dropped.
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+# Runtime environment for the web app (not part of setup.sh, which inlined
+# nothing). The builder calls the Sprites API to provision sprites, so it needs
+# a token; it also forwards model keys into the sprites it creates. Secrets are
+# forwarded by name via the env block rather than inlined. Trim these to match
+# what your server.js actually reads.
+env:
+  - from: SPRITES_TOKEN
+    as: SPRITES_TOKEN
+    required: true
+  - from: ANTHROPIC_API_KEY
+    as: ANTHROPIC_API_KEY
+    required: false
+  - from: OPENAI_API_KEY
+    as: OPENAI_API_KEY
+    required: false
+  - from: GOOGLE_API_KEY
+    as: GOOGLE_API_KEY
+    required: false
+  - from: OPENCLAW_GATEWAY_TOKEN
+    as: OPENCLAW_GATEWAY_TOKEN
+    required: false
+
+phases:
+  # git clone https://github.com/theoctopusperson/openclaw-sprite-builder.git ~/openclaw-builder
+  - type: repo_clone
+    base_dir: "~"
+    repos:
+      - url: https://github.com/theoctopusperson/openclaw-sprite-builder.git
+        dest: ~/openclaw-builder
+
+  # npm install (run inside the cloned builder)
+  - type: npm
+    dir: ~/openclaw-builder
+
+  # setup.sh wrote start.sh with a heredoc; here it is a companion file.
+  - type: file_template
+    src: files/start.sh
+    dest: ~/openclaw-builder/start.sh
+    mode: "0755"
+
+  # Replaces the sprite-env curl PUT plus services start. sprite-env keeps the
+  # builder alive, so the original keep-running plumbing is unnecessary.
+  - type: sprite_service
+    service: openclaw-builder
+    cmd: ~/openclaw-builder/start.sh
+    http_port: 8080
