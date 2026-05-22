@@ -38,24 +38,21 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 - create MIGRATION.md with known cmd workarounds (DONE: Phase 17g)
 - mark plans/findings.md as superseded (already done, skipped)
 
-## Planned (module additions)
+## Done (Phase 17 - module additions)
 
-- update `repo_clone` to accept full git URLs with an explicit dest path, not just owner/repo SSH shorthand (Phase 17g6)
-- add a new `npm` module that runs `npm install` in a directory, with node_modules as the idempotency check (Phase 17g7)
-- update `sprite_service` to support `http_port` and `needs` fields in the service registration body (Phase 17g8)
+- update `repo_clone` to accept full git URLs with an explicit dest path, not just owner/repo SSH shorthand (DONE: Phase 17g6)
+- add a new `npm` module that runs `npm install` in a directory, with node_modules as the idempotency check (DONE: Phase 17g7)
+- update `sprite_service` to support `http_port` and `needs` fields in the service registration body (DONE: Phase 17g8)
 
-## Planned (module additions)
+## Done (Phase 18 - intelligence and completion)
 
-- update `repo_clone` to accept full git URLs with an explicit dest path, not just owner/repo SSH shorthand (Phase 17g6)
-- add a new `npm` module that runs `npm install` in a directory, with node_modules as the idempotency check (Phase 17g7)
-- update `sprite_service` to support `http_port` and `needs` fields in the service registration body (Phase 17g8)
+- add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (DONE: Phase 18a)
+- have a detailed explanation of what scopes are needed on the gh token (DONE: Phase 18b)
 
-## Planned (Phase 18 - intelligence)
+## Dropped / deferred (Phase 18)
 
-- add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (Phase 18a)
-- have a detailed explanation of what scopes are needed on the gh token (Phase 18b)
-- on config init inspect sprite config for an org and offer to select one automatically (Phase 18c)
-- test out the release workflow end-to-end (Phase 18d)
+- on config init inspect sprite config for an org and offer to select one automatically (DROPPED: Phase 18c, the sprites-go SDK exposes no org-listing method; only CreateSpriteWithOrg and an OrgInfo returned alongside sprite listings)
+- test out the release workflow end-to-end (DEFERRED: Phase 18d, requires pushing a real tag to the public repo and goreleaser is not installed in the dev environment)
 
 ## Deferred
 

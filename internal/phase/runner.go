@@ -21,8 +21,9 @@ type RunnerOptions struct {
 
 // Runner orchestrates execution of a list of Phase values.
 type Runner struct {
-	phases []Phase
-	opts   RunnerOptions
+	phases    []Phase
+	opts      RunnerOptions
+	lastState *State
 }
 
 // NewRunner builds Phase values from cfgs using the registry. Returns an error
@@ -138,6 +139,7 @@ func (r *Runner) Run(ctx *Context) error {
 	}
 
 	state.UpdatedAt = now()
+	r.lastState = state
 	if saveErr := SaveState(statePath, state); saveErr != nil {
 		ctx.Log.Warnf("could not write state file: %v", saveErr)
 	}
@@ -145,6 +147,11 @@ func (r *Runner) Run(ctx *Context) error {
 	r.logSummary(ctx, state)
 	return errors.Join(errs...)
 }
+
+// LastState returns the State produced by the most recent Run, or nil if Run
+// has not been called. Useful for callers that want to summarize the run
+// without re-reading the state file.
+func (r *Runner) LastState() *State { return r.lastState }
 
 func (r *Runner) logSummary(ctx *Context, state *State) {
 	var succeeded, skipped, failed, didWork int

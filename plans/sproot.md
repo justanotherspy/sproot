@@ -162,28 +162,32 @@ exec node server.js
 
 ---
 
-### Phase 18: Intelligence and completion
+### Phase 17g6-8 module additions — DONE
 
-#### 18a. llm.txt and agent-context.md after setup
+All three shipped and tested: `repo_clone` accepts full git URLs with explicit `dest` (`RepoCloneEntry` union type in `internal/config/schema.go`); new `npm` module (`internal/phase/modules/npm.go`); `sprite_service` gained optional `http_port` and `needs` fields. 18 module types are now registered.
 
-After `sproot setup` completes inside a sprite, write a summary of what ran to `/.sprite/llm.txt` and `/.sprite/docs/agent-context.md`. Gives Claude Code instant context about the environment.
+### Phase 18: Intelligence and completion — 18a + 18b DONE; 18c dropped; 18d deferred
 
-**Implementation:** New `internal/sprite/llmtxt.go` exports `writeLLMContext(l *log.Logger, state *phase.State) error`. Iterates `state.Phases`, collects `DidWork=true` records, writes a timestamped block using a module-description table keyed by phase `Type`. Hook after `runner.Run(ctx)` in `internal/sprite/setup.go` (non-fatal if write fails). Unit test in `internal/sprite/llmtxt_test.go`; integration test step verifies non-empty output via `sproot exec <name> cat /.sprite/llm.txt`.
+#### 18a. Post-setup summary inside the sprite — DONE
 
-#### 18b. Token scope documentation
+After `sproot setup` completes inside a sprite, it writes a summary of what ran to `/.sprite/docs/sproot-setup.md`, giving Claude Code instant context about what sproot installed.
 
-Add a "Required GitHub token scopes" callout to `docs/modules.md` under `gh_token` and `ssh_setup` sections. Add a brief note to `README.md` prerequisites.
+**Non-destructive by design.** The sprite platform ships its own `/.sprite/llm.txt` (environment overview, security rules, services/checkpoints API) and `/.sprite/docs/agent-context.md` (full reference incl. network policy). sproot must NOT overwrite these. Instead it writes its own `docs/sproot-setup.md` and appends an idempotent managed pointer block (delimited by `<!-- BEGIN SPROOT --> / <!-- END SPROOT -->`) to the platform `llm.txt` so agents reading the canonical entrypoint discover the summary.
+
+**Implementation:** `internal/sprite/llmtxt.go` exports `renderLLMContext(state)` (pure) and `writeLLMContext(l, state, baseDir)`. It collects `DidWork=true` records and renders a timestamped markdown block from a module-description table keyed by phase `Type`, then writes `docs/sproot-setup.md` and updates the `llm.txt` pointer block (`appendPointerBlock`, which strips any prior block first for idempotency). `Runner.LastState()` (added in `internal/phase/runner.go`) exposes the final state; `internal/sprite/setup.go` calls `writeLLMContext` after `runner.Run(ctx)` (non-fatal if the write fails; setup runs as root so it can write under `/.sprite`). Unit tests in `internal/sprite/llmtxt_test.go` (including a platform-content-preservation/idempotency test); an integration step in the `multi-phase` job verifies `/.sprite/docs/sproot-setup.md` exists and that the platform `llm.txt`/`agent-context.md` are preserved with the sproot pointer added.
+
+#### 18b. Token scope documentation — DONE
+
+`docs/modules.md` documents scopes under `gh_token` and `ssh_setup`; `README.md` gained a consolidated "GitHub token scopes" subsection under Host config.
 
 - `gh_token`: no minimum scope required by sproot; match whatever the user wants `gh` to do (typically `repo`, `read:org`)
 - `ssh_setup`: requires `admin:public_key` and `admin:ssh_signing_key` on a classic PAT
 
-#### 18c. Config init org auto-select
+#### 18c. Config init org auto-select — DROPPED
 
-After the user provides `token_env` in interactive `config init`, check if the Sprites SDK exposes an org-listing method. If it does, call the API, print results, and prompt for selection; set `default_org` on selection; fall back to blank prompt on API failure or no results. Drop this item if no method exists.
+The sprites-go SDK exposes no org-listing method (only `CreateSpriteWithOrg` and an `OrgInfo` returned alongside sprite listings), so per the original "drop if no method exists" guidance this item is dropped. `default_org` remains a free-text prompt in `config init`.
 
-**Files:** `internal/host/config.go`, `internal/host/config_test.go`.
-
-#### 18d. Release workflow test
+#### 18d. Release workflow test — DEFERRED
 
 1. `goreleaser release --clean --snapshot` to confirm all 5 platform archives build
 2. Push a test tag (e.g. `v0.0.0-rc1`) to trigger `release.yml` with cosign signing
@@ -216,11 +220,8 @@ All Q1-Q7 resolved.
 
 ## Suggested order of execution
 
-1. **Phase 17** (code quality and bug fixes, NEXT)
-   - PR A first: push env forwarding (CRITICAL)
-   - PR B: HTTP timeouts
-   - PR C: quick wins bundle
-2. **Phase 18** (intelligence and completion; 18a + 18c independent of 18b + 18d)
+1. **Phase 17** (code quality and bug fixes) — DONE
+2. **Phase 18** (intelligence and completion) — 18a + 18b DONE; 18c dropped (no SDK org-listing method); 18d deferred (needs a real tag push)
 3. **Phase 14 deferred** (Claude skills; after everything else is stable)
 
 After each PR: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.

@@ -307,7 +307,7 @@ Reads `GH_TOKEN` from the environment (forwarded via the `env` block in `sproot.
 
 **Idempotency:** checks `gh auth status -h github.com` exits 0 and the logged-in user matches `identity.gh_username`.
 
-**Requires:** `GH_TOKEN` set in the sprite environment. Required scope: `repo`.
+**Requires:** `GH_TOKEN` set in the sprite environment. sproot itself imposes no minimum scope here; match whatever you want `gh` to do inside the sprite (typically `repo`, plus `read:org` for cross-organization work).
 
 ---
 
