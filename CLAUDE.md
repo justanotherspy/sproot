@@ -69,6 +69,7 @@ plugins/sproot/       - the sproot Claude plugin: script-convert + author-config
 | 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md; module additions (repo_clone URLs, npm, sprite_service http_port/needs) (done) |
 | 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d deferred) |
 | 19 | Module gaps to drain cmd blocks: binary_release `version`/`arch_map`/cosign; merge `claude upgrade`+`claude_settings` into a `claude` module (settings/upgrade/CLAUDE.md); sprite-env-aware docker daemon.json merge; apt symlink ~ expansion + mkdir; sprites-artefacts reference snapshot (done) |
+| 20 | Self-update: daily cached release check (`~/.sproot/update-check.json`) that notifies after any command; `sproot self-update` (with `--check`) downloads/verifies/replaces the binary and clears the cache; `SPROOT_NO_UPDATE_CHECK` opt-out (done) |
 
 ## Workflow
 

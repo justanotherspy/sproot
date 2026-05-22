@@ -5,6 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/justanotherspy/sproot/internal/host"
 	"github.com/justanotherspy/sproot/pkg/log"
 )
 
@@ -29,6 +30,16 @@ func newRootCmd() *cobra.Command {
 			log.SetDebug(debug)
 			return nil
 		},
+		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
+			// Notify (at most once a day) that a newer release exists. Skipped for
+			// "setup" (runs in-sprite) and "self-update" (does its own upstream check).
+			switch cmd.Name() {
+			case "setup", "self-update":
+			default:
+				host.NotifyUpdateAvailable(version)
+			}
+			return nil
+		},
 	}
 	root.PersistentFlags().BoolVar(&debug, "debug", false, "enable verbose debug logging")
 
@@ -43,6 +54,7 @@ func newRootCmd() *cobra.Command {
 		newListCmd(),
 		newExecCmd(),
 		newUpgradeCmd(),
+		newSelfUpdateCmd(),
 		newCheckpointCmd(),
 		newCheckpointsCmd(),
 		newRestoreCmd(),

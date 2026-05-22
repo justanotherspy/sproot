@@ -260,6 +260,41 @@ Follow-up (user-owned, separate repo): rewrite `justanotherspy/sprite/sproot.yam
 features (examples in `docs/modules.md` and `MIGRATION.md`). Remaining legitimate `cmd` blocks:
 flyctl install, `garlic setup --defaults`, and shell-completion generation.
 
+### Phase 20: Self-update and daily update notifier — DONE
+
+The CLI now keeps itself current. All logic lives in `internal/host/selfupdate.go` (host-side,
+no sprite interaction), wired through a new `sproot self-update` command and the root command's
+`PersistentPostRunE`.
+
+- **Daily cached check**: a JSON cache at `~/.sproot/update-check.json`
+  (`{checked_at, latest_version}`) records the last successful query of GitHub's
+  `releases/latest`. `cachedLatestVersion` serves the cached value while it is younger than 24h
+  and otherwise refetches and rewrites the cache (atomic temp+rename). The query carries a
+  `User-Agent` (the GitHub API 403s without one) and uses a 3s-timeout client so the once-a-day
+  refresh can never noticeably stall a command.
+- **Notifier**: `NotifyUpdateAvailable` runs from `PersistentPostRunE` after every command
+  except `setup` (runs in-sprite) and `self-update` (does its own check). It prints a two-line
+  notice to stderr only (never stdout, so pipelines are unaffected). It is fully best-effort:
+  any error (network, parse, cache I/O) is swallowed. `dev`/unparseable versions are silent, and
+  `SPROOT_NO_UPDATE_CHECK` disables it entirely (used by the CI smoke step).
+- **`sproot self-update`**: always re-checks upstream (ignoring the cache), and on a real upgrade
+  downloads `sproot_<ver>_<os>_<arch>.{tar.gz,zip}` for the host's `runtime.GOOS/GOARCH`, verifies
+  it against the published `_checksums.txt`, extracts the binary (reusing `extractSprootFromTarGz`;
+  a new `extractSprootFromZip` for Windows), and atomically swaps the running executable
+  (`os.Rename` over the live inode on Unix; move-aside on Windows). It then clears the cache so the
+  next command reflects the new version. `--check` reports availability without downloading.
+  Dev builds refuse to self-update (no matching release); a 403 with `X-RateLimit-Remaining: 0`
+  surfaces a friendly "rate limit exceeded" message.
+- **Version comparison**: promoted `github.com/Masterminds/semver/v3` from indirect to direct;
+  `isNewer` returns false on any unparseable version so the user is never nagged on bad data.
+- **Testing**: 13 unit tests in `internal/host/selfupdate_test.go` cover version comparison,
+  checksum verify (ok/mismatch/missing), tar.gz+zip extraction, cache round-trip/freshness/stale
+  fallback, the notice matrix, and `RunSelfUpdate` (dev refusal, up-to-date, check-only,
+  binary replacement + cache clear, download-error propagation) via `latestFn`/`fetchFn`/`execPath`
+  seams. The live API path is not exercised in `integration.yml`: self-update touches no sprite,
+  and the unauthenticated GitHub API is rate-limited per-IP on shared runners. Instead `ci.yml`
+  has a network-free smoke step asserting the command is wired and refuses a dev build.
+
 ---
 
 ## Open questions

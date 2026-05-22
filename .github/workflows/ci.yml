@@ -26,6 +26,20 @@ jobs:
       - name: test
         run: go test ./...
 
+      # Network-free smoke test of the self-update command wiring. The live
+      # GitHub API path is covered by unit tests with seams; here we only assert
+      # the command is reachable and refuses to self-update a dev build.
+      - name: self-update smoke
+        env:
+          SPROOT_NO_UPDATE_CHECK: "1"
+        run: |
+          go build -o sproot ./cmd/sproot
+          ./sproot self-update --help
+          if ./sproot self-update; then
+            echo "expected dev build self-update to fail" >&2
+            exit 1
+          fi
+
   validate:
     name: validate testdata sproot.yaml
     runs-on: ubuntu-latest
