@@ -117,6 +117,7 @@ type PhaseConfig struct {
 	RCBlock        *RCBlockConfig        `yaml:"-"`
 	RepoClone      *RepoCloneConfig      `yaml:"-"`
 	ClaudeSettings *ClaudeSettingsConfig `yaml:"-"`
+	Npm            *NpmConfig            `yaml:"-"`
 	Cmd            *CmdConfig            `yaml:"-"`
 }
 
@@ -155,7 +156,7 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 		return value.Decode(p.RustComponents)
 	case "docker":
 		p.Docker = &DockerConfig{}
-		return nil
+		return value.Decode(p.Docker)
 	case "sprite_service":
 		p.SpriteService = &SpriteServiceConfig{}
 		return value.Decode(p.SpriteService)
@@ -180,6 +181,9 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "claude_settings":
 		p.ClaudeSettings = &ClaudeSettingsConfig{}
 		return value.Decode(p.ClaudeSettings)
+	case "npm":
+		p.Npm = &NpmConfig{}
+		return value.Decode(p.Npm)
 	case "cmd":
 		p.Cmd = &CmdConfig{}
 		return value.Decode(p.Cmd)
@@ -188,23 +192,33 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	}
 }
 
-// AptConfig installs apt packages.
+// AptSymlink is a post-install symlink created by the apt module.
+type AptSymlink struct {
+	From string `yaml:"from"` // source path (the installed binary, e.g. /usr/bin/batcat)
+	To   string `yaml:"to"`   // symlink path to create (e.g. /usr/local/bin/bat)
+}
+
+// AptConfig installs apt packages and optionally creates post-install symlinks.
 type AptConfig struct {
-	Packages []string `yaml:"packages"`
+	Packages []string     `yaml:"packages"`
+	Symlinks []AptSymlink `yaml:"symlinks"`
 }
 
 // UVTool installs a single tool via uv.
 type UVTool struct {
 	Name string `yaml:"name"`
+	Pkg  string `yaml:"pkg"` // optional; PyPI package name when it differs from the binary name
 }
 
 // UVToolConfig installs tools via uv tool install.
+// uv is installed automatically if not present.
 type UVToolConfig struct {
 	Tools []UVTool `yaml:"tools"`
 }
 
 // BinaryReleaseConfig downloads and installs a GitHub release asset.
-// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch}.
+// Asset supports template variables: {version}, {arch}, {goos}, {dpkg_arch},
+// {x64_arch}, {x86_64_arch}.
 // Install methods: dpkg, tar+install, raw.
 // Checksum is an optional sha256 hex string to verify the downloaded asset.
 // ChecksumAsset is an optional asset name template for a goreleaser-style
@@ -229,14 +243,20 @@ type RustComponentsConfig struct {
 }
 
 // DockerConfig installs docker-ce via the official install script.
-type DockerConfig struct{}
+// DaemonJSON is an optional map written to /etc/docker/daemon.json after install.
+type DockerConfig struct {
+	DaemonJSON map[string]any `yaml:"daemon_json"`
+}
 
 // SpriteServiceConfig registers a sprite-env managed service via the internal API socket.
-// Cmd is the executable path (e.g. /usr/bin/dockerd). Args are optional.
+// Cmd is the executable path. Args, HTTPPort, and Needs are optional.
+// HTTPPort and Needs are omitted from the JSON body when zero/nil.
 type SpriteServiceConfig struct {
-	Service string   `yaml:"service"`
-	Cmd     string   `yaml:"cmd"`
-	Args    []string `yaml:"args"`
+	Service  string   `yaml:"service"`
+	Cmd      string   `yaml:"cmd"`
+	Args     []string `yaml:"args"`
+	HTTPPort int      `yaml:"http_port"`
+	Needs    []string `yaml:"needs"`
 }
 
 // GitIdentityConfig applies git user.name, user.email, and init.defaultBranch from
@@ -267,11 +287,44 @@ type RCBlockConfig struct {
 	Src string `yaml:"src"`
 }
 
-// RepoCloneConfig clones a list of GitHub repos into a base directory.
-// Repos are specified as "owner/repo" (SSH clone from github.com is assumed).
+// RepoCloneEntry is one entry in a repo_clone repos list.
+// Short form (string): "owner/repo" — cloned via SSH into base_dir/<repo>.
+// Long form (map):     {url: "https://...", dest: "~/dir"} — dest is optional;
+// defaults to ~/<repo-name> (last URL path component, minus .git).
+type RepoCloneEntry struct {
+	Raw  string // set for short string form
+	URL  string // set for long map form
+	Dest string // optional explicit destination (long form only)
+}
+
+// UnmarshalYAML accepts both a plain string and a {url, dest} map.
+func (e *RepoCloneEntry) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		e.Raw = value.Value
+		return nil
+	}
+	var s struct {
+		URL  string `yaml:"url"`
+		Dest string `yaml:"dest"`
+	}
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	e.URL = s.URL
+	e.Dest = s.Dest
+	return nil
+}
+
+// RepoCloneConfig clones a list of repos into configured destinations.
+// base_dir is used for short "owner/repo" entries; ignored for long {url,dest} entries.
 type RepoCloneConfig struct {
-	BaseDir string   `yaml:"base_dir"`
-	Repos   []string `yaml:"repos"`
+	BaseDir string           `yaml:"base_dir"`
+	Repos   []RepoCloneEntry `yaml:"repos"`
+}
+
+// NpmConfig runs npm install in a target directory.
+type NpmConfig struct {
+	Dir string `yaml:"dir"`
 }
 
 // ClaudeSettingsConfig deep-merges a JSON object into ~/.claude/settings.json.

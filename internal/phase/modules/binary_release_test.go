@@ -32,6 +32,32 @@ func TestTemplateAsset(t *testing.T) {
 			"goos substituted",
 		},
 		{
+			"{x64_arch}",
+			func(s string) bool {
+				switch runtime.GOARCH {
+				case "amd64":
+					return s == "x64"
+				case "arm64":
+					return s == "arm64"
+				}
+				return s != ""
+			},
+			"x64_arch substituted",
+		},
+		{
+			"{x86_64_arch}",
+			func(s string) bool {
+				switch runtime.GOARCH {
+				case "amd64":
+					return s == "x86_64"
+				case "arm64":
+					return s == "aarch64"
+				}
+				return s != ""
+			},
+			"x86_64_arch substituted",
+		},
+		{
 			"notemplates",
 			func(s string) bool { return s == "notemplates" },
 			"no substitution when no vars",

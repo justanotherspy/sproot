@@ -77,7 +77,7 @@ All phases through 16 are done and merged.
 
 ---
 
-### Phase 17: Code quality and bug fixes (findings round 2) — NEXT
+### Phase 17: Code quality and bug fixes (findings round 2) — DONE
 
 Second-pass review findings. Three PRs recommended; ship in order A, B, C.
 

@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/internal/phase"
@@ -29,6 +30,8 @@ type GHKeyIDs struct {
 	AuthKeyID    int64 `json:"auth_key_id"`
 	SigningKeyID int64 `json:"signing_key_id"`
 }
+
+var ghAPIClient = &http.Client{Timeout: 30 * time.Second}
 
 func init() {
 	phase.Register("ssh_setup", func(cfg config.PhaseConfig) (phase.Phase, error) {
@@ -239,7 +242,7 @@ func postGHKey(token, url, title, pubKey string) (int64, error) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/vnd.github+json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ghAPIClient.Do(req)
 	if err != nil {
 		return 0, err
 	}

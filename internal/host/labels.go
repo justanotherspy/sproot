@@ -30,9 +30,11 @@ type ConfigMeta struct {
 func (m ConfigMeta) Labels() []string {
 	labels := []string{
 		labelBase,
-		labelTarget + "=" + m.Target,
 		labelSource + "=" + m.Source,
 		labelSHA + "=" + m.SHA,
+	}
+	if m.Target != "" {
+		labels = append(labels, labelTarget+"="+m.Target)
 	}
 	if m.Repo != "" {
 		labels = append(labels, labelRepo+"="+m.Repo)
@@ -71,5 +73,5 @@ func ParseConfigMeta(labels []string) ConfigMeta {
 // ConfigSHA returns the first 12 hex characters of the SHA256 of the given bytes.
 func ConfigSHA(data []byte) string {
 	h := sha256.Sum256(data)
-	return fmt.Sprintf("%x", h[:])[:12]
+	return fmt.Sprintf("%x", h[:6])
 }

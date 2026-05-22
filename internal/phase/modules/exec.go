@@ -36,6 +36,32 @@ func runCmd(l *log.Logger, name string, args ...string) error {
 	return nil
 }
 
+// runCmdIn is like runCmd but sets the working directory before executing.
+func runCmdIn(dir string, l *log.Logger, name string, args ...string) error {
+	l.Debugf("exec (in %s): %s %s", dir, name, strings.Join(args, " "))
+	cmd := exec.Command(name, args...) // nosemgrep
+	cmd.Dir = dir
+	pr, pw, err := pipeOf(cmd)
+	if err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	if err := cmd.Start(); err != nil {
+		_ = pw.Close()
+		_ = pr.Close()
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	_ = pw.Close()
+	scanner := bufio.NewScanner(pr)
+	for scanner.Scan() {
+		l.Info(scanner.Text())
+	}
+	_ = pr.Close()
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("%s: %w", name, err)
+	}
+	return nil
+}
+
 // pipeOf wires a single pipe to cmd stdout+stderr and returns the read end.
 func pipeOf(cmd *exec.Cmd) (io.ReadCloser, io.WriteCloser, error) {
 	pr, pw, err := os.Pipe()
