@@ -179,7 +179,7 @@ Current:
 
 > Resolves tokens from your environment (`FLY_API_TOKEN`, `GITHUB_TOKEN`, etc.)
 
-These env var names are not hardcoded. They are whatever the user puts in `token_env` and `gh_token_env`. The skeleton from `RunConfigInit` defaults to `SPRITE_TOKEN`, not `FLY_API_TOKEN`.
+These env var names are not hardcoded. They are whatever the user puts in `token_env` and `gh_token_env`. The skeleton from `RunConfigInit` defaults to `SPRITES_TOKEN`, not `FLY_API_TOKEN`.
 
 **Action:** reword to "Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config` (`token_env` and `gh_token_env`)."
 

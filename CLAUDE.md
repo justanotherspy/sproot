@@ -17,6 +17,14 @@ make tidy        # go mod tidy
 make lint        # golangci-lint run ./...
 ```
 
+## Local development environment
+
+The `sprite` CLI is required to run integration tests and host commands against real sprites. In the cloud execution environment, `SPRITES_TOKEN` is set automatically. Authenticate once per session:
+
+```
+sprite auth setup --token "$SPRITES_TOKEN"
+```
+
 ## Directory layout
 
 ```

@@ -501,7 +501,7 @@ sprite upgrade --channel rc
 
 | Variable | Description |
 |----------|-------------|
-| `SPRITE_TOKEN` | API token override (legacy; falls back if no stored token) |
+| `SPRITES_TOKEN` | API token (used by `sprite auth setup --token "$SPRITES_TOKEN"`) |
 | `SPRITE_URL` | Direct sprite URL (for local/dev direct connections) |
 | `SPRITES_API_URL` | API URL override (default: `https://api.sprites.dev`) |
 

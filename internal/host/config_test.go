@@ -57,7 +57,7 @@ func TestRunConfigValidate_ValidConfig(t *testing.T) {
 	content := `
 config_repo: git@github.com:user/repo.git
 config_ref: main
-token_env: SPRITE_TOKEN
+token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
@@ -76,7 +76,7 @@ func TestRunConfigValidate_InvalidConfig(t *testing.T) {
 	content := `
 config_repo: ""
 config_ref: main
-token_env: SPRITE_TOKEN
+token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 `
 	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {

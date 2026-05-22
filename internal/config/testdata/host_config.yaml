@@ -1,5 +1,5 @@
 config_repo: git@github.com:justanotherspy/sprite.git
 config_ref: main
-token_env: SPRITE_TOKEN
+token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 default_org: ""

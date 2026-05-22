@@ -324,7 +324,7 @@ func TestLoadHostConfig_HappyPath(t *testing.T) {
 	if cfg.ConfigRef != "main" {
 		t.Errorf("config_ref: got %q", cfg.ConfigRef)
 	}
-	if cfg.TokenEnv != "SPRITE_TOKEN" {
+	if cfg.TokenEnv != "SPRITES_TOKEN" {
 		t.Errorf("token_env: got %q", cfg.TokenEnv)
 	}
 	if cfg.GHTokenEnv != "GITHUB_TOKEN" {
@@ -620,7 +620,7 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		return &HostConfig{
 			ConfigRepo: "git@github.com:user/repo.git",
 			ConfigRef:  "main",
-			TokenEnv:   "SPRITE_TOKEN",
+			TokenEnv:   "SPRITES_TOKEN",
 			GHTokenEnv: "GITHUB_TOKEN",
 		}
 	}
@@ -654,7 +654,7 @@ func TestValidateHostConfig_EmptyGHTokenEnvIsValid(t *testing.T) {
 	cfg := &HostConfig{
 		ConfigRepo: "git@github.com:user/repo.git",
 		ConfigRef:  "main",
-		TokenEnv:   "SPRITE_TOKEN",
+		TokenEnv:   "SPRITES_TOKEN",
 		GHTokenEnv: "",
 	}
 	if err := ValidateHostConfig(cfg); err != nil {
@@ -672,8 +672,8 @@ func TestLoadHostConfig_TokenEnvDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.TokenEnv != "SPRITE_TOKEN" {
-		t.Errorf("TokenEnv default: got %q, want SPRITE_TOKEN", cfg.TokenEnv)
+	if cfg.TokenEnv != "SPRITES_TOKEN" {
+		t.Errorf("TokenEnv default: got %q, want SPRITES_TOKEN", cfg.TokenEnv)
 	}
 }
 
@@ -926,7 +926,7 @@ func TestValidateHostConfig_LocalSource(t *testing.T) {
 	cfg := &HostConfig{
 		ConfigSource:    "local",
 		ConfigLocalPath: "~/my-config",
-		TokenEnv:        "SPRITE_TOKEN",
+		TokenEnv:        "SPRITES_TOKEN",
 	}
 	if err := ValidateHostConfig(cfg); err != nil {
 		t.Errorf("expected no error for local source: %v", err)
@@ -936,7 +936,7 @@ func TestValidateHostConfig_LocalSource(t *testing.T) {
 func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
 	cfg := &HostConfig{
 		ConfigSource: "local",
-		TokenEnv:     "SPRITE_TOKEN",
+		TokenEnv:     "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)
 	if err == nil {
@@ -950,7 +950,7 @@ func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
 func TestValidateHostConfig_InvalidSource(t *testing.T) {
 	cfg := &HostConfig{
 		ConfigSource: "ftp",
-		TokenEnv:     "SPRITE_TOKEN",
+		TokenEnv:     "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)
 	if err == nil {
