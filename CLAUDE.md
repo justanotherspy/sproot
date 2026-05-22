@@ -74,9 +74,10 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
 | 12 | SDK alignment: exec, upgrade, checkpoint, checkpoints, restore commands; checkpoint_after_setup in sproot.yaml; --skip-console on new; status --host (done) |
 | 13 | Multi-target support (targets/extends in sproot.yaml, --target flag), local path config source, sproot push/update (done) |
-| 14 | Intelligence: llm.txt/agent-context.md updates after setup, Claude skills for sproot usage and script conversion |
+| 14 | Intelligence: Claude skills for sproot usage and script conversion (deferred) |
 | 15 | Operational improvements: config init org auto-select, token scope docs, valid flag values, CI required checks, module edge cases, release workflow test, code review workflow, audit sproot new flags vs real API |
-| 16 | Integration depth: multi-phase and multi-target CI jobs (no --only), labels end-to-end verification, --skip-verify flag, doc fixes (done) |
+| 16 | Integration depth: multi-phase and multi-target CI jobs (no --only), labels end-to-end verification, --skip-verify flag, smart verify, validate --strict, HostConfig field rename, make e2e (done) |
+| 17 | Intelligence and completion: llm.txt/agent-context.md after setup, token scope docs, config init org auto-select, release workflow test |
 
 ## Workflow
 
