@@ -114,6 +114,7 @@ Cross-reference: `TestRunNew_EnvBlockForwarded` and `TestRunNew_InjectsBinaryAnd
 - **17g3** `uv_tool`: add `pkg` field for cases where package name differs from binary name (e.g. garlic)
 - **17g4** `binary_release`: add `{x64_arch}` and `{x86_64_arch}` template variables (gitleaks uses `x64`, hadolint uses `x86_64`)
 - **17g5** `docker`: add `daemon_json` config field for configuring the Docker daemon
+- **17g6** new `setup_script` module: clones a git repo to a destination directory and runs a script from it. Replaces the common two-phase `repo_clone` + `cmd` pattern. Config fields: `repo` (required, git URL), `dest` (optional, defaults to `~/<repo-name>`), `script` (optional, defaults to `setup.sh`). Idempotency: skip the run if the script has already been executed (use a sentinel file at `<dest>/.sproot-setup-done`). Example use case: `repo: https://github.com/theoctopusperson/openclaw-sprite-builder.git` with default `dest` and `script`.
 
 **17h.** Housekeeping: mark `plans/findings.md` as superseded (add `> SUPERSEDED` header); remove stale Phase 13 done-items from `plans/todo.md`.
 

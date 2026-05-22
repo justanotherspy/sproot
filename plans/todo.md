@@ -38,6 +38,10 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 - expand module improvement items from MIGRATION.md: apt symlinks, uv_tool auto-install and pkg field, binary_release arch template vars, docker daemon_json (Phase 17g)
 - mark plans/findings.md as superseded (Phase 17h)
 
+## Planned (module additions)
+
+- add a `setup_script` module type: clones a git repo and runs a script from it (e.g. `setup.sh`), replacing the repo_clone + cmd two-phase pattern for the common "clone and bootstrap" use case (Phase 17g6)
+
 ## Planned (Phase 18 - intelligence)
 
 - add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (Phase 18a)
