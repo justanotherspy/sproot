@@ -145,18 +145,22 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	}
 
 	var args []string
+	if log.IsDebug() {
+		args = append(args, "--debug")
+	}
+	args = append(args, "setup")
 	if localConfigDir != "" {
 		const spriteLocalConfigDir = "/tmp/sproot-local-config"
 		l.Infof("uploading local config from %s", localConfigDir)
 		if err := uploadDirectory(handle, localConfigDir, spriteLocalConfigDir); err != nil {
 			return fmt.Errorf("upload local config: %w", err)
 		}
-		args = []string{"setup", "--local-config", spriteLocalConfigDir}
+		args = append(args, "--local-config", spriteLocalConfigDir)
 		if configPath != "" {
 			args = append(args, "--config-path", configPath)
 		}
 	} else {
-		args = []string{"setup", "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef}
+		args = append(args, "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef)
 		if configPath != "" {
 			args = append(args, "--config-path", configPath)
 		}
@@ -173,6 +177,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	if opts.DryRun {
 		args = append(args, "--dry-run")
 	}
+	l.Debugf("in-sprite setup args: %v", args)
 
 	// gh_token_env provides a baseline; env block entries are appended after
 	// so they take precedence when both define the same variable name.

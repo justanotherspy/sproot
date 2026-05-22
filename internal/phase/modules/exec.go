@@ -13,6 +13,7 @@ import (
 
 // runCmd logs and executes name with args, streaming stdout+stderr to log line by line.
 func runCmd(l *log.Logger, name string, args ...string) error {
+	l.Debugf("exec: %s %s", name, strings.Join(args, " "))
 	cmd := exec.Command(name, args...) // nosemgrep
 	pr, pw, err := pipeOf(cmd)
 	if err != nil {

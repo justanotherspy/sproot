@@ -83,3 +83,10 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
 
 `integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs: six module-type matrix entries (apt, git_identity, file_template, rc_block, claude_settings, cmd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path).
+
+When a CI job fails, always fetch the full logs using the gh CLI before diagnosing:
+
+```
+gh run view <run-id> --log-failed
+gh run list --branch <branch>   # find the run-id if unknown
+```

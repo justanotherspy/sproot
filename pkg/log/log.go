@@ -13,6 +13,9 @@ var debugEnabled bool
 // SetDebug enables or disables debug-level output for all loggers.
 func SetDebug(v bool) { debugEnabled = v }
 
+// IsDebug reports whether debug-level output is currently enabled.
+func IsDebug() bool { return debugEnabled }
+
 // Logger writes structured log lines to an io.Writer.
 type Logger struct {
 	w io.Writer

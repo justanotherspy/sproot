@@ -64,6 +64,7 @@ func RunSetup(opts SetupOptions) error {
 	if configFile == "" {
 		configFile = "sproot.yaml"
 	}
+	l.Debugf("loading config from %s", filepath.Join(destDir, configFile))
 	cfg, err := config.LoadSprootConfig(filepath.Join(destDir, configFile))
 	if err != nil {
 		return fmt.Errorf("load %s: %w", configFile, err)
@@ -77,6 +78,7 @@ func RunSetup(opts SetupOptions) error {
 	if err != nil {
 		return fmt.Errorf("resolve target: %w", err)
 	}
+	l.Debugf("resolved %d phase(s) for target %q", len(resolvedPhases), opts.Target)
 
 	phases := make([]phase.Phase, 0, len(resolvedPhases)+1)
 	for _, phaseCfg := range resolvedPhases {
@@ -105,6 +107,7 @@ func RunSetup(opts SetupOptions) error {
 // If the recorded remote URL differs from repoURL, the remote is updated first.
 func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 	if _, err := os.Stat(filepath.Join(dest, ".git")); err == nil {
+		l.Debugf("existing repo found at %s; will fetch and checkout", dest)
 		if current, err := gitOutput("-C", dest, "remote", "get-url", "origin"); err == nil {
 			if strings.TrimSpace(current) != repoURL {
 				l.Infof("config_repo URL changed; updating remote to %s", repoURL)
@@ -117,6 +120,7 @@ func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 		if err := runGit("-C", dest, "fetch", "--prune", "origin"); err != nil {
 			return err
 		}
+		l.Debugf("checking out ref %s", ref)
 		if err := runGit("-C", dest, "checkout", ref); err != nil {
 			return err
 		}

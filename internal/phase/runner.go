@@ -80,6 +80,7 @@ func (r *Runner) Run(ctx *Context) error {
 			LastRunAt: now(),
 		}
 
+		ctx.Log.Debugf("[%s] checking idempotency", p.Name())
 		shouldRun, checkErr := p.ShouldRun(ctx)
 		if checkErr != nil {
 			rec.Error = checkErr.Error()
@@ -88,6 +89,7 @@ func (r *Runner) Run(ctx *Context) error {
 			errs = append(errs, fmt.Errorf("phase %s: %w", p.Name(), checkErr))
 			continue
 		}
+		ctx.Log.Debugf("[%s] shouldRun=%v", p.Name(), shouldRun)
 
 		if !shouldRun && !ctx.Force {
 			rec.Skipped = true
@@ -107,6 +109,7 @@ func (r *Runner) Run(ctx *Context) error {
 			continue
 		}
 
+		ctx.Log.Debugf("[%s] running", p.Name())
 		if runErr := p.Run(ctx); runErr != nil {
 			rec.Error = runErr.Error()
 			ctx.Log.Errorf("[%s] failed: %v", p.Name(), runErr)
@@ -117,6 +120,7 @@ func (r *Runner) Run(ctx *Context) error {
 
 		rec.DidWork = true
 
+		ctx.Log.Debugf("[%s] verifying", p.Name())
 		if verifyErr := p.Verify(ctx); verifyErr != nil {
 			rec.VerifyError = verifyErr.Error()
 			ctx.Log.Errorf("[%s] verify failed: %v", p.Name(), verifyErr)
