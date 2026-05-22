@@ -12,8 +12,8 @@ func TestRunOutdated_ShowsCurrentAndStale(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -45,8 +45,8 @@ func TestRunOutdated_SHAFnError(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -76,8 +76,8 @@ func TestRunOutdated_ListError(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -105,8 +105,8 @@ func TestRunOutdated_NoSprites(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")

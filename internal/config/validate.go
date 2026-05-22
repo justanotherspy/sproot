@@ -177,20 +177,20 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 // ValidateHostConfig validates a parsed HostConfig.
 func ValidateHostConfig(cfg *HostConfig) error {
 	var errs []error
-	switch cfg.ConfigSource {
+	switch cfg.SprootConfigSource {
 	case "", "git":
-		if cfg.ConfigRepo == "" {
-			errs = append(errs, errors.New("config_repo is required"))
+		if cfg.SprootConfigRepo == "" {
+			errs = append(errs, errors.New("sproot_config_repo is required"))
 		}
-		if cfg.ConfigRef == "" {
-			errs = append(errs, errors.New("config_ref is required"))
+		if cfg.SprootConfigRef == "" {
+			errs = append(errs, errors.New("sproot_config_ref is required"))
 		}
 	case "local":
-		if cfg.ConfigLocalPath == "" {
-			errs = append(errs, errors.New("config_local_path is required when config_source=local"))
+		if cfg.SprootConfigLocalPath == "" {
+			errs = append(errs, errors.New("sproot_config_local_path is required when sproot_config_source=local"))
 		}
 	default:
-		errs = append(errs, fmt.Errorf("config_source %q is not valid (use \"git\" or \"local\")", cfg.ConfigSource))
+		errs = append(errs, fmt.Errorf("sproot_config_source %q is not valid (use \"git\" or \"local\")", cfg.SprootConfigSource))
 	}
 	if cfg.TokenEnv == "" {
 		errs = append(errs, errors.New("token_env is required"))

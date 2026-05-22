@@ -62,7 +62,7 @@ e2e: build
 	@mkdir -p ~/.sproot
 	@echo "--- e2e: test 1/3 - local config, 5-phase flat run"
 	@{ \
-		printf "config_source: local\nconfig_local_path: $$(pwd)/testdata/integration\nconfig_path: sproot_local_complex.yaml\ntoken_env: SPRITES_TOKEN\ngh_token_env: GITHUB_TOKEN\n" > ~/.sproot/config.yaml; \
+		printf "sproot_config_source: local\nsproot_config_local_path: $$(pwd)/testdata/integration\nsproot_config_path: sproot_local_complex.yaml\ntoken_env: SPRITES_TOKEN\ngh_token_env: GITHUB_TOKEN\n" > ~/.sproot/config.yaml; \
 		./sproot new spr-e2e-complex --skip-console --skip-verify --debug || exit 1; \
 		./sproot outdated | tee /dev/stderr | grep "current" || exit 1; \
 		./sproot push --name spr-e2e-complex --no-checkpoint --skip-verify --debug || exit 1; \
@@ -70,7 +70,7 @@ e2e: build
 	}
 	@echo "--- e2e: test 2/3 - local config, multi-target web (extends)"
 	@{ \
-		printf "config_source: local\nconfig_local_path: $$(pwd)/testdata/integration\nconfig_path: sproot_local_targets.yaml\ntoken_env: SPRITES_TOKEN\ngh_token_env: GITHUB_TOKEN\n" > ~/.sproot/config.yaml; \
+		printf "sproot_config_source: local\nsproot_config_local_path: $$(pwd)/testdata/integration\nsproot_config_path: sproot_local_targets.yaml\ntoken_env: SPRITES_TOKEN\ngh_token_env: GITHUB_TOKEN\n" > ~/.sproot/config.yaml; \
 		./sproot new spr-e2e-target --target web --skip-console --skip-verify --debug || exit 1; \
 		./sproot outdated | tee /dev/stderr | grep "current" || exit 1; \
 	}

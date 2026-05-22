@@ -83,18 +83,18 @@ type Identity struct {
 // HostConfig is the struct for ~/.sproot/config.yaml, the per-machine host file.
 // TokenEnv and GHTokenEnv hold environment variable *names*, not token values.
 // At runtime sproot reads os.Getenv(TokenEnv) to obtain the actual token.
-// ConfigSource is "git" (default) or "local". When "local", ConfigLocalPath is
-// a host directory path used instead of a git clone; ConfigRepo and ConfigRef
+// SprootConfigSource is "git" (default) or "local". When "local", SprootConfigLocalPath is
+// a host directory path used instead of a git clone; SprootConfigRepo and SprootConfigRef
 // are not required.
 type HostConfig struct {
-	ConfigRepo      string `yaml:"config_repo"`
-	ConfigRef       string `yaml:"config_ref"`
-	ConfigPath      string `yaml:"config_path"`       // path to config file within the repo; defaults to "sproot.yaml"
-	TokenEnv        string `yaml:"token_env"`         // env var name holding the sprites API token
-	GHTokenEnv      string `yaml:"gh_token_env"`      // env var name holding the GitHub PAT
-	DefaultOrg      string `yaml:"default_org"`
-	ConfigSource    string `yaml:"config_source"`     // "git" (default/empty) or "local"
-	ConfigLocalPath string `yaml:"config_local_path"` // host directory path when config_source=local
+	SprootConfigRepo      string `yaml:"sproot_config_repo"`
+	SprootConfigRef       string `yaml:"sproot_config_ref"`
+	SprootConfigPath      string `yaml:"sproot_config_path"`       // path to config file within the repo; defaults to "sproot.yaml"
+	TokenEnv              string `yaml:"token_env"`                // env var name holding the sprites API token
+	GHTokenEnv            string `yaml:"gh_token_env"`             // env var name holding the GitHub PAT
+	DefaultOrg            string `yaml:"default_org"`
+	SprootConfigSource    string `yaml:"sproot_config_source"`     // "git" (default/empty) or "local"
+	SprootConfigLocalPath string `yaml:"sproot_config_local_path"` // host directory path when sproot_config_source=local
 }
 
 // PhaseConfig represents one entry in the phases list. Type is always set.

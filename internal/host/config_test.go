@@ -21,7 +21,7 @@ func TestRunConfigInit_WritesGitSkeleton(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"config_source: git", "config_repo", "config_ref", "token_env", "gh_token_env"} {
+	for _, want := range []string{"sproot_config_source: git", "sproot_config_repo", "sproot_config_ref", "token_env", "gh_token_env"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("git skeleton missing %q", want)
 		}
@@ -47,7 +47,7 @@ func TestRunConfigInit_WritesLocalSkeleton(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"config_source: local", "config_local_path", "token_env"} {
+	for _, want := range []string{"sproot_config_source: local", "sproot_config_local_path", "token_env"} {
 		if !strings.Contains(content, want) {
 			t.Errorf("local skeleton missing %q", want)
 		}
@@ -76,8 +76,8 @@ func TestRunConfigValidate_ValidConfig(t *testing.T) {
 	path := filepath.Join(dir, "config")
 
 	content := `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 `
@@ -95,8 +95,8 @@ func TestRunConfigValidate_InvalidConfig(t *testing.T) {
 	path := filepath.Join(dir, "config")
 
 	content := `
-config_repo: ""
-config_ref: main
+sproot_config_repo: ""
+sproot_config_ref: main
 token_env: SPRITES_TOKEN
 gh_token_env: GITHUB_TOKEN
 `

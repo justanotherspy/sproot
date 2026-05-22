@@ -81,8 +81,8 @@ For development or generated configs, you can point sproot at a local directory 
 
 ```yaml
 # ~/.sproot/config.yaml
-config_source: local
-config_local_path: ~/my-sprite-config
+sproot_config_source: local
+sproot_config_local_path: ~/my-sprite-config
 token_env: SPRITES_TOKEN
 ```
 
@@ -98,20 +98,20 @@ sproot uploads the directory to the sprite and runs setup without a git clone.
 
 ```
 ~/.sproot/
-└── config           # YAML: config_repo, token_env, gh_token_env
+└── config           # YAML: sproot_config_repo, token_env, gh_token_env
 ```
 
 `~/.sproot/config.yaml` format:
 
 ```yaml
-config_repo: git@github.com:yourname/sprite.git
-config_ref: main
-config_path: ""             # optional; path to sproot.yaml within the config repo
+sproot_config_repo: git@github.com:yourname/sprite.git
+sproot_config_ref: main
+sproot_config_path: ""             # optional; path to sproot.yaml within the config repo
 token_env: SPRITES_TOKEN     # name of env var holding your sprites API token
 gh_token_env: GITHUB_TOKEN  # name of env var holding your GitHub PAT
 default_org: ""
-# config_source: local      # set to "local" to use a directory instead of a git repo
-# config_local_path: ~/my-sprite-config
+# sproot_config_source: local      # set to "local" to use a directory instead of a git repo
+# sproot_config_local_path: ~/my-sprite-config
 ```
 
 The config stores environment variable **names**, not token values. Tokens stay in your shell environment (e.g. exported from your password manager or `.profile`). Each sprite generates its own SSH keypair; `sproot destroy` removes it from GitHub automatically.

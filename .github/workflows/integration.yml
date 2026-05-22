@@ -80,9 +80,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/$REPO.git"
-            echo "config_ref: $HEAD_REF"
-            echo "config_path: $CONFIG_PATH"
+            echo "sproot_config_repo: https://github.com/$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: $CONFIG_PATH"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -138,9 +138,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/$REPO.git"
-            echo "config_ref: $HEAD_REF"
-            echo "config_path: testdata/integration/sproot.yaml"
+            echo "sproot_config_repo: https://github.com/$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: testdata/integration/sproot.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -196,8 +196,8 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_source: local"
-            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "sproot_config_source: local"
+            echo "sproot_config_local_path: $GITHUB_WORKSPACE/testdata/integration"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -243,8 +243,8 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_source: local"
-            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "sproot_config_source: local"
+            echo "sproot_config_local_path: $GITHUB_WORKSPACE/testdata/integration"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -303,9 +303,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/$REPO.git"
-            echo "config_ref: $HEAD_REF"
-            echo "config_path: testdata/integration/sproot_complex.yaml"
+            echo "sproot_config_repo: https://github.com/$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: testdata/integration/sproot_complex.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -357,9 +357,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/$REPO.git"
-            echo "config_ref: $HEAD_REF"
-            echo "config_path: testdata/integration/sproot_targets.yaml"
+            echo "sproot_config_repo: https://github.com/$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: testdata/integration/sproot_targets.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -409,9 +409,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_source: local"
-            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
-            echo "config_path: sproot_local_targets.yaml"
+            echo "sproot_config_source: local"
+            echo "sproot_config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "sproot_config_path: sproot_local_targets.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -464,9 +464,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_repo: https://github.com/$REPO.git"
-            echo "config_ref: $HEAD_REF"
-            echo "config_path: testdata/integration/sproot_targets.yaml"
+            echo "sproot_config_repo: https://github.com/$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: testdata/integration/sproot_targets.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
@@ -528,9 +528,9 @@ jobs:
         run: |
           mkdir -p ~/.sproot
           {
-            echo "config_source: local"
-            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
-            echo "config_path: sproot_local_complex.yaml"
+            echo "sproot_config_source: local"
+            echo "sproot_config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "sproot_config_path: sproot_local_complex.yaml"
             echo "token_env: SPRITES_TOKEN"
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml

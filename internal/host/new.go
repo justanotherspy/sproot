@@ -23,7 +23,7 @@ type NewOptions struct {
 	Name        string
 	ConfigPath  string // path to config file within the repo; overrides host config; empty uses host config or "sproot.yaml"
 	Target      string // named target from sproot.yaml; empty uses default/flat phases
-	LocalConfig string // host directory path to use instead of git clone (overrides config_source in host config)
+	LocalConfig string // host directory path to use instead of git clone (overrides sproot_config_source in host config)
 	Only        string
 	Force       bool
 	DryRun      bool
@@ -68,13 +68,13 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	// Resolve configPath early so readers can find the right yaml file.
 	configPath := opts.ConfigPath
 	if configPath == "" {
-		configPath = cfg.ConfigPath
+		configPath = cfg.SprootConfigPath
 	}
 
 	// Determine the effective local config directory (flag takes precedence over host config).
 	localConfigDir := opts.LocalConfig
-	if localConfigDir == "" && cfg.ConfigSource == "local" {
-		localConfigDir = cfg.ConfigLocalPath
+	if localConfigDir == "" && cfg.SprootConfigSource == "local" {
+		localConfigDir = cfg.SprootConfigLocalPath
 	}
 
 	var (
@@ -101,7 +101,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		if envReader == nil {
 			envReader = readEnvBlock
 		}
-		envBlock, sprootCfg, configSHA, err = envReader(cfg.ConfigRepo, cfg.ConfigRef, configPath, l)
+		envBlock, sprootCfg, configSHA, err = envReader(cfg.SprootConfigRepo, cfg.SprootConfigRef, configPath, l)
 		if err != nil {
 			return err
 		}
@@ -161,7 +161,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 			args = append(args, "--config-path", configPath)
 		}
 	} else {
-		args = append(args, "--config-repo", cfg.ConfigRepo, "--ref", cfg.ConfigRef)
+		args = append(args, "--config-repo", cfg.SprootConfigRepo, "--ref", cfg.SprootConfigRef)
 		if configPath != "" {
 			args = append(args, "--config-path", configPath)
 		}
@@ -207,8 +207,8 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 			meta.Repo = localConfigDir
 		} else {
 			meta.Source = "git"
-			meta.Repo = cfg.ConfigRepo
-			meta.Ref = cfg.ConfigRef
+			meta.Repo = cfg.SprootConfigRepo
+			meta.Ref = cfg.SprootConfigRef
 		}
 		if err := handle.SetLabels(ctx, meta.Labels()); err != nil {
 			l.Warnf("set config labels failed: %v", err)
@@ -232,7 +232,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 }
 
 // readLocalEnvBlock loads sproot.yaml from a local directory (no git clone),
-// validates it, and resolves the env block. Used when config_source=local.
+// validates it, and resolves the env block. Used when sproot_config_source=local.
 func readLocalEnvBlock(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, string, error) {
 	l.Debugf("reading local config from %s", dir)
 	yamlFile := configPath

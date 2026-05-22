@@ -31,8 +31,8 @@ func TestRunList_TokenEnvUnset(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "")
@@ -47,8 +47,8 @@ func TestRunList_FiltersToSprootLabel(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -72,8 +72,8 @@ func TestRunList_PrefixFilters(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -116,8 +116,8 @@ func TestRunList_WatchExitsOnContextCancel(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -138,8 +138,8 @@ func TestRunList_AllShowsEverything(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")

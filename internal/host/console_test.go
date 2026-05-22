@@ -11,8 +11,8 @@ func TestRunConsole_TokenEnvUnset(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "")
@@ -27,8 +27,8 @@ func TestRunConsole_CallsHandleConsole(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -49,8 +49,8 @@ func TestRunConsole_PropagatesConsoleError(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")

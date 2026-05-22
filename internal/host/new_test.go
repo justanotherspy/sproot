@@ -118,8 +118,8 @@ func TestRunNew_TokenEnvUnset(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 gh_token_env: MY_GH_TOKEN
 `)
@@ -136,8 +136,8 @@ func TestRunNew_NoGHToken_Succeeds(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -160,8 +160,8 @@ func TestRunNew_GHTokenEnvSetButEmpty_Succeeds(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 gh_token_env: MY_GH_TOKEN
 `)
@@ -186,8 +186,8 @@ func TestRunNew_InjectsBinaryAndForwardsGHToken(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 gh_token_env: MY_GH_TOKEN
 `)
@@ -232,8 +232,8 @@ func TestRunNew_ForwardsConfigPath(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -259,10 +259,10 @@ func TestRunNew_ConfigPathFromHostConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
-config_path: infra/sproot.yaml
+sproot_config_path: infra/sproot.yaml
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
 
@@ -286,10 +286,10 @@ func TestRunNew_CLIConfigPathOverridesHostConfig(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
-config_path: infra/sproot.yaml
+sproot_config_path: infra/sproot.yaml
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
 
@@ -314,8 +314,8 @@ func TestRunNew_ForwardsSetupFlags(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 gh_token_env: MY_GH_TOKEN
 `)
@@ -353,8 +353,8 @@ func TestRunNew_EnvBlockForwarded(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -391,8 +391,8 @@ func TestRunNew_EnvBlockRequiredVarMissing(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -421,8 +421,8 @@ func TestRunNew_BinarySrcFnCalled(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -461,8 +461,8 @@ func TestRunNew_BinarySrcFnError(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -509,8 +509,8 @@ func TestRunNew_CheckpointAfterSetup(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
@@ -542,8 +542,8 @@ func TestRunNew_NoCheckpointWhenFlagFalse(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	writeHostConfig(t, filepath.Join(home, ".sproot"), `
-config_repo: git@github.com:user/repo.git
-config_ref: main
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
 token_env: MY_TOKEN
 `)
 	t.Setenv("MY_TOKEN", "fly-tok")
