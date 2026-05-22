@@ -61,7 +61,7 @@ func RunOutdated(ctx context.Context, opts OutdatedOptions) error {
 
 	var shown int
 	for _, e := range all {
-		if !hasLabel(e.Labels, sprootLabel) {
+		if !hasLabel(e.Labels, labelBase) {
 			continue
 		}
 		meta := ParseConfigMeta(e.Labels)

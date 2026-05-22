@@ -20,8 +20,10 @@ type PushOptions struct {
 	DryRun       bool
 	NoCheckpoint bool   // skip the pre-push checkpoint
 	SkipVerify   bool   // passed as --skip-verify to sproot setup
-	client       SpritesClient
-	shaFn        func() (string, ConfigMeta, error) // nil: compute from host config
+	client           SpritesClient
+	shaFn            func() (string, ConfigMeta, error)                                                          // nil: compute from host config
+	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, string, error) // nil: use readEnvBlock
+	localCfgReaderFn func(dir, configPath string, l *log.Logger) ([]string, *config.SprootConfig, string, error) // nil: use readLocalEnvBlock
 }
 
 // RunPush re-runs setup on all sproot-managed sprites (or a specific one).
@@ -72,7 +74,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 
 	var targets []SpriteListEntry
 	for _, e := range all {
-		if !hasLabel(e.Labels, sprootLabel) {
+		if !hasLabel(e.Labels, labelBase) {
 			continue
 		}
 		if opts.SpriteName != "" && e.Name != opts.SpriteName {
@@ -108,6 +110,37 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 		setupLocalDir = expanded
 	}
 
+	// Resolve ghToken and envBlock for forwarding to in-sprite setup.
+	var ghToken string
+	if cfg.GHTokenEnv != "" {
+		ghToken = os.Getenv(cfg.GHTokenEnv)
+		if ghToken == "" {
+			l.Warnf("%s (gh_token_env) is not set; GitHub features will be unavailable", cfg.GHTokenEnv)
+		}
+	}
+	var envBlock []string
+	if cfg.SprootConfigSource == "local" {
+		localReader := opts.localCfgReaderFn
+		if localReader == nil {
+			localReader = readLocalEnvBlock
+		}
+		var envErr error
+		envBlock, _, _, envErr = localReader(setupLocalDir, cfg.SprootConfigPath, l)
+		if envErr != nil {
+			return fmt.Errorf("read env block: %w", envErr)
+		}
+	} else {
+		envReader := opts.envBlockReaderFn
+		if envReader == nil {
+			envReader = readEnvBlock
+		}
+		var envErr error
+		envBlock, _, _, envErr = envReader(cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, l)
+		if envErr != nil {
+			return fmt.Errorf("read env block: %w", envErr)
+		}
+	}
+
 	var wg sync.WaitGroup
 	for i, entry := range targets {
 		wg.Add(1)
@@ -115,7 +148,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, cfg.SprootConfigSource, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, cfg.SprootConfigSource, ghToken, envBlock, l),
 			}
 		}(i, entry)
 	}
@@ -143,7 +176,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 // the host config (always available). labelMeta is sourced from shaFn (may be
 // zero value when SHA computation failed); it is used only for label updates,
 // not for setup args.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource string, l *log.Logger) error {
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource, ghToken string, envBlock []string, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -189,7 +222,7 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 
 	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout}
 	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr}
-	if err := handle.RunCommand("sproot", args, nil, stdout, stderr); err != nil {
+	if err := handle.RunCommand("sproot", args, buildSpriteEnv(ghToken, envBlock), stdout, stderr); err != nil {
 		return err
 	}
 

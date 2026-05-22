@@ -71,7 +71,7 @@ func printList(ctx context.Context, client SpritesClient, opts ListOptions) erro
 
 	var shown int
 	for _, e := range entries {
-		if !opts.All && !hasLabel(e.Labels, sprootLabel) {
+		if !opts.All && !hasLabel(e.Labels, labelBase) {
 			continue
 		}
 		if opts.Prefix != "" && !strings.HasPrefix(e.Name, opts.Prefix) {

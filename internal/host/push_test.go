@@ -7,6 +7,9 @@ import (
 	"testing"
 
 	sprites "github.com/superfly/sprites-go"
+
+	"github.com/justanotherspy/sproot/internal/config"
+	"github.com/justanotherspy/sproot/pkg/log"
 )
 
 // pushMockClient extends mockClient with a configurable sprite list.
@@ -47,16 +50,17 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
-			{Name: "sprite-b", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
+			{Name: "sprite-b", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		NoCheckpoint: true,
-		client:       client,
-		shaFn:        noopSHAFn,
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -93,15 +97,16 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		NoCheckpoint: false,
-		client:       client,
-		shaFn:        noopSHAFn,
+		NoCheckpoint:     false,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -124,16 +129,17 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
-			{Name: "sprite-b", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
+			{Name: "sprite-b", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		SpriteName:   "sprite-a",
-		NoCheckpoint: true,
-		client:       client,
+		SpriteName:       "sprite-a",
+		NoCheckpoint:     true,
+		client:           client,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -153,7 +159,7 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
@@ -184,16 +190,17 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		Target:       "web",
-		NoCheckpoint: true,
-		client:       client,
-		shaFn:        noopSHAFn,
+		Target:           "web",
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -250,16 +257,17 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		DryRun:       true,
-		NoCheckpoint: true,
-		client:       client,
-		shaFn:        noopSHAFn,
+		DryRun:           true,
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -293,15 +301,16 @@ token_env: MY_TOKEN
 	handle := newMockHandle()
 	client := &pushMockClient{
 		sprites: []SpriteListEntry{
-			{Name: "sprite-a", Labels: []string{sprootLabel}},
+			{Name: "sprite-a", Labels: []string{labelBase}},
 		},
 		handle: handle,
 	}
 
 	err := RunPush(context.Background(), PushOptions{
-		NoCheckpoint: true,
-		client:       client,
-		shaFn:        noopSHAFn,
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -316,6 +325,88 @@ token_env: MY_TOKEN
 	}
 	if !strings.Contains(labelStr, "sproot-source=git") {
 		t.Errorf("labels missing expected source; got %s", labelStr)
+	}
+}
+
+func TestRunPush_ForwardsGHToken(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
+token_env: MY_TOKEN
+gh_token_env: MY_GH_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+	t.Setenv("MY_GH_TOKEN", "gh-secret")
+
+	handle := newMockHandle()
+	client := &pushMockClient{
+		sprites: []SpriteListEntry{
+			{Name: "sprite-a", Labels: []string{labelBase}},
+		},
+		handle: handle,
+	}
+
+	err := RunPush(context.Background(), PushOptions{
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: noopEnvBlock,
+	})
+	if err != nil {
+		t.Fatalf("RunPush: %v", err)
+	}
+	found := false
+	for _, e := range handle.lastCmdEnv {
+		if e == "GH_TOKEN=gh-secret" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("GH_TOKEN not forwarded in env: %v", handle.lastCmdEnv)
+	}
+}
+
+func TestRunPush_ForwardsEnvBlock(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+sproot_config_repo: git@github.com:user/repo.git
+sproot_config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &pushMockClient{
+		sprites: []SpriteListEntry{
+			{Name: "sprite-a", Labels: []string{labelBase}},
+		},
+		handle: handle,
+	}
+
+	stubEnvBlock := func(_, _, _ string, _ *log.Logger) ([]string, *config.SprootConfig, string, error) {
+		return []string{"APP_SECRET=top-secret"}, nil, "", nil
+	}
+
+	err := RunPush(context.Background(), PushOptions{
+		NoCheckpoint:     true,
+		client:           client,
+		shaFn:            noopSHAFn,
+		envBlockReaderFn: stubEnvBlock,
+	})
+	if err != nil {
+		t.Fatalf("RunPush: %v", err)
+	}
+	found := false
+	for _, e := range handle.lastCmdEnv {
+		if e == "APP_SECRET=top-secret" {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("env block entry not forwarded: %v", handle.lastCmdEnv)
 	}
 }
 

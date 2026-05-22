@@ -63,10 +63,29 @@ func TestConfigMeta_Labels_Local(t *testing.T) {
 		SHA:    "abc123def456",
 	}
 	labels := m.Labels()
-	// Ref should not appear for local source.
+	// Ref and Target should not appear for local source with no target.
 	for _, l := range labels {
 		if strings.HasPrefix(l, labelRef+"=") {
 			t.Errorf("unexpected %s label for local source: %v", labelRef, labels)
+		}
+		if strings.HasPrefix(l, labelTarget+"=") {
+			t.Errorf("unexpected %s label when Target is empty: %v", labelTarget, labels)
+		}
+	}
+}
+
+func TestConfigMeta_Labels_EmptyTarget(t *testing.T) {
+	m := ConfigMeta{
+		Target: "",
+		Source: "git",
+		Repo:   "git@github.com:user/repo.git",
+		Ref:    "main",
+		SHA:    "abc123def456",
+	}
+	labels := m.Labels()
+	for _, l := range labels {
+		if strings.HasPrefix(l, labelTarget+"=") {
+			t.Errorf("sproot-target label must be omitted when Target is empty, got: %v", labels)
 		}
 	}
 }

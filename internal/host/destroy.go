@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"golang.org/x/term"
 
@@ -19,6 +20,8 @@ import (
 // ghKeyIDsSpritePath is the absolute path inside a sprite where ssh_setup writes key IDs.
 // Sprites run as root, so the XDG config dir resolves to /root/.config.
 const ghKeyIDsSpritePath = "/root/.config/sproot/github_keys.json"
+
+var ghAPIClient = &http.Client{Timeout: 30 * time.Second}
 
 // DestroyOptions controls the behavior of RunDestroy.
 type DestroyOptions struct {
@@ -107,7 +110,7 @@ func deleteGHKey(l *log.Logger, token, baseURL string, id int64) {
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/vnd.github+json")
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := ghAPIClient.Do(req)
 	if err != nil {
 		l.Warnf("delete GitHub key %d: %v", id, err)
 		return

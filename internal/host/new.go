@@ -14,10 +14,6 @@ import (
 	"github.com/justanotherspy/sproot/pkg/log"
 )
 
-// sprootLabel is attached to every sprite created by sproot new.
-// Used by sproot list to filter sprites managed by sproot.
-const sprootLabel = "sproot"
-
 // NewOptions controls the behavior of RunNew.
 type NewOptions struct {
 	Name        string
@@ -113,7 +109,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	}
 
 	l.Infof("creating sprite %s", opts.Name)
-	handle, err := client.CreateSprite(ctx, opts.Name, nil, []string{sprootLabel})
+	handle, err := client.CreateSprite(ctx, opts.Name, nil, []string{labelBase})
 	if err != nil {
 		return fmt.Errorf("create sprite: %w", err)
 	}
@@ -183,13 +179,7 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	}
 	l.Debugf("in-sprite setup args: %v", args)
 
-	// gh_token_env provides a baseline; env block entries are appended after
-	// so they take precedence when both define the same variable name.
-	var env []string
-	if ghToken != "" {
-		env = []string{"GH_TOKEN=" + ghToken}
-	}
-	env = append(env, envBlock...)
+	env := buildSpriteEnv(ghToken, envBlock)
 
 	l.Infof("running setup in sprite %s", opts.Name)
 	if err := handle.RunCommand("sproot", args, env, os.Stdout, os.Stderr); err != nil {
@@ -296,6 +286,17 @@ func uploadDirectory(handle SpriteHandle, srcDir, destDir string) error {
 		}
 		return nil
 	})
+}
+
+// buildSpriteEnv assembles the env slice for RunCommand calls inside a sprite.
+// gh_token_env provides a baseline; env block entries are appended after so they
+// take precedence when both define the same variable name.
+func buildSpriteEnv(ghToken string, envBlock []string) []string {
+	var env []string
+	if ghToken != "" {
+		env = []string{"GH_TOKEN=" + ghToken}
+	}
+	return append(env, envBlock...)
 }
 
 // readEnvBlock clones the config repo at configRepo/configRef into a temp dir,
