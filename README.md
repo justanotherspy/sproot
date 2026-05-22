@@ -140,7 +140,7 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot status <name>` | host | Show setup state (exec into sprite); `--host` reads state without exec |
 | `sproot console <name>` | host | Open an interactive shell in a sprite |
 | `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output (`--env KEY=val,K2=v2`) |
-| `sproot list` | host | List sproot-managed sprites (`--all` shows every sprite, `--prefix` filters by name, `--watch` refreshes live) |
+| `sproot list` | host | List sproot-managed sprites in a colored table (name, status, URL, created, last running) sized to the terminal (`--all` shows every sprite, `--prefix` filters by name, `--watch` refreshes live). Output falls back to plain tab-separated rows when piped or when `NO_COLOR` is set |
 | `sproot upgrade <name>` | host | Upgrade the sprite CLI inside a sprite |
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |

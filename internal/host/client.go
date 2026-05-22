@@ -14,9 +14,13 @@ import (
 
 // SpriteListEntry holds the subset of sprite info needed for list output.
 type SpriteListEntry struct {
-	Name   string
-	Status string
-	Labels []string
+	Name          string
+	Status        string
+	Labels        []string
+	URL           string
+	Organization  string
+	CreatedAt     time.Time
+	LastRunningAt *time.Time
 }
 
 // CheckpointEntry holds the subset of checkpoint info needed for list output.
@@ -90,9 +94,13 @@ func (r *realClient) ListSprites(ctx context.Context) ([]SpriteListEntry, error)
 		}
 		for _, info := range page.Sprites {
 			entries = append(entries, SpriteListEntry{
-				Name:   info.Name,
-				Status: info.Status,
-				Labels: info.Labels,
+				Name:          info.Name,
+				Status:        info.Status,
+				Labels:        info.Labels,
+				URL:           info.URL,
+				Organization:  info.Organization,
+				CreatedAt:     info.CreatedAt,
+				LastRunningAt: info.LastRunningAt,
 			})
 		}
 		if !page.HasMore || page.NextContinuationToken == "" {
