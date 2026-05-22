@@ -88,9 +88,15 @@ else
     log "Latest version: ${VERSION}"
 fi
 
-ARCHIVE_NAME="${BINARY}_${VERSION}_${OS}_${ARCH}.tar.gz"
-CHECKSUM_NAME="${BINARY}_${VERSION}_checksums.txt"
-DOWNLOAD_BASE="${RELEASES_URL}/download/${VERSION}"
+# Release tags are prefixed with "v" (e.g. v0.1.0), but GoReleaser strips the
+# prefix from artifact names (e.g. sproot_0.1.0_linux_amd64.tar.gz). The
+# download path uses the tag, the file names use the bare version.
+VERSION_NUM="${VERSION#v}"
+TAG="v${VERSION_NUM}"
+
+ARCHIVE_NAME="${BINARY}_${VERSION_NUM}_${OS}_${ARCH}.tar.gz"
+CHECKSUM_NAME="${BINARY}_${VERSION_NUM}_checksums.txt"
+DOWNLOAD_BASE="${RELEASES_URL}/download/${TAG}"
 
 TMPDIR="$(mktemp -d)"
 cleanup() { rm -rf "${TMPDIR}"; }
