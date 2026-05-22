@@ -13,7 +13,7 @@ import (
 
 // TestDryRunAllModules builds a runner covering every registered module type
 // with minimal valid config, runs it under DryRun=true, and asserts no errors.
-// It verifies that all 17 module types are registered and parse without panic.
+// It verifies that all 18 module types are registered and parse without panic.
 func TestDryRunAllModules(t *testing.T) {
 	// Provide files that file_template and rc_block need from the config repo.
 	repoDir := t.TempDir()
@@ -23,23 +23,37 @@ func TestDryRunAllModules(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
+	// npm phase needs a dir with a package.json (node_modules absent so ShouldRun=true in dry-run).
+	npmDir := filepath.Join(home, "myapp")
+	_ = os.MkdirAll(npmDir, 0o755)
+
 	cfgs := []config.PhaseConfig{
-		{Type: "apt", Apt: &config.AptConfig{Packages: []string{"bash"}}},
-		{Type: "uv_tool", UVTool: &config.UVToolConfig{Tools: []config.UVTool{{Name: "ruff"}}}},
+		// apt: with symlinks field exercised
+		{Type: "apt", Apt: &config.AptConfig{
+			Packages: []string{"bash"},
+			Symlinks: []config.AptSymlink{{From: "/usr/bin/batcat", To: "/usr/local/bin/bat"}},
+		}},
+		// uv_tool: pkg field (package name differs from binary name)
+		{Type: "uv_tool", UVTool: &config.UVToolConfig{Tools: []config.UVTool{{Name: "garlic", Pkg: "garlic-cli"}}}},
 		{Type: "go_install", GoInstall: &config.GoInstallConfig{
 			Tools: []config.GoTool{{Pkg: "golang.org/x/tools/cmd/goimports", Version: "latest"}},
 		}},
 		{Type: "cargo_install", CargoInstall: &config.CargoInstallConfig{
 			Tools: []config.CargoTool{{Name: "ripgrep"}},
 		}},
+		// binary_release: x64_arch / x86_64_arch template vars
 		{Type: "binary_release", BinaryRelease: &config.BinaryReleaseConfig{
-			Name: "cosign", Repo: "sigstore/cosign", Asset: "cosign_{version}_{arch}.deb", Install: "dpkg",
+			Name: "gitleaks", Repo: "gitleaks/gitleaks", Asset: "gitleaks_{version}_linux_{x64_arch}.tar.gz", Install: "tar+install",
 		}},
 		{Type: "corepack", Corepack: &config.CorepackConfig{Managers: []string{"pnpm", "yarn"}}},
 		{Type: "rust_components", RustComponents: &config.RustComponentsConfig{Components: []string{"clippy", "rustfmt"}}},
-		{Type: "docker", Docker: &config.DockerConfig{}},
+		// docker: daemon_json field
+		{Type: "docker", Docker: &config.DockerConfig{
+			DaemonJSON: map[string]any{"log-driver": "json-file"},
+		}},
+		// sprite_service: http_port and needs fields
 		{Type: "sprite_service", SpriteService: &config.SpriteServiceConfig{
-			Service: "dockerd", Cmd: "/usr/bin/dockerd",
+			Service: "myservice", Cmd: "/usr/bin/myservice", HTTPPort: 8080, Needs: []string{"dockerd"},
 		}},
 		{Type: "git_identity", GitIdentity: &config.GitIdentityConfig{}},
 		{Type: "ssh_setup", SSHSetup: &config.SSHSetupConfig{}},
@@ -48,13 +62,19 @@ func TestDryRunAllModules(t *testing.T) {
 			Src: "file.txt", Dest: filepath.Join(home, "out.txt"),
 		}},
 		{Type: "rc_block", RCBlock: &config.RCBlockConfig{Src: "rc.sh"}},
+		// repo_clone: short form and long URL form
 		{Type: "repo_clone", RepoClone: &config.RepoCloneConfig{
 			BaseDir: filepath.Join(home, "repos"),
-			Repos:   []string{"owner/repo"},
+			Repos: []config.RepoCloneEntry{
+				{Raw: "owner/repo"},
+				{URL: "https://github.com/org/project.git", Dest: filepath.Join(home, "project")},
+			},
 		}},
 		{Type: "claude_settings", ClaudeSettings: &config.ClaudeSettingsConfig{
 			Settings: map[string]any{"theme": "dark"},
 		}},
+		// npm: installs node_modules in a project dir
+		{Type: "npm", Npm: &config.NpmConfig{Dir: npmDir}},
 		{Type: "cmd", Cmd: &config.CmdConfig{Run: "true"}},
 	}
 

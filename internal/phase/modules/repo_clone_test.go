@@ -12,7 +12,7 @@ func TestRepoClone_ShouldRunWhenDirMissing(t *testing.T) {
 	base := t.TempDir()
 	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
 		BaseDir: base,
-		Repos:   []string{"owner/myrepo"},
+		Repos:   []config.RepoCloneEntry{{Raw: "owner/myrepo"}},
 	}}
 
 	should, err := p.ShouldRun(testCtx(t))
@@ -26,13 +26,12 @@ func TestRepoClone_ShouldRunWhenDirMissing(t *testing.T) {
 
 func TestRepoClone_ShouldRunFalseWhenAllPresent(t *testing.T) {
 	base := t.TempDir()
-	// Create a fake git repo dir.
 	repoDir := filepath.Join(base, "myrepo")
 	_ = os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
 
 	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
 		BaseDir: base,
-		Repos:   []string{"owner/myrepo"},
+		Repos:   []config.RepoCloneEntry{{Raw: "owner/myrepo"}},
 	}}
 
 	should, err := p.ShouldRun(testCtx(t))
@@ -46,24 +45,108 @@ func TestRepoClone_ShouldRunFalseWhenAllPresent(t *testing.T) {
 
 func TestRepoClone_SkipsAlreadyCloned(t *testing.T) {
 	base := t.TempDir()
-	// Pre-populate a fake git repo to simulate already-cloned.
 	repoDir := filepath.Join(base, "myrepo")
 	_ = os.MkdirAll(filepath.Join(repoDir, ".git"), 0o755)
 
 	ctx := testCtx(t)
-	logged := false
-	// Run should skip without calling git clone.
 	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
 		BaseDir: base,
-		Repos:   []string{"owner/myrepo"},
+		Repos:   []config.RepoCloneEntry{{Raw: "owner/myrepo"}},
 	}}
-	_ = logged
 	if err := p.Run(ctx); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	// The dir still exists and no git error occurred.
 	if !isGitRepo(repoDir) {
 		t.Error("repo dir lost after Run")
+	}
+}
+
+func TestRepoClone_URLFormWithDest(t *testing.T) {
+	dest := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(dest, ".git"), 0o755)
+
+	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
+		Repos: []config.RepoCloneEntry{{URL: "https://github.com/org/project.git", Dest: dest}},
+	}}
+
+	should, err := p.ShouldRun(testCtx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if should {
+		t.Error("expected ShouldRun=false when dest is already a git repo")
+	}
+}
+
+func TestRepoClone_URLFormWithDestMissing(t *testing.T) {
+	dest := filepath.Join(t.TempDir(), "nonexistent")
+
+	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
+		Repos: []config.RepoCloneEntry{{URL: "https://github.com/org/project.git", Dest: dest}},
+	}}
+
+	should, err := p.ShouldRun(testCtx(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !should {
+		t.Error("expected ShouldRun=true when dest is missing")
+	}
+}
+
+func TestRepoClone_VerifyFailsWhenMissing(t *testing.T) {
+	base := t.TempDir()
+
+	p := &repoClonePhase{cfg: &config.RepoCloneConfig{
+		BaseDir: base,
+		Repos:   []config.RepoCloneEntry{{Raw: "owner/missingrepo"}},
+	}}
+
+	if err := p.Verify(testCtx(t)); err == nil {
+		t.Error("expected Verify to fail when repo not cloned")
+	}
+}
+
+func TestEntryDest_ShortForm(t *testing.T) {
+	base := t.TempDir()
+	entry := config.RepoCloneEntry{Raw: "owner/myrepo"}
+	dest, err := entryDest(entry, base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := filepath.Join(base, "myrepo")
+	if dest != want {
+		t.Errorf("got %q, want %q", dest, want)
+	}
+}
+
+func TestEntryDest_URLFormWithDest(t *testing.T) {
+	explicitDest := "/tmp/myproject"
+	entry := config.RepoCloneEntry{URL: "https://github.com/org/project.git", Dest: explicitDest}
+	dest, err := entryDest(entry, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dest != explicitDest {
+		t.Errorf("got %q, want %q", dest, explicitDest)
+	}
+}
+
+func TestEntryCloneURL_ShortForm(t *testing.T) {
+	entry := config.RepoCloneEntry{Raw: "owner/repo"}
+	got := entryCloneURL(entry)
+	want := "git@github.com:owner/repo.git"
+	if got != want {
+		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+func TestEntryCloneURL_URLForm(t *testing.T) {
+	url := "https://github.com/org/project.git"
+	entry := config.RepoCloneEntry{URL: url}
+	got := entryCloneURL(entry)
+	if got != url {
+		t.Errorf("got %q, want %q", got, url)
 	}
 }
 

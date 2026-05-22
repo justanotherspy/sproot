@@ -4,9 +4,10 @@ package modules
 // internal Unix socket API. The service is started and kept alive by sprite-env.
 //
 //	- type: sprite_service
-//	  service: dockerd
-//	  cmd: /usr/bin/dockerd
-//	  args: []   # optional
+//	  service: openclaw-builder
+//	  cmd: ~/openclaw-builder/start.sh
+//	  http_port: 8080      # optional
+//	  needs: [dockerd]     # optional
 
 import (
 	"encoding/json"
@@ -43,6 +44,12 @@ func (p *spriteServicePhase) Run(ctx *phase.Context) error {
 	body := map[string]any{"cmd": p.cfg.Cmd}
 	if len(p.cfg.Args) > 0 {
 		body["args"] = p.cfg.Args
+	}
+	if p.cfg.HTTPPort != 0 {
+		body["http_port"] = p.cfg.HTTPPort
+	}
+	if len(p.cfg.Needs) > 0 {
+		body["needs"] = p.cfg.Needs
 	}
 	bodyJSON, err := json.Marshal(body)
 	if err != nil {

@@ -236,12 +236,16 @@ Registers a long-running service with the sprite-env daemon.
   cmd: /usr/bin/dockerd
   args:
     - --host=unix:///var/run/docker.sock
+  http_port: 2375        # optional: port sprite-env monitors for health
+  needs: [networking]    # optional: services that must start first
 ```
 
 **Fields:**
 - `service`: service name (used as path key in the API)
 - `cmd`: executable path
 - `args`: optional command arguments
+- `http_port`: optional port number; when set, sprite-env monitors it for health checks
+- `needs`: optional list of service names that must be running before this service starts
 
 **Idempotency:** checks `sprite-env curl /v1/services/<name>` exits 0.
 
@@ -358,23 +362,27 @@ Both `.bashrc` and `.zshrc` are updated. On re-run, the existing block is replac
 
 ## repo_clone
 
-Clones GitHub repositories into a base directory.
+Clones repositories into configured destinations.
 
 ```yaml
 - type: repo_clone
   base_dir: ~/repos
   repos:
-    - justanotherspy/sproot
+    - justanotherspy/sproot          # short form: SSH clone into base_dir/<repo>
     - justanotherspy/sprite
+    - url: https://github.com/org/project.git   # long form: explicit URL
+      dest: ~/project                            # optional explicit destination
 ```
 
+**Short form** (`owner/repo` string): clones via SSH (`git@github.com:owner/repo.git`) into `<base_dir>/<repo>`. Requires `base_dir`.
+
+**Long form** (`{url, dest}` map): clones the given URL. `dest` is optional; when omitted, defaults to `~/<repo-name>` (last URL path component, minus `.git`).
+
 **Fields:**
-- `base_dir`: directory to clone into (`~` is expanded)
-- `repos`: list of `owner/repo` strings
+- `base_dir`: base directory for short-form repos (`~` is expanded)
+- `repos`: list of short-form strings or `{url, dest}` maps
 
-Clones via SSH: `git@github.com:owner/repo.git`. Each repo lands at `<base_dir>/<repo>`.
-
-**Idempotency:** skips repos where `<base_dir>/<repo>/.git` already exists.
+**Idempotency:** skips repos where the destination directory already contains `.git`.
 
 ---
 
@@ -397,6 +405,22 @@ Deep-merges settings into `~/.claude/settings.json`.
 Existing keys not listed in `settings` are preserved. Nested maps are merged recursively.
 
 **Idempotency:** checks that all specified keys already match target values.
+
+---
+
+## npm
+
+Runs `npm install` in a project directory.
+
+```yaml
+- type: npm
+  dir: ~/my-project
+```
+
+**Fields:**
+- `dir`: directory containing `package.json` (`~` is expanded)
+
+**Idempotency:** skips when `node_modules` already exists in `dir`.
 
 ---
 

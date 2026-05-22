@@ -175,8 +175,8 @@ func TestPhaseConfig_RepoCloneFields(t *testing.T) {
 	if len(rc.Repos) != 2 {
 		t.Fatalf("repos: got %d, want 2", len(rc.Repos))
 	}
-	if rc.Repos[0] != "justanotherspy/garlic" {
-		t.Errorf("repos[0]: got %q", rc.Repos[0])
+	if rc.Repos[0].Raw != "justanotherspy/garlic" {
+		t.Errorf("repos[0]: got %q", rc.Repos[0].Raw)
 	}
 }
 
@@ -518,7 +518,7 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 		{
 			"repo_clone_missing_base_dir",
 			func(c *SprootConfig) {
-				c.Phases = []PhaseConfig{{Type: "repo_clone", RepoClone: &RepoCloneConfig{Repos: []string{"a/b"}}}}
+				c.Phases = []PhaseConfig{{Type: "repo_clone", RepoClone: &RepoCloneConfig{Repos: []RepoCloneEntry{{Raw: "a/b"}}}}}
 			},
 			"phases[0] (repo_clone): base_dir is required",
 		},
