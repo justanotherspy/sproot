@@ -1,0 +1,16 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+phases:
+  - type: apt
+    packages: [git, jq, ripgrep, bat, fd-find]
+    symlinks:
+      - from: /usr/bin/batcat
+        to: /usr/local/bin/bat
+      - from: /usr/bin/fdfind
+        to: /usr/local/bin/fd

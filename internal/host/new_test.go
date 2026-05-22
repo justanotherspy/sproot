@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	sprites "github.com/superfly/sprites-go"
@@ -35,8 +36,10 @@ func (m *mockClient) GetHandle(_ string) SpriteHandle                           
 func (m *mockClient) DestroySprite(_ context.Context, _ string) error           { return m.destroyErr }
 func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error)  { return nil, nil }
 
-// mockHandle records calls for assertions.
+// mockHandle records calls for assertions. RunPush updates sprites in parallel
+// and shares one handle across goroutines, so mu guards the recorded state.
 type mockHandle struct {
+	mu             sync.Mutex
 	writtenFiles   map[string][]byte
 	readFiles      map[string][]byte
 	readErr        error
@@ -56,11 +59,15 @@ func newMockHandle() *mockHandle {
 }
 
 func (h *mockHandle) WriteFile(path string, data []byte, _ fs.FileMode) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.writtenFiles[path] = data
 	return nil
 }
 
 func (h *mockHandle) ReadFile(path string) ([]byte, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	if h.readErr != nil {
 		return nil, h.readErr
 	}
@@ -72,15 +79,23 @@ func (h *mockHandle) ReadFile(path string) ([]byte, error) {
 }
 
 func (h *mockHandle) RunCommand(name string, args, env []string, _, _ io.Writer) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.lastCmdName = name
 	h.lastCmdArgs = args
 	h.lastCmdEnv = env
 	return h.runErr
 }
 
-func (h *mockHandle) Console(_ []string) error { return h.runErr }
+func (h *mockHandle) Console(_ []string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.runErr
+}
 
 func (h *mockHandle) Checkpoint(_ context.Context, _ string, _ io.Writer) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.checkpointDone = true
 	return h.checkpointErr
 }
@@ -92,6 +107,8 @@ func (h *mockHandle) ListCheckpoints(_ context.Context, _ bool) ([]CheckpointEnt
 func (h *mockHandle) Restore(_ context.Context, _ string, _ io.Writer) error { return nil }
 
 func (h *mockHandle) SetLabels(_ context.Context, labels []string) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	h.writtenFiles["__labels__"] = []byte(strings.Join(labels, "\n"))
 	return nil
 }

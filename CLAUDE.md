@@ -38,6 +38,8 @@ pkg/log/              - structured logger (+/-/!/x visual conventions)
 docs/                 - user-facing docs (modules.md)
 testdata/integration/ - integration test config used by integration.yml
 plans/                - design docs, not shipped
+.claude-plugin/       - marketplace.json (this repo is a Claude plugin marketplace)
+plugins/sproot/       - the sproot Claude plugin: script-convert + author-config skills, shared reference/
 ```
 
 ## Conventions
@@ -60,7 +62,7 @@ plans/                - design docs, not shipped
 |-------|-------------|
 | 0-7 | Foundation: scaffold, config schema, phase engine, 17 modules, sproot setup, host CLI, sprite config repo, release pipeline (done) |
 | 8-13 | Hardening: doc fixes, bug fixes, cross-arch binary, UX, SDK alignment, multi-target/push (done) |
-| 14 | Intelligence: Claude skills for sproot usage and script conversion (deferred) |
+| 14 | Intelligence: Claude plugin marketplace with two skills (`script-convert` bash->sproot.yaml converter, `author-config` usage assistant); golden fixtures validated in CI (done) |
 | 15-16 | Operational improvements, integration depth, make e2e (done) |
 | 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md; module additions (repo_clone URLs, npm, sprite_service http_port/needs) (done) |
 | 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d deferred) |
@@ -71,6 +73,7 @@ plans/                - design docs, not shipped
 - Each phase or feature goes on its own branch and merges via PR. Never push directly to main.
 - Run `make check` before every push (vet + test + lint must all pass).
 - When behavior changes, update the relevant docs in the same PR: `docs/modules.md` for module changes, `README.md` for user-facing command or config changes, `CLAUDE.md` phase table for phase completion, and `plans/sproot.md` for design decisions and phase summaries.
+- When a module is added, removed, or its fields change, also update the plugin's `plugins/sproot/reference/module-map.md` and `reference/module-schema.md` in the same PR (they back the script-convert/author-config skills), and consider whether a new golden fixture under `plugins/sproot/skills/script-convert/examples/` is warranted.
 - Every new CLI command or config feature must have corresponding integration test coverage: unit tests under `internal/host/` or `internal/sprite/`, a dry-run path in `internal/phase/modules/integration_test.go` if a new module type is added, and an entry in `integration.yml` (matrix or separate job) that exercises the feature against a real sprite. When reviewing or implementing a phase, explicitly check that all new functionality is covered end-to-end.
 - Sprites spin up in 1-2 seconds. Integration tests do not need artificial sleep or retry loops; commands can run immediately after sprite creation.
 - When adding integration tests for config-source functionality, cover BOTH `config_source: git` (standard git clone path) and `config_source: local` (local directory uploaded to sprite). The two code paths are distinct and both must be exercised.
@@ -78,6 +81,8 @@ plans/                - design docs, not shipped
 ## CI
 
 Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
+
+`plugins.yml` runs on every push/PR and gates the Claude plugin marketplace: `validate-plugin` installs the `claude` CLI and runs `claude plugin validate --strict` on `.claude-plugin/marketplace.json` and `plugins/sproot`; `validate-fixtures` builds the binary and runs `sproot validate` on every `plugins/sproot/skills/script-convert/examples/*/expected/sproot.yaml` golden fixture.
 
 `integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs include module-type matrix entries (apt, git_identity, file_template, rc_block, claude, cmd, binary-release), tooling matrix entries against `sproot_tooling.yaml` (uv_tool, corepack, rust_components, go_install, cargo_install, npm, sprite_service), a docker-daemon job (docker daemon.json merge + sprite_service dockerd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path). `gh_token` and `ssh_setup` are not in the matrix: they need a user-scoped GitHub PAT and mutate the GitHub account, so they cannot run unattended with the default Actions token. The `cargo_install` job uses a small, dependency-light crate (`hexyl`, ~25s to compile on the base image) to keep it fast; avoid swapping in crates with heavy dependency trees.
 

@@ -1,0 +1,13 @@
+{
+  "name": "sproot",
+  "description": "Convert setup bash scripts into sproot.yaml modules, and author/explain/validate sproot configs.",
+  "version": "0.1.0",
+  "author": {
+    "name": "justanotherspy",
+    "url": "https://github.com/justanotherspy"
+  },
+  "homepage": "https://github.com/justanotherspy/sproot",
+  "repository": "https://github.com/justanotherspy/sproot",
+  "license": "MIT",
+  "keywords": ["sproot", "sprite", "bootstrap", "yaml", "bash"]
+}

@@ -153,6 +153,28 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
+## Skills (Claude plugin)
+
+This repo doubles as a Claude Code plugin marketplace. The `sproot` plugin (under `plugins/`)
+ships two skills that help you author sproot configs:
+
+- **`/sproot:script-convert <path>`** turns an existing setup bash script into a `sproot.yaml`
+  plus its companion files, mapping each command to the right module (`apt-get install` -> `apt`,
+  heredocs -> `file_template`, `>> ~/.bashrc` -> `rc_block`, GitHub release downloads ->
+  `binary_release`, ...) and falling back to `cmd` only when nothing structured fits. It runs
+  `sproot validate` on its output and reports what needs human review.
+- **`/sproot:author-config`** generates a config from a description, explains an existing one,
+  interprets `sproot validate` errors, and suggests modules.
+
+Install from inside Claude Code:
+
+```sh
+/plugin marketplace add justanotherspy/sproot
+/plugin install sproot@sproot
+```
+
+See [`plugins/sproot/README.md`](plugins/sproot/README.md) for details.
+
 ## Quickstart
 
 **1. Initialize host config:**

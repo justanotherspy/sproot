@@ -1,0 +1,17 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+# The mkdir is dropped: file_template creates the destination's parent directory.
+# Both the ~/.bashrc and ~/.zshrc appends coalesce into one rc_block companion file
+# (rc_block writes the managed block to both shells).
+phases:
+  - type: file_template
+    src: files/init.lua
+    dest: ~/.config/nvim/init.lua
+  - type: rc_block
+    src: files/rc_additions.sh

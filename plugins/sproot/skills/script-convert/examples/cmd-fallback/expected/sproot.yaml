@@ -1,0 +1,24 @@
+schema_version: 1
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+# None of these map to a structured module, so each becomes a cmd with an
+# idempotency check. All three are flagged for human review (the curl|sh installer
+# especially: opaque and unversioned).
+phases:
+  - type: cmd
+    run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
+    check: "command -v rustup"
+    name: install-rustup
+  - type: cmd
+    run: "npm install -g typescript"
+    check: "command -v tsc"
+    name: npm-global-typescript
+  - type: cmd
+    run: "mkdir -p ~/.local/state/myapp && touch ~/.local/state/myapp/initialized"
+    check: "test -f ~/.local/state/myapp/initialized"
+    name: init-myapp-state

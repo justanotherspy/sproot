@@ -492,3 +492,13 @@ Runs an arbitrary shell command.
 **Idempotency:** if `check` is provided, skips when it exits 0. Without `check`, always runs.
 
 Use this as an escape hatch for one-off operations not covered by other module types.
+
+---
+
+## Generating configs with the Claude plugin
+
+The `sproot` Claude Code plugin (under `plugins/`) can write these modules for you:
+`/sproot:script-convert` turns an existing setup bash script into a `sproot.yaml` (plus companion
+files), and `/sproot:author-config` generates, explains, and validates configs. The plugin's
+`reference/module-map.md` and `reference/module-schema.md` mirror this document; this file remains
+the canonical source of truth. See [`plugins/sproot/README.md`](../plugins/sproot/README.md).
