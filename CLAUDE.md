@@ -74,9 +74,10 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 - Each phase or feature goes on its own branch and merges via PR. Never push directly to main.
 - Run `make check` before every push (vet + test + lint must all pass).
 - When behavior changes, update the relevant docs in the same PR: `docs/modules.md` for module changes, `README.md` for user-facing command or config changes, `CLAUDE.md` phase table for phase completion, and `plans/sproot.md` for design decisions and phase summaries.
+- Every new CLI command or config feature must have corresponding integration test coverage: unit tests under `internal/host/` or `internal/sprite/`, a dry-run path in `internal/phase/modules/integration_test.go` if a new module type is added, and an entry in `integration.yml` (matrix or separate job) that exercises the feature against a real sprite. When reviewing or implementing a phase, explicitly check that all new functionality is covered end-to-end.
 
 ## CI
 
-Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
+Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
 
-`integration.yml` runs on owner-triggered pushes: builds the binary and runs six matrix integration tests against real sprites.
+`integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs: six module-type matrix entries (apt, git_identity, file_template, rc_block, claude_settings, cmd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path).

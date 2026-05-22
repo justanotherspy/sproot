@@ -237,6 +237,88 @@ token_env: MY_TOKEN
 	}
 }
 
+func TestRunPush_DryRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &pushMockClient{
+		sprites: []SpriteListEntry{
+			{Name: "sprite-a", Labels: []string{sprootLabel}},
+		},
+		handle: handle,
+	}
+
+	err := RunPush(context.Background(), PushOptions{
+		DryRun:       true,
+		NoCheckpoint: true,
+		client:       client,
+		shaFn:        noopSHAFn,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	found := false
+	for _, a := range handle.lastCmdArgs {
+		if a == "--dry-run" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected --dry-run in args %v", handle.lastCmdArgs)
+	}
+	// Labels must NOT be updated during a dry run.
+	if _, ok := handle.writtenFiles["__labels__"]; ok {
+		t.Error("SetLabels must not be called during a dry run")
+	}
+}
+
+func TestRunPush_LabelsUpdated(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	writeHostConfig(t, filepath.Join(home, ".sproot"), `
+config_repo: git@github.com:user/repo.git
+config_ref: main
+token_env: MY_TOKEN
+`)
+	t.Setenv("MY_TOKEN", "fly-tok")
+
+	handle := newMockHandle()
+	client := &pushMockClient{
+		sprites: []SpriteListEntry{
+			{Name: "sprite-a", Labels: []string{sprootLabel}},
+		},
+		handle: handle,
+	}
+
+	err := RunPush(context.Background(), PushOptions{
+		NoCheckpoint: true,
+		client:       client,
+		shaFn:        noopSHAFn,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, ok := handle.writtenFiles["__labels__"]
+	if !ok {
+		t.Fatal("expected SetLabels to be called after a successful push")
+	}
+	labelStr := string(raw)
+	if !strings.Contains(labelStr, "sproot-sha=abc123def456") {
+		t.Errorf("labels missing expected SHA; got %s", labelStr)
+	}
+	if !strings.Contains(labelStr, "sproot-source=git") {
+		t.Errorf("labels missing expected source; got %s", labelStr)
+	}
+}
+
 func TestPrefixWriter(t *testing.T) {
 	var buf strings.Builder
 	pw := &prefixWriter{prefix: "[test] ", w: &buf}

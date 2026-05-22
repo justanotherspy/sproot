@@ -1,0 +1,21 @@
+schema_version: 1
+identity:
+  name: sproot CI
+  email: ci@sproot.dev
+  branch: main
+  gh_username: justanotherspy
+
+targets:
+  base:
+    phases:
+      - type: cmd
+        name: base-echo
+        run: echo 'base target: ok'
+        check: "true"
+  web:
+    extends: base
+    phases:
+      - type: cmd
+        name: web-echo
+        run: echo 'web target: ok'
+        check: "true"
