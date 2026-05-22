@@ -94,6 +94,12 @@ sproot new my-sprite --local-config ~/my-sprite-config
 
 sproot uploads the directory to the sprite and runs setup without a git clone.
 
+## Examples
+
+The [`examples/`](examples/) directory holds complete, ready-to-adapt configs.
+
+- [`examples/openclaw/`](examples/openclaw/) reimplements the [OpenClaw Sprite Builder](https://github.com/theoctopusperson/openclaw-sprite-builder) (linked from the OpenClaw deploy page on sprite.dev) as a single `sproot.yaml`: it clones the builder, runs `npm install`, drops a start script, and registers it as a sprite-env service on port 8080, replacing the hand-run `setup.sh`.
+
 ## Host config
 
 ```
