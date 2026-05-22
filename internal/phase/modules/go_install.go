@@ -59,12 +59,18 @@ func (p *goInstallPhase) ShouldRun(_ *phase.Context) (bool, error) {
 }
 
 func (p *goInstallPhase) Run(ctx *phase.Context) error {
+	// Install into ~/.local/bin (on the default PATH) rather than the default
+	// GOPATH/bin, which is not on PATH inside a sprite.
+	bin, err := userLocalBin()
+	if err != nil {
+		return fmt.Errorf("go_install: %w", err)
+	}
 	for _, t := range p.cfg.Tools {
 		ver := t.Version
 		if ver == "" {
 			ver = "latest"
 		}
-		if err := runCmd(ctx.Log, "go", "install", t.Pkg+"@"+ver); err != nil {
+		if err := runCmdEnv([]string{"GOBIN=" + bin}, ctx.Log, "go", "install", t.Pkg+"@"+ver); err != nil {
 			return err
 		}
 	}

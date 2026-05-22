@@ -37,7 +37,14 @@ func (p *corepackPhase) ShouldRun(_ *phase.Context) (bool, error) {
 }
 
 func (p *corepackPhase) Run(ctx *phase.Context) error {
-	if err := runCmd(ctx.Log, "corepack", "enable"); err != nil {
+	// Install the manager shims into ~/.local/bin (on the default PATH). By
+	// default corepack writes them next to the active node binary, which is not
+	// on PATH inside a sprite.
+	bin, err := userLocalBin()
+	if err != nil {
+		return fmt.Errorf("corepack: %w", err)
+	}
+	if err := runCmd(ctx.Log, "corepack", "enable", "--install-directory", bin); err != nil {
 		return err
 	}
 	for _, mgr := range p.cfg.Managers {
