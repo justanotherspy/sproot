@@ -1,375 +1,412 @@
-# sproot doc and code review findings
+# sproot doc and code review findings (round 2)
 
-Handoff document for Claude Code. The reviewer (an external Claude session) went through `docs/modules.md`, `README.md`, `CLAUDE.md`, and cross-checked them against the code in `internal/`, `cmd/`, and the testdata.
+Handoff document for Claude Code. A fresh review of the sproot repo on main, cross-checking `docs/`, `plans/`, `README.md`, `CLAUDE.md`, `MIGRATION.md`, and the code in `internal/`, `cmd/`, and the testdata against each other.
 
-Findings are grouped by severity. Questions for the human are flagged with `OPEN QUESTION` and must be answered before acting on items that depend on them.
+The previous findings handoff (`plans/findings.md`) is fully superseded; every item there was resolved in Phase 8 or Phase 9. The items below are new.
+
+Findings are grouped by severity. Open questions for the human are flagged with `OPEN QUESTION`.
 
 Project convention reminder: no emdashes anywhere. Use parens or commas.
 
 ---
 
-## 1. CRITICAL: `docs/modules.md` YAML examples are wrong for all 17 modules
+## 1. CRITICAL: `sproot push` silently drops env block and `GH_TOKEN` forwarding
 
 ### Problem
 
-Every module example in `docs/modules.md` shows a nested structure with the type name as a sub-key:
+Compare the env handling in the two code paths that run `sproot setup` inside a sprite.
 
-```yaml
-- type: apt
-  apt:
-    packages:
-      - git
-```
-
-The actual code does not parse this. `PhaseConfig.UnmarshalYAML` in `internal/config/schema.go` decodes the whole phase node directly into the concrete config struct:
+`internal/host/new.go` (in `RunNew`):
 
 ```go
-case "apt":
-    p.Apt = &AptConfig{}
-    return value.Decode(p.Apt)   // decodes the whole node into AptConfig
+var env []string
+if ghToken != "" {
+    env = []string{"GH_TOKEN=" + ghToken}
+}
+env = append(env, envBlock...)
+if err := handle.RunCommand("sproot", args, env, os.Stdout, os.Stderr); err != nil {
+    return err
+}
 ```
 
-So the real shape is flat:
+`internal/host/push.go` (in `pushOne`):
 
-```yaml
-- type: apt
-  packages: [shellcheck, jq]
+```go
+if err := handle.RunCommand("sproot", args, nil, stdout, stderr); err != nil {
+    return err
+}
 ```
+
+`push.go` passes `nil` for env. Consequences:
+
+- The host config `gh_token_env` (implemented in Phase 8 Q1) is forwarded by `sproot new` but ignored by `sproot push`.
+- The `env:` block in `sproot.yaml` is resolved by `currentConfigSHA` (which calls `readEnvBlock` and gets back the env slice) but then thrown away in `pushOne`. The slice never reaches `RunCommand`.
+- `Required: true` env vars are still enforced (because `readEnvBlock` fails fast) but the resolved values do not propagate.
+- Any user-defined env vars (e.g. `DATABASE_URL`, `STRIPE_KEY`) do not reach phases on push.
+- `ssh_setup` and `gh_token` running under `--force` (push always sets --force) will not have `GH_TOKEN` available. Both currently degrade gracefully (warning instead of error), so push does not crash, but key registration is silently skipped and `gh auth login` is bypassed.
 
 ### Cross-check
 
-Flat form is used by every other source in the repo:
-- `README.md` examples
-- `internal/config/testdata/sproot.yaml`
-- `testdata/integration/sproot.yaml`
-- `plans/sproot.md` examples
-- Doc comments inside every module `.go` file (e.g. `internal/phase/modules/apt.go`)
-
-A user following `modules.md` will get either empty configs (the nested sub-key has no matching field, so values stay at zero values) or validation errors like `phases[0] (rc_block): src is required`.
+- `internal/host/new_test.go` has `TestRunNew_EnvBlockForwarded` and `TestRunNew_InjectsBinaryAndForwardsGHToken`. Both confirm new.go forwards env correctly.
+- `internal/host/push_test.go` has no equivalent test. There is no assertion about `handle.lastCmdEnv` anywhere in push tests.
+- Reading `pushOne` end to end confirms no env slice is built.
 
 ### Action
 
-Rewrite every YAML block in `docs/modules.md` to drop the nested key. Use the flat form already in `internal/config/testdata/sproot.yaml` as the source of truth.
-
-Affected modules (all 17): `apt`, `uv_tool`, `go_install`, `cargo_install`, `binary_release`, `corepack`, `rust_components`, `docker`, `sprite_service`, `git_identity`, `ssh_setup`, `gh_token`, `file_template`, `rc_block`, `repo_clone`, `claude_settings`, `cmd`.
-
-The `env` block at the top is already shown in flat form correctly; only the per-phase examples need the fix.
+1. Plumb the env slice through `pushOne`. `RunPush` already needs `readEnvBlock` output for the SHA, so capture both halves:
+   - Change `shaFn` signature (or add a sibling) so it returns the env slice alongside SHA and meta.
+   - Or, more cleanly, give `pushOne` access to the host config (`cfg`) and the parsed `sprootCfg`, and let it build the env slice the same way `new.go` does.
+2. The simpler refactor: extract the env-building from `new.go` into a helper (e.g. `buildSpriteEnv(ghToken string, envBlock []string) []string`) and call it from both places. Note `new.go` resolves `ghToken` from `cfg.GHTokenEnv`; `push.go` already has `cfg` in scope.
+3. Add `TestRunPush_ForwardsEnvBlock` and `TestRunPush_ForwardsGHToken` mirroring the new.go tests.
+4. Run the `push-and-outdated` integration job locally with an `env:` block in the test config to confirm.
 
 ---
 
-## 2. `docs/modules.md`: `file_template` `template: true` field does not exist
+## 2. `deleteGHKey` uses `http.DefaultClient` with no timeout
 
 ### Problem
 
-The docs claim:
-
-> - `template`: optional; if true, executes `src` as a Go template with `ctx.Identity` as data
-
-`FileTemplateConfig` (`internal/config/schema.go`) has no `Template` field. `render()` in `internal/phase/modules/file_template.go` always attempts `text/template.Parse` and falls back to a literal copy if parsing fails:
+`internal/host/destroy.go`:
 
 ```go
-tmpl, err := template.New("").Parse(string(raw))
-if err != nil {
-    // Not a template or parse error; treat file as literal.
-    return raw, nil
+resp, err := http.DefaultClient.Do(req)
+```
+
+Same hazard finding 9d fixed in `binary_release.go`. If GitHub's API hangs, `sproot destroy` hangs indefinitely. Users hitting an outage cannot Ctrl+C cleanly because there is no context wired through either.
+
+The same pattern is present in `internal/phase/modules/ssh_setup.go` `postGHKey`:
+
+```go
+resp, err := http.DefaultClient.Do(req)
+```
+
+Both should use a bounded client.
+
+### Action
+
+Add a package-level client to each file with a sane timeout (30 seconds is consistent with `tagClient` in `binary_release.go`):
+
+```go
+var ghAPIClient = &http.Client{Timeout: 30 * time.Second}
+```
+
+Then replace `http.DefaultClient.Do(req)` with `ghAPIClient.Do(req)` in both `destroy.go` (`deleteGHKey`) and `ssh_setup.go` (`postGHKey`).
+
+Optional follow-up: thread `context.Context` through phase.Context so callers can cancel in-flight network operations. Lower priority.
+
+---
+
+## 3. Duplicate "sproot" label constant
+
+### Problem
+
+Two constants hold the same string value in the same package:
+
+- `internal/host/new.go`: `const sprootLabel = "sproot"`
+- `internal/host/labels.go`: `labelBase = "sproot"` (inside the const block with the other `labelTarget`, `labelSource`, etc.)
+
+Usage is split inconsistently:
+- `new.go`, `list.go`, `push.go`, `outdated.go` all use `sprootLabel` in `hasLabel(e.Labels, sprootLabel)`.
+- `labels.go` uses `labelBase` only inside `ConfigMeta.Labels()`.
+- `labels_test.go` uses `labelBase`.
+
+### Action
+
+Consolidate to one constant. `labelBase` is the more consistent name with `labelTarget`/`labelSource`/`labelRepo`/`labelRef`/`labelSHA`. Remove `sprootLabel` and update the four files that reference it.
+
+(Trivial mechanical change; safe to bundle with another PR.)
+
+---
+
+## 4. `ConfigSHA` formats full 64-char hex then slices
+
+### Problem
+
+`internal/host/labels.go`:
+
+```go
+func ConfigSHA(data []byte) string {
+    h := sha256.Sum256(data)
+    return fmt.Sprintf("%x", h[:])[:12]
 }
 ```
 
-This means a literal file containing `{{ .GitUserName }}` (unintentional) will be substituted; a literal file containing `{{` that does not parse will silently fall through to literal.
+This formats the entire 64-char hex string then keeps the first 12 chars. Not broken, just wasteful in a function called by `currentConfigSHA` on every `outdated` and `push`.
 
-### `OPEN QUESTION` for user
-
-Pick one:
-
-1. **Document the actual behavior:** templating is always attempted, fallback to literal on parse error, no flag needed. Lower effort. Mildly fragile (the silent substitution risk above).
-2. **Add a real `Template bool` field** to `FileTemplateConfig`, gate the template parse on it, and have the docs match. Safer default behavior. Recommended.
-
-### Action (after question is answered)
-
-- If option 1: edit `docs/modules.md` `file_template` section to remove the `template:` field and describe the actual auto-detect behavior including caveats.
-- If option 2: add `Template bool \`yaml:"template"\`` to `FileTemplateConfig`. Update `render()` to only call `template.Parse` when `p.cfg.Template` is true. Update or add tests in `internal/phase/modules/file_template_test.go`. Leave docs as-is.
-
----
-
-## 3. The `env` block is documented but not implemented
-
-### Problem
-
-`docs/modules.md` describes an `env block (top-level)` that "declares host environment variables to forward into the sprite before `sproot setup` runs". Schema, parsing, and validation exist for it (`EnvVar` struct in `internal/config/schema.go`, validation in `internal/config/validate.go`).
-
-But:
-
-- `internal/host/new.go` only ever forwards `GH_TOKEN` from `cfg.GHTokenEnv`. It does not read the `env` block.
-- The host never loads `sproot.yaml` at all; only the sprite does, after cloning the config repo.
-- `Required: true` is never enforced anywhere.
-- Nothing in the codebase reads the parsed `EnvVar` values.
-
-So the `env` block is declarative-only: it parses, it validates, and then nothing happens with it. `gh_token_env` in `~/.sproot/config` does the actual `GH_TOKEN` forwarding.
-
-The docs also lean on this in two other places:
-- `ssh_setup` says: "Registers the public key with GitHub ... using `GH_TOKEN` (set via the `env` block)"
-- `gh_token` says: "Reads `GH_TOKEN` from the environment (injected via the `env` block in `sproot.yaml`)"
-
-Both are wrong; `GH_TOKEN` arrives via `gh_token_env` on the host config.
-
-### `OPEN QUESTION` for user
-
-Pick one:
-
-1. **Implement it.** `RunNew` shallow-clones the config repo on the host (or has the user provide a path), reads `sproot.yaml`, resolves each `from` env var via `os.Getenv`, fails fast when `required: true` and unset, builds the env slice for the sprite command. Most flexible, biggest change.
-2. **Drop it.** Remove `EnvVar`, the `Env` field on `SprootConfig`, the validation cases, the test data, and the docs section. The `gh_token_env` host config field already covers the common case.
-3. **Document as future / not yet wired.** Leave parsing in place, mark it as planned, add a TODO in `schema.go`. Note in `docs/modules.md` that the block currently parses but does nothing. Least satisfying.
-
-### Action (after question is answered)
-
-If option 1, also update the `ssh_setup` and `gh_token` doc sections to reference the env block accurately. If option 2 or 3, update both of those sections to say `GH_TOKEN` is forwarded via `gh_token_env` in `~/.sproot/config`.
-
----
-
-## 4. `docs/modules.md`: `cmd` module `name` field does not exist
-
-### Problem
-
-The docs show:
-
-```yaml
-- type: cmd
-  cmd:
-    run: "..."
-    check: "..."
-    name: "Install mytool"
-```
-
-(That nested form is also wrong per finding 1.)
-
-`CmdConfig` has no `Name` field. `cmdPhase.Name()` returns the literal string `"cmd"` regardless of config.
-
-### `OPEN QUESTION` for user
-
-Pick one:
-
-1. **Add the field.** `Name string \`yaml:"name"\`` on `CmdConfig`. `cmdPhase.Name()` returns `fmt.Sprintf("cmd(%s)", p.cfg.Name)` when set, else `"cmd"`. Matches the disambiguator pattern used by `binary_release(cosign)` and `file_template(<dest>)`.
-2. **Drop from docs.**
-
-### Action (after question is answered)
-
-If option 1: schema change, update `cmdPhase.Name()`, add a test case. Docs already mention the field (after fix in finding 1).
-If option 2: remove `name:` from the cmd example and the field list in `docs/modules.md`.
-
----
-
-## 5. README.md issues
-
-### 5a. Commands table is wrong and incomplete
-
-Current row:
-
-| `sproot config validate` | host | Validate host config and sproot.yaml |
-
-This is wrong. `sproot config validate` (see `cmd/sproot/config.go`) only validates `~/.sproot/config`. There is a separate top-level `sproot validate [--path PATH]` command (see `cmd/sproot/validate.go`) that validates `sproot.yaml`. CI uses this one (`ci.yml` validate job).
-
-**Action:**
-
-- Fix description: `sproot config validate` -> "Validate `~/.sproot/config`".
-- Add a row: `sproot validate [--path PATH]` (host) "Validate a sproot.yaml file. Defaults to `config_path` from `~/.sproot/config`, or `sproot.yaml` in cwd."
-
-### 5b. "How it works" step 2 is misleading
-
-Current:
-
-> Resolves tokens from your environment (`FLY_API_TOKEN`, `GITHUB_TOKEN`, etc.)
-
-These env var names are not hardcoded. They are whatever the user puts in `token_env` and `gh_token_env`. The skeleton from `RunConfigInit` defaults to `SPRITES_TOKEN`, not `FLY_API_TOKEN`.
-
-**Action:** reword to "Resolves the API and GitHub tokens from the env vars named in `~/.sproot/config` (`token_env` and `gh_token_env`)."
-
-### 5c. Host config example missing `config_path`
-
-`HostConfig` has a `ConfigPath` field (path to the config file within the repo, defaults to `sproot.yaml`). The README example does not show it. The skeleton from `RunConfigInit` also omits it.
-
-**Action:**
-
-- Add to the README host config example:
-  ```yaml
-  config_path: ""             # optional; defaults to sproot.yaml at the repo root
-  ```
-- Optionally add the same line to `configSkeleton` in `internal/host/config.go`.
-
----
-
-## 6. CLAUDE.md issues
-
-### 6a. Phase plan table is stale
-
-Current table shows Phase 7 (Release pipeline) and Phase 8 (Docs) as not done. But:
-
-- `.goreleaser.yaml`, `.github/workflows/release.yml`, `install.sh` all exist (Phase 7 work is at least partly shipped).
-- `docs/modules.md` and `README.md` exist (Phase 8 work is shipped, though buggy per this review).
-
-Phase 6 (Convert sprite into config repo) is in a different repo so its status is not visible here.
-
-**Action:** mark Phases 7 and 8 as "partial" or "done" as appropriate. Optionally add a note: "Phase 8 doc accuracy issues are tracked in the findings handoff."
-
-### 6b. CI section undercounts jobs
-
-Current:
-
-> Two jobs run on every push: `build-and-test` and `lint`.
-
-Actual `ci.yml` has three: `build-and-test`, `validate` (runs `./sproot validate --path internal/config/testdata/sproot.yaml`), and `lint`. Plus `integration.yml` adds a build job and six matrix integration tests (only for the repo owner).
-
-**Action:** update the CI section to list all three `ci.yml` jobs and mention the integration workflow.
-
-### 6c. Directory layout is incomplete
-
-Missing `docs/` and `testdata/integration/`.
-
-**Action:** add to the directory layout block:
-
-```
-docs/                - user-facing docs (modules.md, etc.)
-testdata/integration/ - integration test config used by integration.yml
-```
-
----
-
-## 7. Code bugs
-
-These are real behaviour bugs, not just doc issues. Each can land independently of the doc fixes.
-
-### 7a. `rc_block` `ShouldRun` only checks `.bashrc`
-
-`internal/phase/modules/rc_block.go`:
+### Action
 
 ```go
-func (p *rcBlockPhase) ShouldRun(ctx *phase.Context) (bool, error) {
+return fmt.Sprintf("%x", h[:6])
+```
+
+Same output, half the work. Trivial.
+
+---
+
+## 5. `plans/sproot.md` Phase 12b is stale
+
+### Problem
+
+Phase 12b in `plans/sproot.md` claims:
+
+> Added `Upgrade`, `Checkpoint`, `ListCheckpoints`, `Restore` to `SpriteHandle` interface and `realHandle`.
+> Added `UpgradeSprite` to `SpritesClient` interface and `realClient`.
+
+Current `internal/host/client.go`:
+
+- `SpriteHandle` interface has: `WriteFile, ReadFile, RunCommand, Console, Checkpoint, ListCheckpoints, Restore, SetLabels`. No `Upgrade`.
+- `SpritesClient` interface has: `CreateSprite, GetHandle, DestroySprite, ListSprites`. No `UpgradeSprite`.
+
+Phase 15h explains why ("upgrade was changed to run `sprite upgrade` inside the sprite rather than calling the SDK VM upgrade method"), so the methods were removed when that switch happened. But Phase 12b still reads as if they exist.
+
+### Action
+
+Append a parenthetical to Phase 12b in `plans/sproot.md`:
+
+> Added `Upgrade`, `Checkpoint`, `ListCheckpoints`, `Restore` to `SpriteHandle` interface and `realHandle`. (Note: `Upgrade` was later removed in Phase 15h when `sproot upgrade` switched to running `sprite upgrade` inside the sprite.)
+> Added `UpgradeSprite` to `SpritesClient` interface and `realClient`. (Note: also removed in Phase 15h, see above.)
+
+---
+
+## 6. README `sproot push` row missing `--only` flag
+
+### Problem
+
+`cmd/sproot/push.go`:
+
+```go
+cmd.Flags().StringVar(&opts.Only, "only", "", "pass --only to sproot setup (run only the named phase type)")
+```
+
+README commands table for push:
+
+| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint, `--skip-verify` to skip end-of-run checks) |
+
+Missing: `--only <type>`. CI uses it (`--only cmd` in the `push-and-outdated` job in `.github/workflows/integration.yml`).
+
+### Action
+
+Update the push row to mention `--only`:
+
+> ... (`--name` for one, `--target` to select a target, `--only <type>` to run a single phase type, `--no-checkpoint` to skip pre-push checkpoint, `--skip-verify` to skip end-of-run checks)
+
+---
+
+## 7. `currentConfigSHA` re-clones the git repo on every call
+
+### Problem
+
+`internal/host/push.go`:
+
+```go
+func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta, error) {
     ...
-    bashrc := filepath.Join(home, ".bashrc")
-    existing, err := os.ReadFile(bashrc)
-    if err != nil {
-        return true, nil
-    }
-    wantHash := blockHash(src)
-    return extractBlockHash(string(existing)) != wantHash, nil
+    // Git source: readEnvBlock clones into its own temp dir and returns the SHA.
+    l.Debugf("cloning config repo to compute current SHA")
+    _, _, sha, err := readEnvBlock(cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, l)
+    ...
 }
 ```
 
-`Run` writes both `.bashrc` and `.zshrc`. `Verify` checks both. So if `.bashrc` has the correct block but `.zshrc` is missing or stale (a user wiped it between runs), `ShouldRun` returns false, `Run` is skipped, then `Verify` fails on `.zshrc`.
+Called by `sproot outdated` and `sproot push`. `outdated` is the kind of command users may run frequently (in scripts, in a watch loop). Each call does `git clone --depth 1` into a fresh temp dir, reads one yaml file, then deletes the dir.
 
-**Action:** iterate `.bashrc` and `.zshrc` in `ShouldRun`. Return true if either is missing or has the wrong hash. Add a test for the case where only one file is stale.
+### Action
 
-### 7b. `rc_block` trailing newline not guaranteed
+Low priority, two reasonable options:
 
-`applyRCBlock` formats the block as:
+1. Cache the SHA + timestamp in `~/.cache/sproot/sha-cache.json` and reuse for some short interval (e.g. 60 seconds, controlled by a `--no-cache` flag).
+2. Use `git ls-remote` to get the HEAD commit SHA cheaply; only clone when it differs from a cached commit -> file-SHA mapping.
+
+Neither is urgent since clones are fast. Worth a TODO comment in `currentConfigSHA` so a future maintainer notices.
+
+### `OPEN QUESTION` for user
+
+Is this performance concern worth addressing now, or defer? Defer is the safe answer unless users have complained.
+
+---
+
+## 8. `RunNew` clones the git config repo twice end-to-end
+
+### Problem
+
+For git config sources, `sproot new` clones twice:
+
+1. Host-side clone in `readEnvBlock` (just to resolve env vars and compute SHA).
+2. In-sprite clone in `RunSetup` (the real one, runs every phase).
+
+The in-sprite clone is unavoidable (the sprite needs the files). The host clone could be avoided in the common case where the `env:` block is empty.
+
+### Action
+
+Low priority. Possible approaches:
+
+1. Skip the host clone when `cfg.SprootConfigSource != "local"` AND we can know up front there is no env block. We cannot know that without reading the yaml, which requires fetching it. So this is hard to do cleanly without `git archive`.
+2. Use `git archive --remote=<url> <ref> sproot.yaml | tar -xO` to fetch only the yaml file. Some servers (notably GitHub over HTTPS) do not support `git archive --remote`. Would have to be SSH-only.
+3. Accept the double clone as the price of correctness.
+
+### `OPEN QUESTION` for user
+
+Defer this entirely? It is only relevant if `sproot new` startup time becomes a complaint.
+
+---
+
+## 9. `labels.go` `Labels()` emits empty target values
+
+### Problem
+
+`internal/host/labels.go`:
 
 ```go
-block := fmt.Sprintf("\n%s\n%s%s\n", rcBegin, src, rcEnd)
-```
-
-If `src` does not end in `\n`, the end sentinel sits on the same line as the last src line. The hash check still passes because both sides see the same body, but it is ugly.
-
-**Action:** ensure `src` ends with `\n` before composing the block. One line:
-
-```go
-if !strings.HasSuffix(src, "\n") {
-    src += "\n"
+labels := []string{
+    labelBase,
+    labelTarget + "=" + m.Target,   // "sproot-target=" when Target is empty
+    labelSource + "=" + m.Source,
+    labelSHA + "=" + m.SHA,
+}
+if m.Repo != "" {
+    labels = append(labels, labelRepo+"="+m.Repo)
+}
+if m.Ref != "" {
+    labels = append(labels, labelRef+"="+m.Ref)
 }
 ```
 
-### 7c. `binary_release`: no checksum or signature verification
+`labelTarget` is always emitted, even when `m.Target` is empty (the default-target case). The label list ends up with a `sproot-target=` entry with no value. `ParseConfigMeta` handles this fine, so no behavior bug.
 
-`internal/phase/modules/binary_release.go`. `downloadAsset` pulls the artifact and `dpkg -i` / extract / chmod-and-copy it with zero verification. sproot itself ships with cosign keyless signing, so the contrast here is sharp: every `binary_release` phase silently runs whatever GitHub serves.
+`Repo` and `Ref` are correctly omitted when empty. `Target` is inconsistent.
 
-**`OPEN QUESTION` for user:** is this lacking-checksum behavior a known tradeoff, or should it be fixed now?
+### Action
 
-**Action (if fixing):** add optional `checksum:` field (sha256 string) or `checksum_asset:` (template pointing to a `*_checksums.txt`-style file). Verify before installing. Update `BinaryReleaseConfig`, the templating in `templateAsset`, the run flow, and docs.
+Optional cleanup. Move `labelTarget` to the conditional block:
 
-### 7d. `binary_release`: unauthenticated GitHub API
+```go
+if m.Target != "" {
+    labels = append(labels, labelTarget+"="+m.Target)
+}
+```
 
-`githubLatestTag` hits `https://api.github.com/...` with no auth. The anonymous rate limit is 60 req/hour per IP.
-
-**Action:** when `os.Getenv("GH_TOKEN") != ""`, send `Authorization: Bearer $GH_TOKEN` on the request. Trivial change.
-
-### 7e. `binary_release`: no HTTP timeout or context
-
-`http.Get(url) //nolint:noctx`. Stalled connections can hang the phase indefinitely.
-
-**Action:** build an `*http.Client` with a sane timeout (e.g. 5 minutes for downloads, 30 seconds for the latest-tag lookup), or thread `context.Context` through `phase.Context` and use `http.NewRequestWithContext`. The latter is the cleaner long-term shape.
-
-### 7f. `ssh_setup` idempotency is too narrow
-
-`ShouldRun` only checks that `~/.ssh/id_ed25519` exists and `github.com` is in `known_hosts`. It does not verify that:
-
-- The key is registered with GitHub.
-- `allowed_signers` contains the entry.
-- The key IDs file at `~/.config/sproot/github_keys.json` exists.
-
-Concretely: if the local key was generated but `GH_TOKEN` was unset on a previous run (so GitHub registration was skipped with a warning), the next run with `GH_TOKEN` set will still skip the whole phase. Workaround today is `--force`.
-
-**Action:** make `ShouldRun` also return true if:
-
-- `GH_TOKEN` is set AND `~/.config/sproot/github_keys.json` does not exist (means we never registered).
-- `allowed_signers` does not contain the local public key.
-
-Optionally also fetch GitHub's reported keys and compare fingerprints, but that adds an HTTP call to every `ShouldRun`; probably not worth it.
-
-### 7g. `gh_token` doc lists scopes under the wrong module
-
-`docs/modules.md` says under `gh_token`:
-
-> **Requires:** `GH_TOKEN` set in the sprite environment via the `env` block. Required scopes: `admin:public_key`, `admin:ssh_signing_key`.
-
-Those two scopes are actually needed by `ssh_setup` (it calls the GitHub keys API). `gh_token` itself only needs whatever scopes the user wants `gh` to use (typically `repo`).
-
-**Action:** move the "Required scopes" line to the `ssh_setup` section, or duplicate it in both. While there, also fix the `env block` reference per finding 3.
-
-### 7h. Sprite `cloneOrPull` does not handle changed `config_repo` URL
-
-`internal/sprite/setup.go` does `git fetch && git checkout ref` if the dest dir exists. If the user changes `config_repo` in `~/.sproot/config`, the next setup still fetches from the OLD remote because the cloned dir's `origin` is unchanged.
-
-Edge case, probably low priority.
-
-**Action (low priority):** detect URL drift before fetching. Either re-clone or `git remote set-url origin <new>`. Or just delete the dest dir if `git remote get-url origin` differs from `opts.ConfigRepo`.
-
-### 7i. `gh_token` actual flags differ slightly from docs
-
-Docs say: `gh auth login --with-token --git-protocol ssh`.
-Code calls: `gh auth login --hostname github.com --git-protocol ssh --with-token`.
-
-Functionally equivalent. Tiny doc drift.
-
-**Action:** add `--hostname github.com` to the docs string, or describe the flags in prose without the example. Nit-level.
+Update the tests in `labels_test.go` accordingly. `TestParseConfigMeta_Empty` already expects an empty `Target`, so round-tripping still works.
 
 ---
 
-## 8. Smaller doc nits (low priority)
+## 10. `plans/findings.md` is fully superseded
 
-- `plans/sproot.md` "Host file layout" still shows `private/id_ed25519` from the abandoned host-key model. The text immediately below already describes the env-var-name model. User has flagged plans as out of date; safe to leave, but worth a note in the file or a "superseded" marker on that block.
-- `docs/modules.md` `rc_block` section shows the sentinels as `# BEGIN SPROOT MANAGED BLOCK` / `# END SPROOT MANAGED BLOCK`. This matches the code (`rcBegin` / `rcEnd` in `rc_block.go`). No action.
-- `docs/modules.md` `claude_settings` example uses `claude-haiku-4-5-20251001` as an example model. That model exists (it's current). No action.
+### Problem
 
----
+Every OPEN QUESTION (Q1 to Q5) and every code bug (7a to 7i) in `plans/findings.md` was resolved in Phase 8 or Phase 9 per `plans/sproot.md`. The file still reads as an open handoff.
 
-## 9. Open questions summary
+### Action
 
-Quick rollup of everything tagged `OPEN QUESTION`:
+Pick one:
 
-1. **`env` block:** implement, drop, or document as future? (Affects finding 3, plus the `ssh_setup` and `gh_token` doc references.)
-2. **`file_template` `template:` flag:** add an opt-in field, or document the always-attempt behavior? (Affects finding 2.)
-3. **`cmd` module `name` field:** add the field, or drop from docs? (Affects finding 4.)
-4. **`binary_release` checksum verification:** known tradeoff, or fix now? (Affects finding 7c.)
-5. **`sproot config validate` vs `sproot validate`:** keep them separate (just fix the README description, per 5a), or combine into one command that checks both files?
+1. Add a `> SUPERSEDED` header at the top of `findings.md` pointing at Phase 8 and Phase 9 in `plans/sproot.md`. Keep the file as historical record.
+2. Move it to `plans/archive/findings-2026-05.md`.
+3. Delete it (the resolutions are already captured in `plans/sproot.md` Phase 8 and Phase 9 summaries).
+
+Recommendation: option 1. Cheapest and preserves history.
 
 ---
 
-## 10. Suggested order of execution for Claude Code
+## 11. `plans/todo.md` "Planned" section has stale Phase 13 entries
 
-Once questions are answered:
+### Problem
 
-1. Quick wins, no questions blocking: 5a, 5b, 5c, 6a, 6b, 6c, 7b, 7d, 7e, 7g, 7h, 7i.
-2. Module YAML format fix (1): biggest doc impact, mechanical change.
-3. `rc_block` `ShouldRun` fix (7a) plus its test.
-4. `ssh_setup` idempotency (7f) plus tests.
-5. Whichever way the questions land: 2 (file_template), 3 (env block), 4 (cmd name), 7c (binary_release checksums).
+`plans/todo.md` `Planned (tracked in plans/sproot.md)` section lists these as planned:
 
-After all changes, run `make check` and the CI `validate` step locally.
+- `add a way to pass in a sproot.yaml file from the host instead of a git repo (Phase 13b)`
+- `have a sproot push command that pushes changes to all sproot-labeled sprites (Phase 13c)`
+- `multi-target support in sproot.yaml with extends (Phase 13a)`
+
+All three are done per `plans/sproot.md` Phase 13.
+
+Phase 14a, 14b, 14c are correctly still listed as planned.
+
+The `inter-sproot URL templating ... (Phase 13a future direction)` is also correctly still planned.
+
+### Action
+
+Remove the three done items from `plans/todo.md`. Move them to a `Done (Phase 13)` section if you want to preserve the trail, similar to the existing `Done (phases 8-12)` section.
+
+---
+
+## 12. `plans/sproot.md` "Host file layout" diagram is partial
+
+### Problem
+
+```
+~/.sproot/
+└── config           # YAML: config_repo, config_ref, token_env, gh_token_env, default_org
+```
+
+This diagram does not mention `sproot_config_source` or `sproot_config_local_path`, which were added in Phase 13b. It also still uses the prefix-less key names (`config_repo`, `config_ref`) but the actual host config now uses `sproot_config_repo`, `sproot_config_ref`, `sproot_config_path`.
+
+The parenthetical immediately below already corrects the abandoned `private/id_ed25519` model, so that part of finding 8 from the old `findings.md` is partially handled.
+
+### Action
+
+Update the inline comment to include the current key set:
+
+```
+~/.sproot/
+└── config.yaml      # sproot_config_source, sproot_config_repo, sproot_config_ref,
+                    # sproot_config_path, sproot_config_local_path, token_env,
+                    # gh_token_env, default_org
+```
+
+Or just replace the whole "Host file layout" block with a pointer to the `HostConfig` struct doc comment in `internal/config/schema.go`, which is the canonical source.
+
+---
+
+## 13. `MIGRATION.md` "Known cmd workarounds" should be enumerated in plans
+
+### Problem
+
+`MIGRATION.md` lists five concrete `cmd` workarounds tracked for upstream fixes:
+
+- `bat`/`fd` symlinks (apt module should have a `symlinks` field)
+- `uv` auto-bootstrap (uv_tool should install uv when absent)
+- garlic package/binary mismatch (uv_tool needs `pkg` field separate from binary name)
+- `binary_release` arch naming (gitleaks uses `x64`, hadolint uses `x86_64`; needs `{x64_arch}` and `{x86_64_arch}` template variables)
+- `docker` `daemon.json` (docker module should support a `daemon_json` config field)
+
+These all map to Phase 15e in `plans/sproot.md` (`update modules to better handle different cases (fewer cmd fallbacks)`), but Phase 15e is currently a one-liner. The specific items are at risk of being lost.
+
+### Action
+
+Expand Phase 15e in `plans/sproot.md` to enumerate the five items as 15e1 through 15e5, each with the specific module and field that needs to change. Cross-reference back to `MIGRATION.md`.
+
+---
+
+## 14. Suggested order of execution for Claude Code
+
+Quick wins (no questions blocking, mechanical):
+
+1. **6** (README push row gets `--only`)
+2. **5** (Phase 12b superseded note in plans/sproot.md)
+3. **3** (consolidate `sprootLabel` and `labelBase`)
+4. **4** (`ConfigSHA` formats only 6 bytes)
+5. **9** (omit empty `labelTarget`)
+6. **10** (mark findings.md superseded)
+7. **11** (prune Phase 13 entries from todo.md)
+8. **12** (refresh Host file layout in plans/sproot.md)
+9. **13** (enumerate Phase 15e items)
+
+Real fixes with tests:
+
+10. **2** (HTTP timeouts on `deleteGHKey` and `postGHKey`)
+11. **1** (push env forwarding) plus `TestRunPush_ForwardsEnvBlock` and `TestRunPush_ForwardsGHToken`
+
+Deferred unless user answers OPEN QUESTION:
+
+12. **7** (currentConfigSHA caching)
+13. **8** (avoid double clone in RunNew)
+
+After all changes:
+
+```
+make check
+./sproot validate --path internal/config/testdata/sproot.yaml
+./sproot validate --path internal/config/testdata/sproot_targets.yaml
+```
+
+Bundle the quick wins into one PR (label as docs+cleanup), put finding 1 in its own PR (it changes runtime behaviour and needs careful test coverage), put finding 2 in its own PR (cross-cuts two files in different packages).
