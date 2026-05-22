@@ -1,4 +1,4 @@
-# sproot
+# 🌱 sproot
 
 sproot bootstraps [sprite.dev](https://sprite.dev) sprites from a user-owned config repo. It replaces bash-based setup scripts with a single, versioned Go binary driven by a `sproot.yaml` file you control.
 
