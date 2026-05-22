@@ -114,6 +114,43 @@ Cross-reference: `TestRunNew_EnvBlockForwarded` and `TestRunNew_InjectsBinaryAnd
 - **17g3** `uv_tool`: add `pkg` field for cases where package name differs from binary name (e.g. garlic)
 - **17g4** `binary_release`: add `{x64_arch}` and `{x86_64_arch}` template variables (gitleaks uses `x64`, hadolint uses `x86_64`)
 - **17g5** `docker`: add `daemon_json` config field for configuring the Docker daemon
+- **17g6** `repo_clone`: add support for full git URLs with explicit `dest`. Currently only accepts `owner/repo` shorthand (clones via SSH to `<base_dir>/<repo>`). New long form: each entry may be either the existing string (`owner/repo`) or a struct `{url: "https://...", dest: "~/my-dir"}`. When `url` is used, `dest` is optional and defaults to `~/<repo-name>` (last path component of URL, minus `.git`). Custom YAML unmarshaling on `RepoCloneEntry` handles both forms. Files: `internal/config/schema.go` (new `RepoCloneEntry` union type + unmarshaling), `internal/phase/modules/repo_clone.go` (clone URL + dest resolution), `internal/phase/modules/repo_clone_test.go`, `docs/modules.md`.
+- **17g7** new `npm` module: runs `npm install` in a target directory. Config fields: `dir` (required, path expanded with `~`). Idempotency: checks `test -d <dir>/node_modules`. Files: `internal/config/schema.go` (new `NpmConfig` struct and `PhaseConfig.Npm` field), `internal/phase/modules/npm.go`, `internal/phase/modules/npm_test.go`, `docs/modules.md`, integration test entry.
+- **17g8** `sprite_service`: add `http_port` (optional int) and `needs` (optional `[]string`) fields to the service registration body. Both are omitted from the JSON when zero/nil (use `omitempty`). Files: `internal/config/schema.go` (update `SpriteServiceConfig`), `internal/phase/modules/sprite_service.go` (update body marshal), `internal/phase/modules/sprite_service_test.go`, `docs/modules.md`.
+
+**Target sproot.yaml after 17g6-8** (openclaw-builder, no `cmd` modules):
+```yaml
+phases:
+  - type: apt
+    packages:
+      - nodejs
+      - npm
+
+  - type: repo_clone
+    repos:
+      - url: https://github.com/theoctopusperson/openclaw-sprite-builder.git
+        dest: ~/openclaw-builder
+
+  - type: npm
+    dir: ~/openclaw-builder
+
+  - type: file_template
+    src: files/openclaw-start.sh
+    dest: ~/openclaw-builder/start.sh
+    mode: "0755"
+
+  - type: sprite_service
+    service: openclaw-builder
+    cmd: ~/openclaw-builder/start.sh
+    http_port: 8080
+```
+
+The `files/openclaw-start.sh` in the config repo contains:
+```bash
+#!/bin/bash
+cd ~/openclaw-builder
+exec node server.js
+```
 
 **17h.** Housekeeping: mark `plans/findings.md` as superseded (add `> SUPERSEDED` header); remove stale Phase 13 done-items from `plans/todo.md`.
 
