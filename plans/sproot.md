@@ -168,11 +168,13 @@ All three shipped and tested: `repo_clone` accepts full git URLs with explicit `
 
 ### Phase 18: Intelligence and completion — 18a + 18b DONE; 18c dropped; 18d deferred
 
-#### 18a. llm.txt and agent-context.md after setup — DONE
+#### 18a. Post-setup summary inside the sprite — DONE
 
-After `sproot setup` completes inside a sprite, it writes a summary of what ran to `/.sprite/llm.txt` and `/.sprite/docs/agent-context.md`, giving Claude Code instant context about the environment.
+After `sproot setup` completes inside a sprite, it writes a summary of what ran to `/.sprite/docs/sproot-setup.md`, giving Claude Code instant context about what sproot installed.
 
-**Implementation:** `internal/sprite/llmtxt.go` exports `renderLLMContext(state)` (pure) and `writeLLMContext(l, state, baseDir)`. It collects `DidWork=true` records and renders a timestamped markdown block from a module-description table keyed by phase `Type`. `Runner.LastState()` (added in `internal/phase/runner.go`) exposes the final state; `internal/sprite/setup.go` calls `writeLLMContext` after `runner.Run(ctx)` (non-fatal if the write fails). Unit tests in `internal/sprite/llmtxt_test.go`; an integration step in the `multi-phase` job verifies non-empty output via `sproot exec <name> cat /.sprite/llm.txt`.
+**Non-destructive by design.** The sprite platform ships its own `/.sprite/llm.txt` (environment overview, security rules, services/checkpoints API) and `/.sprite/docs/agent-context.md` (full reference incl. network policy). sproot must NOT overwrite these. Instead it writes its own `docs/sproot-setup.md` and appends an idempotent managed pointer block (delimited by `<!-- BEGIN SPROOT --> / <!-- END SPROOT -->`) to the platform `llm.txt` so agents reading the canonical entrypoint discover the summary.
+
+**Implementation:** `internal/sprite/llmtxt.go` exports `renderLLMContext(state)` (pure) and `writeLLMContext(l, state, baseDir)`. It collects `DidWork=true` records and renders a timestamped markdown block from a module-description table keyed by phase `Type`, then writes `docs/sproot-setup.md` and updates the `llm.txt` pointer block (`appendPointerBlock`, which strips any prior block first for idempotency). `Runner.LastState()` (added in `internal/phase/runner.go`) exposes the final state; `internal/sprite/setup.go` calls `writeLLMContext` after `runner.Run(ctx)` (non-fatal if the write fails; setup runs as root so it can write under `/.sprite`). Unit tests in `internal/sprite/llmtxt_test.go` (including a platform-content-preservation/idempotency test); an integration step in the `multi-phase` job verifies `/.sprite/docs/sproot-setup.md` exists and that the platform `llm.txt`/`agent-context.md` are preserved with the sproot pointer added.
 
 #### 18b. Token scope documentation — DONE
 

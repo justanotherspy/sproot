@@ -27,7 +27,7 @@ func sampleState() *phase.State {
 func TestRenderLLMContext_ListsWorkedModulesAndTally(t *testing.T) {
 	out := renderLLMContext(sampleState())
 
-	if !strings.Contains(out, "# Sprite environment") {
+	if !strings.Contains(out, "# sproot setup summary") {
 		t.Errorf("missing header in output:\n%s", out)
 	}
 	// Modules that did work should be described.
@@ -60,23 +60,58 @@ func TestRenderLLMContext_NoWork(t *testing.T) {
 	}
 }
 
-func TestWriteLLMContext_WritesBothFiles(t *testing.T) {
+func TestWriteLLMContext_WritesSummaryAndPointer(t *testing.T) {
 	dir := t.TempDir()
 	if err := writeLLMContext(log.Stderr(), sampleState(), dir); err != nil {
 		t.Fatalf("writeLLMContext: %v", err)
 	}
 
-	for _, rel := range []string{"llm.txt", filepath.Join("docs", "agent-context.md")} {
-		path := filepath.Join(dir, rel)
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatalf("read %s: %v", path, err)
+	summaryPath := filepath.Join(dir, sprootSummaryRel)
+	data, err := os.ReadFile(summaryPath)
+	if err != nil {
+		t.Fatalf("read %s: %v", summaryPath, err)
+	}
+	if !strings.Contains(string(data), "# sproot setup summary") {
+		t.Errorf("%s missing expected header", summaryPath)
+	}
+
+	llm, err := os.ReadFile(filepath.Join(dir, "llm.txt"))
+	if err != nil {
+		t.Fatalf("read llm.txt: %v", err)
+	}
+	if !strings.Contains(string(llm), pointerBegin) || !strings.Contains(string(llm), pointerEnd) {
+		t.Errorf("llm.txt missing pointer block:\n%s", llm)
+	}
+	if !strings.Contains(string(llm), summaryPath) {
+		t.Errorf("llm.txt pointer does not reference summary path:\n%s", llm)
+	}
+}
+
+// TestWriteLLMContext_PreservesPlatformContent ensures sproot appends to an
+// existing platform llm.txt rather than overwriting it, and is idempotent
+// across re-runs (no duplicate blocks).
+func TestWriteLLMContext_PreservesPlatformContent(t *testing.T) {
+	dir := t.TempDir()
+	platform := "# Sprite Environment\n\nplatform-provided guidance\n"
+	if err := os.WriteFile(filepath.Join(dir, "llm.txt"), []byte(platform), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	for i := 0; i < 2; i++ {
+		if err := writeLLMContext(log.Stderr(), sampleState(), dir); err != nil {
+			t.Fatalf("writeLLMContext run %d: %v", i, err)
 		}
-		if len(data) == 0 {
-			t.Errorf("%s is empty", path)
-		}
-		if !strings.Contains(string(data), "# Sprite environment") {
-			t.Errorf("%s missing expected header", path)
-		}
+	}
+
+	llm, err := os.ReadFile(filepath.Join(dir, "llm.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(llm)
+	if !strings.Contains(s, "platform-provided guidance") {
+		t.Errorf("platform content was clobbered:\n%s", s)
+	}
+	if n := strings.Count(s, pointerBegin); n != 1 {
+		t.Errorf("expected exactly one pointer block after re-run, got %d:\n%s", n, s)
 	}
 }

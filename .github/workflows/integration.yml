@@ -328,8 +328,13 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot exec "spr-multi-${RUN_ID}-${RUN_ATTEMPT}" cat /.sprite/llm.txt | tee /dev/stderr | grep "Sprite environment"
-          ./sproot exec "spr-multi-${RUN_ID}-${RUN_ATTEMPT}" cat /.sprite/docs/agent-context.md | grep "Sprite environment"
+          NAME="spr-multi-${RUN_ID}-${RUN_ATTEMPT}"
+          # sproot writes its own summary and must not clobber platform docs.
+          ./sproot exec "$NAME" cat /.sprite/docs/sproot-setup.md | tee /dev/stderr | grep "sproot setup summary"
+          # The platform's llm.txt is preserved and carries a sproot pointer block.
+          ./sproot exec "$NAME" cat /.sprite/llm.txt | tee /dev/stderr | grep "BEGIN SPROOT"
+          ./sproot exec "$NAME" cat /.sprite/llm.txt | grep "Sprite Environment"
+          ./sproot exec "$NAME" cat /.sprite/docs/agent-context.md | grep "Sprite Environment"
 
       - name: destroy sprite
         if: always()
