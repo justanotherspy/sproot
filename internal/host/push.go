@@ -95,6 +95,17 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 	}
 	results := make([]result, len(targets))
 
+	// Resolve the setup config from the host config (always available, independent of
+	// SHA computation). setupLocalDir is non-empty only when config_source=local.
+	var setupLocalDir string
+	if cfg.ConfigSource == "local" {
+		expanded, err := config.ExpandTilde(cfg.ConfigLocalPath)
+		if err != nil {
+			return fmt.Errorf("expand local config path: %w", err)
+		}
+		setupLocalDir = expanded
+	}
+
 	var wg sync.WaitGroup
 	for i, entry := range targets {
 		wg.Add(1)
@@ -102,7 +113,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, cfg.ConfigPath, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.ConfigRepo, cfg.ConfigRef, cfg.ConfigPath, l),
 			}
 		}(i, entry)
 	}
@@ -125,7 +136,11 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 
 // pushOne runs setup on a single sprite, optionally checkpointing first,
 // then updates the sprite's metadata labels.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, base ConfigMeta, configPath string, l *log.Logger) error {
+//
+// setupLocalDir, setupRepo, setupRef, configPath are sourced from the host config
+// (always available). labelMeta is sourced from shaFn (may be zero value when SHA
+// computation failed); it is used only for label updates, not for setup args.
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath string, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -136,21 +151,17 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	}
 
 	args := []string{"setup", "--force"}
-	// Pass the config source so the in-sprite setup command knows where to fetch config.
-	if base.Source == "local" && base.Repo != "" {
-		// For local config, upload the host directory to the sprite before running setup,
-		// then point setup at the in-sprite copy (the host path is unreachable inside the sprite).
+	if setupLocalDir != "" {
+		// For local config: upload host directory to the sprite, then point setup at
+		// the in-sprite copy. The host path is not reachable from inside the sprite.
 		const spriteLocalConfigDir = "/tmp/sproot-local-config"
-		l.Infof("[%s] uploading local config from %s", name, base.Repo)
-		if err := uploadDirectory(handle, base.Repo, spriteLocalConfigDir); err != nil {
+		l.Infof("[%s] uploading local config from %s", name, setupLocalDir)
+		if err := uploadDirectory(handle, setupLocalDir, spriteLocalConfigDir); err != nil {
 			return fmt.Errorf("[%s] upload local config: %w", name, err)
 		}
 		args = append(args, "--local-config", spriteLocalConfigDir)
-	} else if base.Repo != "" {
-		args = append(args, "--config-repo", base.Repo)
-		if base.Ref != "" {
-			args = append(args, "--ref", base.Ref)
-		}
+	} else {
+		args = append(args, "--config-repo", setupRepo, "--ref", setupRef)
 	}
 	if configPath != "" {
 		args = append(args, "--config-path", configPath)
@@ -171,9 +182,9 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	if !opts.DryRun && sha != "" {
 		meta := ConfigMeta{
 			Target: opts.Target,
-			Source: base.Source,
-			Repo:   base.Repo,
-			Ref:    base.Ref,
+			Source: labelMeta.Source,
+			Repo:   labelMeta.Repo,
+			Ref:    labelMeta.Ref,
 			SHA:    sha,
 		}
 		if err := handle.SetLabels(ctx, meta.Labels()); err != nil {

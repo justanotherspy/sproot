@@ -10,12 +10,12 @@ targets:
     phases:
       - type: cmd
         name: base-echo
-        run: echo 'base target: ok'
+        run: "echo 'base target ok'"
         check: "true"
   web:
     extends: base
     phases:
       - type: cmd
         name: web-echo
-        run: echo 'web target: ok'
+        run: "echo 'web target ok'"
         check: "true"
