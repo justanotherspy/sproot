@@ -1,9 +1,12 @@
 package host
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	sprites "github.com/superfly/sprites-go"
@@ -412,7 +415,8 @@ token_env: MY_TOKEN
 
 func TestPrefixWriter(t *testing.T) {
 	var buf strings.Builder
-	pw := &prefixWriter{prefix: "[test] ", w: &buf}
+	var mu sync.Mutex
+	pw := &prefixWriter{prefix: "[test] ", w: &buf, mu: &mu}
 
 	_, _ = pw.Write([]byte("hello\nworld\n"))
 	got := buf.String()
@@ -424,7 +428,8 @@ func TestPrefixWriter(t *testing.T) {
 
 func TestPrefixWriter_PartialLine(t *testing.T) {
 	var buf strings.Builder
-	pw := &prefixWriter{prefix: "[x] ", w: &buf}
+	var mu sync.Mutex
+	pw := &prefixWriter{prefix: "[x] ", w: &buf, mu: &mu}
 
 	_, _ = pw.Write([]byte("hel"))
 	_, _ = pw.Write([]byte("lo\n"))
@@ -432,5 +437,40 @@ func TestPrefixWriter_PartialLine(t *testing.T) {
 	want := "[x] hello\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
+	}
+}
+
+// TestPrefixWriter_ConcurrentNoInterleave verifies that prefixWriters sharing a
+// mutex never split a line across prefixes when writing concurrently. Run with
+// -race to also catch data races on the shared output.
+func TestPrefixWriter_ConcurrentNoInterleave(t *testing.T) {
+	var buf bytes.Buffer
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	prefixes := []string{"[a] ", "[b] ", "[c] "}
+	const linesPer = 200
+	for _, p := range prefixes {
+		wg.Add(1)
+		go func(prefix string) {
+			defer wg.Done()
+			pw := &prefixWriter{prefix: prefix, w: &buf, mu: &mu}
+			for i := 0; i < linesPer; i++ {
+				_, _ = pw.Write([]byte("payload\n"))
+			}
+		}(p)
+	}
+	wg.Wait()
+
+	scanner := bufio.NewScanner(bytes.NewReader(buf.Bytes()))
+	count := 0
+	for scanner.Scan() {
+		line := scanner.Text()
+		if line != "[a] payload" && line != "[b] payload" && line != "[c] payload" {
+			t.Fatalf("interleaved/garbled line: %q", line)
+		}
+		count++
+	}
+	if want := len(prefixes) * linesPer; count != want {
+		t.Errorf("got %d lines, want %d", count, want)
 	}
 }

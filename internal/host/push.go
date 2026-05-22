@@ -142,6 +142,9 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 		}
 	}
 
+	// outMu serializes writes to the shared stdout/stderr so output from sprites
+	// updated in parallel is not interleaved mid-line.
+	var outMu sync.Mutex
 	var wg sync.WaitGroup
 	for i, entry := range targets {
 		wg.Add(1)
@@ -149,7 +152,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 			defer wg.Done()
 			results[idx] = result{
 				name: e.Name,
-				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, cfg.SprootConfigSource, ghToken, envBlock, l),
+				err:  pushOne(ctx, client, e.Name, opts, currentSHA, baseMeta, setupLocalDir, cfg.SprootConfigRepo, cfg.SprootConfigRef, cfg.SprootConfigPath, cfg.SprootConfigSource, ghToken, envBlock, &outMu, l),
 			}
 		}(i, entry)
 	}
@@ -177,7 +180,7 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 // the host config (always available). labelMeta is sourced from shaFn (may be
 // zero value when SHA computation failed); it is used only for label updates,
 // not for setup args.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource, ghToken string, envBlock []string, l *log.Logger) error {
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource, ghToken string, envBlock []string, outMu *sync.Mutex, l *log.Logger) error {
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -221,8 +224,8 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	}
 	l.Debugf("[%s] in-sprite setup args: %v", name, args)
 
-	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout}
-	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr}
+	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout, mu: outMu}
+	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr, mu: outMu}
 	if err := handle.RunCommand("sproot", args, buildSpriteEnv(ghToken, envBlock), stdout, stderr); err != nil {
 		return err
 	}
@@ -278,9 +281,12 @@ func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta
 }
 
 // prefixWriter wraps an io.Writer and prepends a prefix to each line of output.
+// mu is shared across all prefixWriters in a single RunPush so that lines from
+// sprites updated in parallel are not interleaved on the shared output stream.
 type prefixWriter struct {
 	prefix  string
 	w       io.Writer
+	mu      *sync.Mutex
 	partial []byte
 }
 
@@ -295,7 +301,10 @@ func (pw *prefixWriter) Write(p []byte) (int, error) {
 			return total, nil
 		}
 		line := buf[:idx+1]
-		if _, err := fmt.Fprintf(pw.w, "%s%s", pw.prefix, line); err != nil {
+		pw.mu.Lock()
+		_, err := fmt.Fprintf(pw.w, "%s%s", pw.prefix, line)
+		pw.mu.Unlock()
+		if err != nil {
 			return 0, err
 		}
 		buf = buf[idx+1:]
