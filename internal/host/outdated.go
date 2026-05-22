@@ -3,11 +3,22 @@ package host
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
+	"github.com/justanotherspy/sproot/pkg/table"
+	"github.com/justanotherspy/sproot/pkg/tty"
 )
+
+// outdatedRow is one sprite's freshness compared to the current config SHA.
+type outdatedRow struct {
+	Name   string
+	Target string
+	SHA    string
+	Status string
+}
 
 // OutdatedOptions controls the behavior of RunOutdated.
 type OutdatedOptions struct {
@@ -59,7 +70,7 @@ func RunOutdated(ctx context.Context, opts OutdatedOptions) error {
 		return fmt.Errorf("list sprites: %w", err)
 	}
 
-	var shown int
+	var rows []outdatedRow
 	for _, e := range all {
 		if !hasLabel(e.Labels, labelBase) {
 			continue
@@ -75,12 +86,57 @@ func RunOutdated(ctx context.Context, opts OutdatedOptions) error {
 		if target == "" {
 			target = "(default)"
 		}
-		_, _ = fmt.Fprintf(os.Stdout, "%-30s %-12s %-14s %s\n", e.Name, target, meta.SHA, status)
-		shown++
+		rows = append(rows, outdatedRow{Name: e.Name, Target: target, SHA: meta.SHA, Status: status})
 	}
 
-	if shown == 0 {
+	if len(rows) == 0 {
 		l.Info("no sproot-managed sprites found")
+		return nil
 	}
+
+	renderOutdated(os.Stdout, rows, tty.IsColor(os.Stdout), tty.Width(os.Stdout))
 	return nil
+}
+
+// renderOutdated writes the freshness table to w, drawing a colored box on a
+// terminal and falling back to tab-separated rows when piped.
+func renderOutdated(w io.Writer, rows []outdatedRow, color bool, width int) {
+	if !color {
+		for _, r := range rows {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", r.Name, r.Target, r.SHA, r.Status)
+		}
+		return
+	}
+
+	t := table.Table{
+		Columns: []table.Column{
+			{Header: "NAME", Align: table.AlignLeft},
+			{Header: "TARGET", Align: table.AlignLeft},
+			{Header: "SHA", Align: table.AlignLeft},
+			{Header: "STATUS", Align: table.AlignLeft},
+		},
+		Flex:  0, // NAME absorbs slack to fill the terminal width
+		Width: width,
+		Color: true,
+	}
+	for _, r := range rows {
+		t.Rows = append(t.Rows, []table.Cell{
+			{Text: r.Name},
+			{Text: r.Target},
+			{Text: r.SHA},
+			{Text: r.Status, Style: outdatedStyle(r.Status)},
+		})
+	}
+	_ = t.Render(w)
+}
+
+func outdatedStyle(status string) table.Style {
+	switch status {
+	case "current":
+		return table.StyleGreen
+	case "stale":
+		return table.StyleYellow
+	default:
+		return table.StyleRed
+	}
 }

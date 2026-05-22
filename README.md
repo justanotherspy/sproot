@@ -153,6 +153,8 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
+Tabular commands (`list`, `status`, `checkpoints`, `outdated`) render a colored, terminal-fitted box table on an interactive terminal and fall back to plain tab-separated rows when piped, redirected, or when `NO_COLOR` is set. Log messages color their `+`/`!`/`x` symbols under the same rules.
+
 ## Skills (Claude plugin)
 
 This repo doubles as a Claude Code plugin marketplace. The `sproot` plugin (under `plugins/`)

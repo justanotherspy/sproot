@@ -3,11 +3,13 @@ package host
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
-	"text/tabwriter"
 
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
+	"github.com/justanotherspy/sproot/pkg/table"
+	"github.com/justanotherspy/sproot/pkg/tty"
 )
 
 // CheckpointOptions controls the behavior of RunCheckpoint.
@@ -60,21 +62,46 @@ func RunCheckpoints(ctx context.Context, opts CheckpointsOptions) error {
 		_, err = fmt.Fprintln(os.Stdout, "no checkpoints found")
 		return err
 	}
-	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ID\tCREATED\tCOMMENT")
-	for _, e := range entries {
-		auto := ""
-		if e.IsAuto {
-			auto = " (auto)"
+	renderCheckpoints(os.Stdout, entries, tty.IsColor(os.Stdout), tty.Width(os.Stdout))
+	return nil
+}
+
+// renderCheckpoints writes the checkpoint list to w, drawing a colored box on a
+// terminal and falling back to tab-separated rows when piped.
+func renderCheckpoints(w io.Writer, entries []CheckpointEntry, color bool, width int) {
+	if !color {
+		for _, e := range entries {
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s%s\n",
+				e.ID, e.CreateTime.Format("2006-01-02 15:04:05"), e.Comment, autoSuffix(e))
 		}
-		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s%s\n",
-			e.ID,
-			e.CreateTime.Format("2006-01-02 15:04:05"),
-			e.Comment,
-			auto,
-		)
+		return
 	}
-	return tw.Flush()
+
+	t := table.Table{
+		Columns: []table.Column{
+			{Header: "ID", Align: table.AlignLeft},
+			{Header: "CREATED", Align: table.AlignLeft},
+			{Header: "COMMENT", Align: table.AlignLeft},
+		},
+		Flex:  2, // COMMENT absorbs slack to fill the terminal width
+		Width: width,
+		Color: true,
+	}
+	for _, e := range entries {
+		t.Rows = append(t.Rows, []table.Cell{
+			{Text: e.ID},
+			{Text: e.CreateTime.Format("2006-01-02 15:04:05")},
+			{Text: e.Comment + autoSuffix(e)},
+		})
+	}
+	_ = t.Render(w)
+}
+
+func autoSuffix(e CheckpointEntry) string {
+	if e.IsAuto {
+		return " (auto)"
+	}
+	return ""
 }
 
 // RunRestore restores the named sprite from a checkpoint, streaming progress to stdout.

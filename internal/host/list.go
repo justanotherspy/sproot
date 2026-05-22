@@ -11,7 +11,7 @@ import (
 	"github.com/justanotherspy/sproot/internal/config"
 	"github.com/justanotherspy/sproot/pkg/log"
 	"github.com/justanotherspy/sproot/pkg/table"
-	"golang.org/x/term"
+	"github.com/justanotherspy/sproot/pkg/tty"
 )
 
 // ListOptions controls the behavior of RunList.
@@ -93,7 +93,7 @@ func printList(ctx context.Context, client SpritesClient, opts ListOptions) erro
 		return nil
 	}
 
-	renderList(os.Stdout, shown, fancyOutput(os.Stdout), terminalWidth(os.Stdout))
+	renderList(os.Stdout, shown, tty.IsColor(os.Stdout), tty.Width(os.Stdout))
 	return nil
 }
 
@@ -214,24 +214,6 @@ func formatStamp(t *time.Time) string {
 		return ""
 	}
 	return t.UTC().Format(time.RFC3339)
-}
-
-// fancyOutput reports whether colored box output is appropriate for f: it must
-// be a terminal, NO_COLOR must be unset, and TERM must not be "dumb".
-func fancyOutput(f *os.File) bool {
-	if os.Getenv("NO_COLOR") != "" || os.Getenv("TERM") == "dumb" {
-		return false
-	}
-	return term.IsTerminal(int(f.Fd()))
-}
-
-// terminalWidth returns the column count of f, or 0 if it cannot be determined.
-func terminalWidth(f *os.File) int {
-	w, _, err := term.GetSize(int(f.Fd()))
-	if err != nil {
-		return 0
-	}
-	return w
 }
 
 // hasLabel reports whether labels contains the target string.
