@@ -32,9 +32,11 @@ sproot new my-sprite
 
 ---
 
-## Completed phases (0-16)
+## Completed phases (0-20)
 
-All phases through 16 are done and merged.
+All phases through 20 are done and merged. Phases 0-16 (foundation and hardening) are
+summarized in the two tables below; phases 17-20 (and the late-shipping Phase 14 skills work)
+follow as their own sections.
 
 ### Foundation (phases 0-7)
 
@@ -195,7 +197,11 @@ The sprites-go SDK exposes no org-listing method (only `CreateSpriteWithOrg` and
 4. Delete the test tag and release
 5. Fix `.goreleaser.yaml` or `release.yml` if anything fails
 
-#### Phase 14: Intelligence (skills) — DONE
+---
+
+### Phase 14: Intelligence (skills) — DONE
+
+(Numbered 14 but shipped late, after Phase 19, as PR #47.)
 
 Shipped as a Claude Code plugin marketplace inside this repo (`.claude-plugin/marketplace.json`)
 with one plugin (`plugins/sproot/`) holding two skills, rather than baking conversion into the
@@ -297,6 +303,30 @@ no sprite interaction), wired through a new `sproot self-update` command and the
 
 ---
 
+### Examples and design notes (post-Phase 20)
+
+These shipped after Phase 20 as docs/examples, not as new code phases.
+
+- **OpenClaw builder example (#51)**: `examples/openclaw/` is a complete `sproot.yaml`
+  (plus `files/start.sh`) that translates the upstream `openclaw-sprite-builder` `setup.sh`
+  into modules. It exercises exactly the 17g6-8 additions end to end with no `cmd` blocks:
+  `repo_clone` with a full git URL + explicit `dest`, `npm` install, `file_template` for the
+  start script, and `sprite_service` with `http_port`. It is the worked example the Phase 19
+  follow-up called for (a real config repo using the drained features), kept in-repo rather
+  than in the separate `justanotherspy/sprite` repo. README links to it.
+
+- **Agent on a sprite (#50)**: `plans/claude-agent.md` is a standalone design for bootstrapping
+  a sprite that runs a Claude Code agent against a target repo from a single `sproot new`. Key
+  finding: v1 needs no new module. The `env` block forwards `ANTHROPIC_API_KEY` /
+  `CLAUDE_CODE_OAUTH_TOKEN` (non-interactive auth is just an env var, there is no `/login` to
+  script), and `claude` + `gh_token` + `repo_clone` + a final `cmd` running `claude -p` cover
+  the flow. A dedicated `claude_agent` module is proposed (workdir, prompt source, permission
+  mode, blocking vs `sprite_service` background) but deferred per its own Q3 until the pattern
+  recurs. If built, it becomes the candidate Phase 21 (see that doc for the file-touch list and
+  open questions Q1-Q5).
+
+---
+
 ## Open questions
 
 All Q1-Q7 resolved.
@@ -313,11 +343,19 @@ All Q1-Q7 resolved.
 
 ---
 
-## Suggested order of execution
+## Status and remaining work
 
-1. **Phase 17** (code quality and bug fixes) — DONE
-2. **Phase 18** (intelligence and completion) — 18a + 18b DONE; 18c dropped (no SDK org-listing method); 18d deferred (needs a real tag push)
-3. **Phase 14 deferred** (Claude skills; after everything else is stable)
+All numbered phases (0-20) plus the Phase 14 skills work are done and merged. Nothing in the
+core roadmap is outstanding. The only open items are deferrals and a design that has not been
+committed to code:
+
+- **17i** (deferred): `currentConfigSHA` re-clones the git repo on every `sproot outdated`.
+  Cache or `git ls-remote` if it becomes a complaint.
+- **17j** (deferred): `sproot new` clones the git config repo twice. Unavoidable without
+  `git archive` support; defer unless startup time is a complaint.
+- **18d** (deferred): release workflow end-to-end test, needs a real tag push to the public repo.
+- **claude_agent module** (deferred): the agent-on-sprite design (`plans/claude-agent.md`).
+  Candidate Phase 21 if/when the `cmd` recipe recurs enough to justify a module.
 
 After each PR: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
 
