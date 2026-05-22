@@ -1,0 +1,32 @@
+schema_version: 1
+
+identity:
+  git_user_name: "sproot CI"
+  git_user_email: "ci@example.com"
+  git_default_branch: main
+  gh_username: justanotherspy
+
+# Multi-phase integration test config. Run without --only to exercise a full
+# sequential multi-phase setup in a single sprite. The final cmd phase verifies
+# that earlier phases actually took effect.
+phases:
+  - type: apt
+    packages: [curl, jq]
+
+  - type: git_identity
+
+  - type: file_template
+    src: testdata/integration/files/hello.sh
+    dest: /tmp/sproot-test-hello.sh
+    mode: "0755"
+
+  - type: rc_block
+    src: testdata/integration/files/rc_block.sh
+
+  - type: cmd
+    name: verify-setup
+    run: |
+      jq --version
+      git config --global user.email | grep ci@example.com
+      test -x /tmp/sproot-test-hello.sh
+    check: "jq --version && git config --global user.email | grep -q ci@example.com && test -x /tmp/sproot-test-hello.sh"

@@ -28,6 +28,7 @@ type NewOptions struct {
 	Force       bool
 	DryRun      bool
 	SkipConsole bool   // skip opening console after successful setup
+	SkipVerify  bool   // skip the built-in verify phase (useful for minimal/partial configs)
 	Version     string // build version (from main.version); used to download linux/amd64 binary on non-linux/amd64 hosts
 
 	client              SpritesClient                                                                            // nil: use real client (test injection point)
@@ -176,6 +177,9 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 	}
 	if opts.DryRun {
 		args = append(args, "--dry-run")
+	}
+	if opts.SkipVerify {
+		args = append(args, "--skip-verify")
 	}
 	l.Debugf("in-sprite setup args: %v", args)
 

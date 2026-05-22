@@ -184,6 +184,39 @@ func TestCloneOrPull_UpdatesRemoteURL(t *testing.T) {
 	}
 }
 
+func TestRunSetup_SkipVerify(t *testing.T) {
+	// Create a minimal local config dir (no rc_block, so verify will always fail the
+	// sentinel check when the phase runs against a fresh HOME).
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "sproot.yaml"), []byte(minimalSprootYAML), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	tmpHome := t.TempDir()
+	t.Setenv("HOME", tmpHome)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(tmpHome, ".config"))
+
+	// Create empty shell RC files so verify can read them but finds no sentinel.
+	for _, rc := range []string{".bashrc", ".zshrc"} {
+		if err := os.WriteFile(filepath.Join(tmpHome, rc), []byte(""), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Without SkipVerify the built-in verify phase runs and fails (sentinel missing,
+	// gh auth unavailable, etc.).
+	err := RunSetup(SetupOptions{LocalConfig: dir, SkipVerify: false})
+	if err == nil {
+		t.Fatal("expected verify phase to fail without SkipVerify=true")
+	}
+
+	// With SkipVerify the verify phase is not appended; setup should succeed.
+	err = RunSetup(SetupOptions{LocalConfig: dir, SkipVerify: true})
+	if err != nil {
+		t.Fatalf("RunSetup with SkipVerify=true failed: %v", err)
+	}
+}
+
 func TestRunSetup_InvalidYAML(t *testing.T) {
 	// Repo with invalid sproot.yaml (missing required fields).
 	repoURL := newLocalRepo(t, "schema_version: 1\n")

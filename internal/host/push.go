@@ -19,6 +19,7 @@ type PushOptions struct {
 	Only         string // passed as --only to sproot setup
 	DryRun       bool
 	NoCheckpoint bool   // skip the pre-push checkpoint
+	SkipVerify   bool   // passed as --skip-verify to sproot setup
 	client       SpritesClient
 	shaFn        func() (string, ConfigMeta, error) // nil: compute from host config
 }
@@ -180,6 +181,9 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	}
 	if opts.DryRun {
 		args = append(args, "--dry-run")
+	}
+	if opts.SkipVerify {
+		args = append(args, "--skip-verify")
 	}
 	l.Debugf("[%s] in-sprite setup args: %v", name, args)
 

@@ -6,8 +6,9 @@ identity:
   git_default_branch: main
   gh_username: justanotherspy
 
-# Multi-target integration test config. The web target extends base, producing
-# a 5-phase run that exercises extends inheritance across real module types.
+# Local-config-safe multi-target config. Uses only phases that have no
+# config-relative file dependencies (no file_template or rc_block src paths),
+# so this config works when uploaded via local config source without path issues.
 targets:
   base:
     phases:
@@ -22,13 +23,7 @@ targets:
   web:
     extends: base
     phases:
-      - type: file_template
-        src: testdata/integration/files/hello.sh
-        dest: /tmp/sproot-test-hello.sh
-        mode: "0755"
-      - type: rc_block
-        src: testdata/integration/files/rc_block.sh
       - type: cmd
         name: web-verify
-        run: "test -x /tmp/sproot-test-hello.sh"
-        check: "test -x /tmp/sproot-test-hello.sh"
+        run: "which curl && git config --global user.email | grep ci@example.com"
+        check: "which curl && git config --global user.email | grep -q ci@example.com"

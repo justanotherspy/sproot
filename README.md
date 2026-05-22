@@ -126,7 +126,7 @@ sproot config init
 
 | Command | Where | Description |
 |---------|-------|-------------|
-| `sproot new <name>` | host | Create and provision a sprite (`--skip-console` to skip opening a shell) |
+| `sproot new <name>` | host | Create and provision a sprite (`--skip-console` to skip opening a shell, `--skip-verify` to skip the built-in end-of-run verification) |
 | `sproot destroy <name>` | host | Destroy a sprite and remove its GitHub SSH keys (`--force` skips confirmation) |
 | `sproot status <name>` | host | Show setup state (exec into sprite); `--host` reads state without exec |
 | `sproot console <name>` | host | Open an interactive shell in a sprite |
@@ -137,6 +137,7 @@ sproot config init
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
 | `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint) |
+| `sproot outdated` | host | Show which sproot-managed sprites have a stale config SHA |
 | `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
 | `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
 | `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`) |

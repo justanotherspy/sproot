@@ -25,6 +25,7 @@ type SetupOptions struct {
 	Force       bool
 	DryRun      bool
 	Status      bool
+	SkipVerify  bool // skip the built-in verify phase (useful for minimal/partial configs)
 }
 
 const defaultConfigRepoDir = "~/.sproot/config-repo"
@@ -88,7 +89,9 @@ func RunSetup(opts SetupOptions) error {
 		}
 		phases = append(phases, p)
 	}
-	phases = append(phases, newVerifyPhase())
+	if !opts.SkipVerify {
+		phases = append(phases, newVerifyPhase())
+	}
 
 	runner := phase.NewRunnerFromPhases(phases, phase.RunnerOptions{Only: opts.Only})
 	ctx := &phase.Context{

@@ -26,5 +26,6 @@ func newSetupCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "re-run phases even if already complete")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")
 	cmd.Flags().BoolVar(&opts.Status, "status", false, "print phase status table and exit")
+	cmd.Flags().BoolVar(&opts.SkipVerify, "skip-verify", false, "skip the built-in verify phase")
 	return cmd
 }

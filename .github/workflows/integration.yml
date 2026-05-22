@@ -163,7 +163,7 @@ jobs:
           ./sproot push --name "spr-push-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated
-        run: ./sproot outdated
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
 
       - name: destroy sprite
         if: always()
@@ -267,7 +267,7 @@ jobs:
           ./sproot push --name "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated (local config)
-        run: ./sproot outdated
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
 
       - name: destroy sprite
         if: always()
@@ -277,3 +277,282 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           ./sproot destroy --force "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}"
+
+  multi-phase:
+    name: test multi-phase (no --only)
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_repo: https://github.com/$REPO.git"
+            echo "config_ref: $HEAD_REF"
+            echo "config_path: testdata/integration/sproot_complex.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (full multi-phase run)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot new "spr-multi-${RUN_ID}-${RUN_ATTEMPT}" \
+            --skip-console \
+            --skip-verify \
+            --debug
+
+      - name: verify labels are current
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-multi-${RUN_ID}-${RUN_ATTEMPT}"
+
+  multi-target-full:
+    name: test multi-target with extends (no --only)
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_repo: https://github.com/$REPO.git"
+            echo "config_ref: $HEAD_REF"
+            echo "config_path: testdata/integration/sproot_targets.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (web target, 5-phase extends run)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot new "spr-mttgt-${RUN_ID}-${RUN_ATTEMPT}" \
+            --target web \
+            --skip-console \
+            --skip-verify \
+            --debug
+
+      - name: verify labels are current
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-mttgt-${RUN_ID}-${RUN_ATTEMPT}"
+
+  local-config-multi-target:
+    name: test local-config + multi-target
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config (local source)
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_source: local"
+            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "config_path: sproot_local_targets.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (local config + web target, 4-phase extends run)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot new "spr-locmt-${RUN_ID}-${RUN_ATTEMPT}" \
+            --target web \
+            --skip-console \
+            --skip-verify \
+            --debug
+
+      - name: verify labels are current
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-locmt-${RUN_ID}-${RUN_ATTEMPT}"
+
+  push-multi-target:
+    name: test push with multi-target
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_repo: https://github.com/$REPO.git"
+            echo "config_ref: $HEAD_REF"
+            echo "config_path: testdata/integration/sproot_targets.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (web target)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot new "spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}" \
+            --target web \
+            --skip-console \
+            --skip-verify \
+            --debug
+
+      - name: push to sprite (web target)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot push \
+            --name "spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}" \
+            --target web \
+            --no-checkpoint \
+            --skip-verify \
+            --debug
+
+      - name: verify labels still current after push
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}"
+
+  local-config-multi-phase:
+    name: test local-config multi-phase (no --only, flat phases)
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      - name: write host config (local source, complex config)
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "config_source: local"
+            echo "config_local_path: $GITHUB_WORKSPACE/testdata/integration"
+            echo "config_path: sproot_local_complex.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (5-phase local config run)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot new "spr-locmp-${RUN_ID}-${RUN_ATTEMPT}" \
+            --skip-console \
+            --skip-verify \
+            --debug
+
+      - name: verify labels are current
+        run: ./sproot outdated | tee /dev/stderr | grep "current"
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-locmp-${RUN_ID}-${RUN_ATTEMPT}"
