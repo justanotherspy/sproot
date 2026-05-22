@@ -7,11 +7,11 @@ import (
 	"testing"
 )
 
-func TestRunConfigInit_WritesSkeletonFile(t *testing.T) {
+func TestRunConfigInit_WritesGitSkeleton(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".sproot", "config")
 
-	if err := RunConfigInit(path); err != nil {
+	if err := RunConfigInit(path, "git"); err != nil {
 		t.Fatalf("RunConfigInit: %v", err)
 	}
 
@@ -21,15 +21,36 @@ func TestRunConfigInit_WritesSkeletonFile(t *testing.T) {
 	}
 	content := string(data)
 
-	for _, want := range []string{"config_repo", "config_ref", "token_env", "gh_token_env"} {
+	for _, want := range []string{"config_source: git", "config_repo", "config_ref", "token_env", "gh_token_env"} {
 		if !strings.Contains(content, want) {
-			t.Errorf("skeleton missing %q", want)
+			t.Errorf("git skeleton missing %q", want)
 		}
 	}
 
 	info, _ := os.Stat(path)
 	if info.Mode().Perm() != 0o600 {
 		t.Errorf("file mode: got %o, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestRunConfigInit_WritesLocalSkeleton(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".sproot", "config")
+
+	if err := RunConfigInit(path, "local"); err != nil {
+		t.Fatalf("RunConfigInit local: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	content := string(data)
+
+	for _, want := range []string{"config_source: local", "config_local_path", "token_env"} {
+		if !strings.Contains(content, want) {
+			t.Errorf("local skeleton missing %q", want)
+		}
 	}
 }
 
@@ -41,7 +62,7 @@ func TestRunConfigInit_ErrorIfExists(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err := RunConfigInit(path)
+	err := RunConfigInit(path, "git")
 	if err == nil {
 		t.Fatal("expected error when file exists, got nil")
 	}

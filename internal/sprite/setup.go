@@ -100,6 +100,7 @@ func RunSetup(opts SetupOptions) error {
 		Log:            l,
 		DryRun:         opts.DryRun,
 		Force:          opts.Force,
+		OnlyFilter:     opts.Only,
 	}
 
 	return runner.Run(ctx)

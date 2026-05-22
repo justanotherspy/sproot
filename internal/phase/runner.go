@@ -64,6 +64,7 @@ func (r *Runner) Run(ctx *Context) error {
 	state := &State{
 		SchemaVersion: StateVersion,
 		UpdatedAt:     now(),
+		OnlyFilter:    r.opts.Only,
 	}
 	var errs []error
 	matched := 0

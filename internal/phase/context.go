@@ -24,4 +24,9 @@ type Context struct {
 	// Force, when true, means the runner will call Run regardless of what
 	// ShouldRun returns.
 	Force bool
+
+	// OnlyFilter is non-empty when --only was passed. It equals the phase type
+	// that was selected. The verify phase uses this to skip checks that are only
+	// relevant to phases that were filtered out.
+	OnlyFilter string
 }

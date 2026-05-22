@@ -14,7 +14,8 @@ import (
 	"github.com/justanotherspy/sproot/pkg/log"
 )
 
-const configSkeleton = `config_repo: ""
+const configSkeletonGit = `config_source: git
+config_repo: ""
 config_ref: main
 config_path: ""       # optional; path to sproot.yaml within the config repo
 token_env: SPRITES_TOKEN
@@ -22,9 +23,18 @@ gh_token_env: ""
 default_org: ""
 `
 
+const configSkeletonLocal = `config_source: local
+config_local_path: ""  # absolute path to the local config directory
+config_path: ""        # optional; path to sproot.yaml within the local dir
+token_env: SPRITES_TOKEN
+gh_token_env: ""
+default_org: ""
+`
+
 // RunConfigInit writes a skeleton host config file at path.
 // Returns an error if the file already exists.
-func RunConfigInit(path string) error {
+// source must be "git" or "local"; defaults to "git" when empty.
+func RunConfigInit(path, source string) error {
 	expanded, err := config.ExpandTilde(path)
 	if err != nil {
 		return err
@@ -32,10 +42,14 @@ func RunConfigInit(path string) error {
 	if _, err := os.Stat(expanded); err == nil {
 		return fmt.Errorf("%s already exists; delete it first", expanded)
 	}
+	skeleton := configSkeletonGit
+	if source == "local" {
+		skeleton = configSkeletonLocal
+	}
 	if err := os.MkdirAll(filepath.Dir(expanded), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}
-	if err := os.WriteFile(expanded, []byte(configSkeleton), 0o600); err != nil {
+	if err := os.WriteFile(expanded, []byte(skeleton), 0o600); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}
 	log.Stderr().Infof("wrote %s", expanded)
@@ -55,10 +69,15 @@ func RunConfigInitInteractive(path string) error {
 
 	r := bufio.NewReader(os.Stdin)
 
-	configRepo, err := promptField(r, "config_repo (e.g. git@github.com:you/sprite.git)", "")
+	// Ask about config source first so subsequent prompts make sense.
+	sourceRaw, err := promptField(r, "config_source (git or local)", "git")
 	if err != nil {
 		return err
 	}
+	if sourceRaw != "git" && sourceRaw != "local" {
+		return fmt.Errorf("config_source must be 'git' or 'local', got %q", sourceRaw)
+	}
+
 	tokenEnv, err := promptField(r, "token_env (env var holding your sprites API token)", "SPRITES_TOKEN")
 	if err != nil {
 		return err
@@ -72,21 +91,63 @@ func RunConfigInitInteractive(path string) error {
 		return err
 	}
 
+	var content string
 	cfg := &config.HostConfig{
-		ConfigRepo: configRepo,
-		ConfigRef:  "main",
-		TokenEnv:   tokenEnv,
-		GHTokenEnv: ghTokenEnv,
-		DefaultOrg: defaultOrg,
-	}
-	if err := config.ValidateHostConfig(cfg); err != nil {
-		return fmt.Errorf("validation failed: %w", err)
+		TokenEnv:     tokenEnv,
+		GHTokenEnv:   ghTokenEnv,
+		DefaultOrg:   defaultOrg,
+		ConfigSource: sourceRaw,
 	}
 
-	content := fmt.Sprintf(
-		"config_repo: %q\nconfig_ref: main\nconfig_path: \"\"\ntoken_env: %s\ngh_token_env: %s\ndefault_org: %s\n",
-		configRepo, tokenEnv, ghTokenEnv, defaultOrg,
-	)
+	if sourceRaw == "local" {
+		localPath, lerr := promptField(r, "config_local_path (absolute path to your local config directory)", "")
+		if lerr != nil {
+			return lerr
+		}
+		configPath, lerr := promptField(r, "config_path (path to sproot.yaml within the local dir, or blank)", "")
+		if lerr != nil {
+			return lerr
+		}
+		cfg.ConfigLocalPath = localPath
+		cfg.ConfigPath = configPath
+		if err := config.ValidateHostConfig(cfg); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+		configPathLine := ""
+		if configPath != "" {
+			configPathLine = fmt.Sprintf("config_path: %q\n", configPath)
+		} else {
+			configPathLine = "config_path: \"\"\n"
+		}
+		content = fmt.Sprintf(
+			"config_source: local\nconfig_local_path: %q\n%stoken_env: %s\ngh_token_env: %s\ndefault_org: %s\n",
+			localPath, configPathLine, tokenEnv, ghTokenEnv, defaultOrg,
+		)
+	} else {
+		configRepo, rerr := promptField(r, "config_repo (e.g. git@github.com:you/sprite.git)", "")
+		if rerr != nil {
+			return rerr
+		}
+		configRef, rerr := promptField(r, "config_ref (branch, tag, or SHA)", "main")
+		if rerr != nil {
+			return rerr
+		}
+		configPath, rerr := promptField(r, "config_path (path to sproot.yaml within the repo, or blank)", "")
+		if rerr != nil {
+			return rerr
+		}
+		cfg.ConfigRepo = configRepo
+		cfg.ConfigRef = configRef
+		cfg.ConfigPath = configPath
+		if err := config.ValidateHostConfig(cfg); err != nil {
+			return fmt.Errorf("validation failed: %w", err)
+		}
+		content = fmt.Sprintf(
+			"config_source: git\nconfig_repo: %q\nconfig_ref: %s\nconfig_path: %q\ntoken_env: %s\ngh_token_env: %s\ndefault_org: %s\n",
+			configRepo, configRef, configPath, tokenEnv, ghTokenEnv, defaultOrg,
+		)
+	}
+
 	if err := os.MkdirAll(filepath.Dir(expanded), 0o750); err != nil {
 		return fmt.Errorf("create config dir: %w", err)
 	}

@@ -17,25 +17,28 @@ func newConfigCmd() *cobra.Command {
 
 func newConfigInitCmd() *cobra.Command {
 	var nonInteractive bool
+	var source string
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Write a skeleton ~/.sproot/config.yaml",
 		Long: "init writes a host config to ~/.sproot/config.yaml. " +
-			"By default it prompts for each field interactively. " +
-			"Use --non-interactive to write a skeleton file with placeholder values instead.",
+			"By default it prompts for each field interactively, starting with config_source (git or local). " +
+			"Use --non-interactive to write a skeleton file with placeholder values. " +
+			"Use --source to set the config_source in the skeleton (default: git).",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			path, err := config.DefaultHostConfigPath()
 			if err != nil {
 				return err
 			}
 			if nonInteractive {
-				return host.RunConfigInit(path)
+				return host.RunConfigInit(path, source)
 			}
 			return host.RunConfigInitInteractive(path)
 		},
 	}
 	cmd.Flags().BoolVar(&nonInteractive, "non-interactive", false, "write a skeleton file with placeholder values instead of prompting")
+	cmd.Flags().StringVar(&source, "source", "git", "config source for the skeleton: git or local (only with --non-interactive)")
 	return cmd
 }
 

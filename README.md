@@ -136,11 +136,11 @@ sproot config init
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
-| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint) |
+| `sproot push` | host | Re-run setup on all sproot-managed sprites (`--name` for one, `--target` to select a target, `--no-checkpoint` to skip pre-push checkpoint, `--skip-verify` to skip end-of-run checks) |
 | `sproot outdated` | host | Show which sproot-managed sprites have a stale config SHA |
 | `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
 | `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
-| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`) |
+| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`); missing file is a warning unless `--strict` is passed |
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
@@ -229,7 +229,10 @@ make check              # vet + test + lint
 make lint               # golangci-lint
 make release-check      # validate .goreleaser.yaml syntax
 make release-dry-run    # local snapshot build (requires goreleaser)
+make e2e                # end-to-end tests against real sprites (requires SPRITES_TOKEN)
 ```
+
+`make e2e` creates real sprites using `testdata/integration` configs, verifies labels, tests push, and destroys everything. All sprites are destroyed in cleanup even if a step fails.
 
 Requires Go 1.25+.
 
