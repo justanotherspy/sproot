@@ -152,7 +152,11 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 		}
 	}
 
-	args := []string{"setup", "--force"}
+	var args []string
+	if log.IsDebug() {
+		args = append(args, "--debug")
+	}
+	args = append(args, "setup", "--force")
 	if setupLocalDir != "" {
 		// For local config: upload host directory to the sprite, then point setup at
 		// the in-sprite copy. The host path is not reachable from inside the sprite.
@@ -177,6 +181,7 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	if opts.DryRun {
 		args = append(args, "--dry-run")
 	}
+	l.Debugf("[%s] in-sprite setup args: %v", name, args)
 
 	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout}
 	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr}

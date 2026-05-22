@@ -102,7 +102,8 @@ jobs:
           ./sproot new "spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}" \
             --only "$MATRIX_ONLY" \
             $TARGET_FLAG \
-            --skip-console
+            --skip-console \
+            --debug
 
       - name: destroy sprite
         if: always()
@@ -151,14 +152,15 @@ jobs:
         run: |
           ./sproot new "spr-push-${RUN_ID}-${RUN_ATTEMPT}" \
             --only cmd \
-            --skip-console
+            --skip-console \
+            --debug
 
       - name: push to sprite
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot push --name "spr-push-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd
+          ./sproot push --name "spr-push-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated
         run: ./sproot outdated
@@ -207,7 +209,8 @@ jobs:
         run: |
           ./sproot new "spr-local-${RUN_ID}-${RUN_ATTEMPT}" \
             --only cmd \
-            --skip-console
+            --skip-console \
+            --debug
 
       - name: destroy sprite
         if: always()
@@ -253,14 +256,15 @@ jobs:
         run: |
           ./sproot new "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" \
             --only cmd \
-            --skip-console
+            --skip-console \
+            --debug
 
       - name: push to sprite (local config)
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot push --name "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd
+          ./sproot push --name "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated (local config)
         run: ./sproot outdated
