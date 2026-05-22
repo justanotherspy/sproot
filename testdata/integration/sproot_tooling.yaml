@@ -16,8 +16,6 @@ identity:
 #     account (key registration / scope checks). The default Actions token cannot
 #     satisfy gh_token's verify (gh api user != gh_username), so they cannot run
 #     unattended in CI.
-#   - cargo_install: compiles crates from source, which is too slow/flaky for the
-#     fast per-job integration matrix.
 phases:
   - type: uv_tool
     tools:
@@ -33,6 +31,13 @@ phases:
     tools:
       - pkg: golang.org/x/tools/cmd/goimports
         version: latest
+
+  # hexyl is a small, dependency-light binary crate (compiles in ~25s on the base
+  # image), chosen so the cargo_install job stays fast while still exercising a
+  # real `cargo install` end-to-end (binary must land on PATH, Verify must pass).
+  - type: cargo_install
+    tools:
+      - name: hexyl
 
   # dir points at the npm fixture inside the cloned config repo (config_source:
   # git clones into ~/.sproot/config-repo on the sprite before phases run).
