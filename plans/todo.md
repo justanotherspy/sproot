@@ -40,7 +40,9 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 
 ## Planned (module additions)
 
-- add a `setup_script` module type: clones a git repo and runs a script from it (e.g. `setup.sh`), replacing the repo_clone + cmd two-phase pattern for the common "clone and bootstrap" use case (Phase 17g6)
+- update `repo_clone` to accept full git URLs with an explicit dest path, not just owner/repo SSH shorthand (Phase 17g6)
+- add a new `npm` module that runs `npm install` in a directory, with node_modules as the idempotency check (Phase 17g7)
+- update `sprite_service` to support `http_port` and `needs` fields in the service registration body (Phase 17g8)
 
 ## Planned (Phase 18 - intelligence)
 
