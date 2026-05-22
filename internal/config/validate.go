@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 )
 
@@ -114,6 +115,18 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 		return []error{fmt.Errorf("%s.type %q is not a known module type", prefix, phase.Type)}
 	}
 	switch phase.Type {
+	case "apt":
+		if a := phase.Apt; a != nil && len(a.Packages) == 0 && len(a.Symlinks) == 0 {
+			errs = append(errs, fmt.Errorf("%s (apt): packages or symlinks must not be empty", prefix))
+		}
+	case "uv_tool":
+		if u := phase.UVTool; u != nil && len(u.Tools) == 0 {
+			errs = append(errs, fmt.Errorf("%s (uv_tool): tools must not be empty", prefix))
+		}
+	case "npm":
+		if n := phase.Npm; n != nil && n.Dir == "" {
+			errs = append(errs, fmt.Errorf("%s (npm): dir is required", prefix))
+		}
 	case "corepack":
 		if c := phase.Corepack; c != nil && len(c.Managers) == 0 {
 			errs = append(errs, fmt.Errorf("%s (corepack): managers must not be empty", prefix))
@@ -144,6 +157,11 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 			}
 			if br.Asset == "" {
 				errs = append(errs, fmt.Errorf("%s (binary_release): asset is required", prefix))
+			}
+			switch br.Install {
+			case "dpkg", "tar+install", "raw":
+			default:
+				errs = append(errs, fmt.Errorf("%s (binary_release): install %q is not valid (use \"dpkg\", \"tar+install\", or \"raw\")", prefix, br.Install))
 			}
 			// {arch_alias} requires arch_map. The per-GOARCH key is checked at
 			// runtime, since the host arch may differ from the sprite arch.
@@ -189,6 +207,11 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 			}
 			if ft.Dest == "" {
 				errs = append(errs, fmt.Errorf("%s (file_template): dest is required", prefix))
+			}
+			if ft.Mode != "" {
+				if _, err := strconv.ParseUint(ft.Mode, 8, 32); err != nil {
+					errs = append(errs, fmt.Errorf("%s (file_template): mode %q is not a valid octal file mode", prefix, ft.Mode))
+				}
 			}
 		}
 	case "rc_block":

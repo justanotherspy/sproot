@@ -668,6 +668,54 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 			},
 			`"claude_settings" is not a known module type`,
 		},
+		{
+			"apt_empty",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "apt", Apt: &AptConfig{}}}
+			},
+			"phases[0] (apt): packages or symlinks must not be empty",
+		},
+		{
+			"uv_tool_empty",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "uv_tool", UVTool: &UVToolConfig{}}}
+			},
+			"phases[0] (uv_tool): tools must not be empty",
+		},
+		{
+			"npm_missing_dir",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "npm", Npm: &NpmConfig{}}}
+			},
+			"phases[0] (npm): dir is required",
+		},
+		{
+			"binary_release_invalid_install",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "binary_release", BinaryRelease: &BinaryReleaseConfig{
+					Name: "tool", Repo: "x/y", Asset: "foo", Install: "bogus",
+				}}}
+			},
+			`phases[0] (binary_release): install "bogus" is not valid`,
+		},
+		{
+			"binary_release_empty_install",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "binary_release", BinaryRelease: &BinaryReleaseConfig{
+					Name: "tool", Repo: "x/y", Asset: "foo",
+				}}}
+			},
+			`phases[0] (binary_release): install "" is not valid`,
+		},
+		{
+			"file_template_bad_mode",
+			func(c *SprootConfig) {
+				c.Phases = []PhaseConfig{{Type: "file_template", FileTemplate: &FileTemplateConfig{
+					Src: "files/x", Dest: "/tmp/x", Mode: "98a",
+				}}}
+			},
+			`phases[0] (file_template): mode "98a" is not a valid octal file mode`,
+		},
 	}
 
 	for _, tc := range cases {
