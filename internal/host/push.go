@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/justanotherspy/sproot/internal/config"
@@ -14,12 +15,12 @@ import (
 
 // PushOptions controls the behavior of RunPush.
 type PushOptions struct {
-	SpriteName   string // empty = all sproot-managed sprites
-	Target       string // passed as --target to sproot setup
-	Only         string // passed as --only to sproot setup
-	DryRun       bool
-	NoCheckpoint bool   // skip the pre-push checkpoint
-	SkipVerify   bool   // passed as --skip-verify to sproot setup
+	SpriteName       string // empty = all sproot-managed sprites
+	Target           string // passed as --target to sproot setup
+	Only             string // passed as --only to sproot setup
+	DryRun           bool
+	NoCheckpoint     bool // skip the pre-push checkpoint
+	SkipVerify       bool // passed as --skip-verify to sproot setup
 	client           SpritesClient
 	shaFn            func() (string, ConfigMeta, error)                                                          // nil: compute from host config
 	envBlockReaderFn func(repo, ref, path string, l *log.Logger) ([]string, *config.SprootConfig, string, error) // nil: use readEnvBlock
@@ -243,6 +244,11 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 
 // currentConfigSHA clones/reads the current config and returns its SHA plus
 // base metadata (source, repo, ref). Used by RunPush to compute the target SHA.
+//
+// TODO(perf): for git sources this does a full `git clone --depth 1` into a temp
+// dir on every `sproot outdated` and `sproot push`. If that becomes a complaint,
+// use `git ls-remote` for a cheap HEAD-SHA check, or cache the SHA in
+// ~/.cache/sproot keyed by repo+ref. See plans/sproot.md item 17i.
 func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta, error) {
 	if cfg.SprootConfigSource == "local" {
 		dir, err := config.ExpandTilde(cfg.SprootConfigLocalPath)
@@ -253,7 +259,7 @@ func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta
 		if yamlFile == "" {
 			yamlFile = "sproot.yaml"
 		}
-		raw, err := os.ReadFile(dir + "/" + yamlFile)
+		raw, err := os.ReadFile(filepath.Join(dir, yamlFile))
 		if err != nil {
 			return "", ConfigMeta{}, fmt.Errorf("read local config: %w", err)
 		}

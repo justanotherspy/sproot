@@ -62,8 +62,8 @@ plans/                - design docs, not shipped
 | 8-13 | Hardening: doc fixes, bug fixes, cross-arch binary, UX, SDK alignment, multi-target/push (done) |
 | 14 | Intelligence: Claude skills for sproot usage and script conversion (deferred) |
 | 15-16 | Operational improvements, integration depth, make e2e (done) |
-| 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md (done) |
-| 18 | Intelligence and completion: llm.txt/agent-context.md after setup, token scope docs, config init org auto-select, release workflow test (next) |
+| 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md; module additions (repo_clone URLs, npm, sprite_service http_port/needs) (done) |
+| 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d deferred) |
 
 ## Workflow
 

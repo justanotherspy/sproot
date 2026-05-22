@@ -122,6 +122,15 @@ Initialize with:
 sproot config init
 ```
 
+### GitHub token scopes
+
+The token named by `gh_token_env` is forwarded into the sprite as `GH_TOKEN`. The scopes it needs depend on which phases your `sproot.yaml` uses:
+
+- **`gh_token` phase:** no minimum scope is required by sproot. Match whatever you want `gh` to do inside the sprite (typically `repo` for private repos, plus `read:org` if you work across organizations).
+- **`ssh_setup` phase:** registers a generated SSH key with GitHub, so the token needs `admin:public_key` (authentication keys) and `admin:ssh_signing_key` (signing keys) on a classic PAT.
+
+If you use both phases, the union of these scopes is required. See [docs/modules.md](docs/modules.md) for per-module details.
+
 ## Commands
 
 | Command | Where | Description |

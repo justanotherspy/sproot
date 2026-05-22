@@ -103,7 +103,17 @@ func RunSetup(opts SetupOptions) error {
 		OnlyFilter:     opts.Only,
 	}
 
-	return runner.Run(ctx)
+	err = runner.Run(ctx)
+
+	// Write a post-setup summary inside the sprite for Claude Code to read.
+	// Non-fatal: the sprite is already provisioned regardless of this write.
+	if st := runner.LastState(); st != nil {
+		if werr := writeLLMContext(l, st, defaultSpriteContextDir); werr != nil {
+			l.Warnf("could not write sprite context: %v", werr)
+		}
+	}
+
+	return err
 }
 
 // cloneOrPull clones repoURL at ref into dest. If dest already contains a git

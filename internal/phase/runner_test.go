@@ -54,6 +54,23 @@ func loadTestState(t *testing.T, path string) *State {
 	return s
 }
 
+func TestRunner_LastState(t *testing.T) {
+	r := newTestRunner([]Phase{&dummyPhase{typ: "ok", name: "ok", shouldRun: true}}, statePath(t))
+	if r.LastState() != nil {
+		t.Fatal("LastState should be nil before Run")
+	}
+	if err := r.Run(newTestCtx(t)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	st := r.LastState()
+	if st == nil {
+		t.Fatal("LastState should be non-nil after Run")
+	}
+	if len(st.Phases) != 1 || st.Phases[0].Name != "ok" {
+		t.Errorf("unexpected LastState phases: %+v", st.Phases)
+	}
+}
+
 func TestRunner_PassPhaseRunsAndVerifies(t *testing.T) {
 	p := &dummyPhase{typ: "ok", name: "ok", shouldRun: true}
 	sp := statePath(t)
