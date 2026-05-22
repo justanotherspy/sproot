@@ -20,6 +20,8 @@ func newSetupCmd() *cobra.Command {
 	cmd.Flags().StringVar(&opts.ConfigRepo, "config-repo", "", "git URL of the config repo")
 	cmd.Flags().StringVar(&opts.Ref, "ref", "main", "branch, tag, or SHA to check out")
 	cmd.Flags().StringVar(&opts.ConfigPath, "config-path", "", "path to config file within the repo (default: sproot.yaml)")
+	cmd.Flags().StringVar(&opts.Target, "target", "", "named target to run from sproot.yaml (requires targets: block)")
+	cmd.Flags().StringVar(&opts.LocalConfig, "local-config", "", "path to config directory already in the sprite; skips git clone")
 	cmd.Flags().StringVar(&opts.Only, "only", "", "run only phases matching this type")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "re-run phases even if already complete")
 	cmd.Flags().BoolVar(&opts.DryRun, "dry-run", false, "describe changes without executing them")

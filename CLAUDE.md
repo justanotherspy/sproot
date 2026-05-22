@@ -65,7 +65,7 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 | 10 | Cross-arch binary injection fix (download Linux/amd64 binary at runtime) (done) |
 | 11 | UX improvements: interactive config init, console command, list command, auto-setup, debug flag, pre-flight sproot.yaml validation (done) |
 | 12 | SDK alignment: exec, upgrade, checkpoint, checkpoints, restore commands; checkpoint_after_setup in sproot.yaml; --storage-gb on new; status --host (done) |
-| 13 | Multi-target support (targets/extends in sproot.yaml, --target flag), local path config source, sproot push/update |
+| 13 | Multi-target support (targets/extends in sproot.yaml, --target flag), local path config source, sproot push/update (done) |
 | 14 | Intelligence: llm.txt/agent-context.md updates after setup, Claude skills for sproot usage and script conversion |
 | 15 | Operational improvements: config init org auto-select, token scope docs, valid flag values, CI required checks, module edge cases, release workflow test, code review workflow, audit sproot new flags vs real API |
 
@@ -74,9 +74,12 @@ Phases are implemented in order. Each phase has unit tests before the next one s
 - Each phase or feature goes on its own branch and merges via PR. Never push directly to main.
 - Run `make check` before every push (vet + test + lint must all pass).
 - When behavior changes, update the relevant docs in the same PR: `docs/modules.md` for module changes, `README.md` for user-facing command or config changes, `CLAUDE.md` phase table for phase completion, and `plans/sproot.md` for design decisions and phase summaries.
+- Every new CLI command or config feature must have corresponding integration test coverage: unit tests under `internal/host/` or `internal/sprite/`, a dry-run path in `internal/phase/modules/integration_test.go` if a new module type is added, and an entry in `integration.yml` (matrix or separate job) that exercises the feature against a real sprite. When reviewing or implementing a phase, explicitly check that all new functionality is covered end-to-end.
+- Sprites spin up in 1-2 seconds. Integration tests do not need artificial sleep or retry loops; commands can run immediately after sprite creation.
+- When adding integration tests for config-source functionality, cover BOTH `config_source: git` (standard git clone path) and `config_source: local` (local directory uploaded to sprite). The two code paths are distinct and both must be exercised.
 
 ## CI
 
-Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
+Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
 
-`integration.yml` runs on owner-triggered pushes: builds the binary and runs six matrix integration tests against real sprites.
+`integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs: six module-type matrix entries (apt, git_identity, file_template, rc_block, claude_settings, cmd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path).

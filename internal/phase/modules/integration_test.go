@@ -81,3 +81,61 @@ func TestDryRunAllModules(t *testing.T) {
 		t.Errorf("dry-run failed: %v", err)
 	}
 }
+
+// TestDryRunTargetPhases verifies that target resolution (with extends) produces
+// the correct phase list and that all resolved phases run cleanly under DryRun.
+func TestDryRunTargetPhases(t *testing.T) {
+	repoDir := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	identity := config.Identity{
+		GitUserName:      "Test User",
+		GitUserEmail:     "test@example.com",
+		GitDefaultBranch: "main",
+		GHUsername:       "testuser",
+	}
+
+	cfg := &config.SprootConfig{
+		Identity: identity,
+		Targets: map[string]*config.TargetConfig{
+			"base": {
+				Phases: []config.PhaseConfig{
+					{Type: "cmd", Cmd: &config.CmdConfig{Run: "true"}},
+				},
+			},
+			"web": {
+				Extends: "base",
+				Phases: []config.PhaseConfig{
+					{Type: "cmd", Cmd: &config.CmdConfig{Run: "true"}},
+				},
+			},
+		},
+	}
+
+	phases, err := cfg.ResolveTarget("web")
+	if err != nil {
+		t.Fatalf("ResolveTarget(web): %v", err)
+	}
+	if len(phases) != 2 {
+		t.Fatalf("expected 2 phases (base + web), got %d", len(phases))
+	}
+
+	r, err := phase.NewRunner(phases, phase.RunnerOptions{
+		StatePath: filepath.Join(t.TempDir(), "state.json"),
+	})
+	if err != nil {
+		t.Fatalf("NewRunner: %v", err)
+	}
+
+	ctx := &phase.Context{
+		ConfigRepoPath: repoDir,
+		Log:            log.New(io.Discard),
+		DryRun:         true,
+		Identity:       identity,
+	}
+
+	if err := r.Run(ctx); err != nil {
+		t.Errorf("dry-run for web target failed: %v", err)
+	}
+}

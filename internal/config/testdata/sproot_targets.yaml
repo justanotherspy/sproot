@@ -1,0 +1,23 @@
+schema_version: 1
+
+identity:
+  git_user_name: "Test User"
+  git_user_email: "test@example.com"
+  git_default_branch: main
+  gh_username: testuser
+
+targets:
+  base:
+    phases:
+      - type: apt
+        packages: [curl, git]
+      - type: git_identity
+
+  web:
+    extends: base
+    phases:
+      - type: apt
+        packages: [nginx]
+      - type: cmd
+        run: "echo web setup done"
+        name: web-post-install

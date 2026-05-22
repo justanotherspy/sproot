@@ -42,6 +42,8 @@ type SpriteHandle interface {
 	ListCheckpoints(ctx context.Context, includeAuto bool) ([]CheckpointEntry, error)
 	// Restore restores the sprite from a checkpoint, streaming progress to w.
 	Restore(ctx context.Context, checkpointID string, w io.Writer) error
+	// SetLabels replaces all labels on the sprite with the given set.
+	SetLabels(ctx context.Context, labels []string) error
 }
 
 // SpritesClient abstracts sprite lifecycle operations, enabling test mocking.
@@ -64,11 +66,11 @@ func (r *realClient) CreateSprite(ctx context.Context, name string, cfg *sprites
 	if err != nil {
 		return nil, err
 	}
-	return &realHandle{s: s}, nil
+	return &realHandle{s: s, c: r.c, name: name}, nil
 }
 
 func (r *realClient) GetHandle(name string) SpriteHandle {
-	return &realHandle{s: r.c.Sprite(name)}
+	return &realHandle{s: r.c.Sprite(name), c: r.c, name: name}
 }
 
 func (r *realClient) DestroySprite(ctx context.Context, name string) error {
@@ -101,7 +103,11 @@ func (r *realClient) ListSprites(ctx context.Context) ([]SpriteListEntry, error)
 	return entries, nil
 }
 
-type realHandle struct{ s *sprites.Sprite }
+type realHandle struct {
+	s    *sprites.Sprite
+	c    *sprites.Client
+	name string
+}
 
 func (h *realHandle) WriteFile(path string, data []byte, perm fs.FileMode) error {
 	return h.s.Filesystem().WriteFile(path, data, perm)
@@ -184,5 +190,12 @@ func (h *realHandle) Restore(ctx context.Context, checkpointID string, w io.Writ
 			_, _ = fmt.Fprintln(w, "error: "+msg.Error)
 		}
 		return nil
+	})
+}
+
+func (h *realHandle) SetLabels(ctx context.Context, labels []string) error {
+	return h.c.UpdateSprite(ctx, h.name, &sprites.UpdateSpriteRequest{
+		ClearLabels: true,
+		Labels:      labels,
 	})
 }

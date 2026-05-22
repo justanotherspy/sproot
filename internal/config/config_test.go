@@ -471,7 +471,7 @@ func TestValidateSprootConfig_Errors(t *testing.T) {
 		{
 			"empty_phases",
 			func(c *SprootConfig) { c.Phases = nil },
-			"phases must not be empty",
+			"phases (or targets) must not be empty",
 		},
 		{
 			"binary_release_missing_name",
@@ -723,6 +723,241 @@ func TestDefaultHostConfigPath(t *testing.T) {
 	}
 	if !strings.HasSuffix(path, ".sproot/config.yaml") && !strings.HasSuffix(path, ".sproot/config") {
 		t.Errorf("path %q does not end with .sproot/config.yaml or .sproot/config", path)
+	}
+}
+
+// --- Multi-target fixture ---
+
+func TestLoadSprootConfig_Targets(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot_targets.yaml"))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(cfg.Targets) != 2 {
+		t.Fatalf("targets: got %d, want 2", len(cfg.Targets))
+	}
+	if err := ValidateSprootConfig(cfg); err != nil {
+		t.Errorf("validate failed: %v", err)
+	}
+	// Base target: 2 phases.
+	base := cfg.Targets["base"]
+	if base == nil || len(base.Phases) != 2 {
+		t.Errorf("base target: got %+v, want 2 phases", base)
+	}
+	// Web target extends base: ResolveTarget returns 4 phases.
+	phases, err := cfg.ResolveTarget("web")
+	if err != nil {
+		t.Fatalf("ResolveTarget web: %v", err)
+	}
+	if len(phases) != 4 {
+		t.Errorf("web resolved phases: got %d, want 4", len(phases))
+	}
+}
+
+// --- ResolveTarget ---
+
+func aptPhase() PhaseConfig {
+	return PhaseConfig{Type: "apt", Apt: &AptConfig{Packages: []string{"curl"}}}
+}
+
+func TestResolveTarget_BackwardCompat_FlatPhases(t *testing.T) {
+	cfg := &SprootConfig{Phases: []PhaseConfig{aptPhase()}}
+	phases, err := cfg.ResolveTarget("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 1 || phases[0].Type != "apt" {
+		t.Errorf("got %+v, want [apt]", phases)
+	}
+}
+
+func TestResolveTarget_SingleTarget(t *testing.T) {
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"web": {Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	phases, err := cfg.ResolveTarget("web")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 1 || phases[0].Type != "apt" {
+		t.Errorf("got %+v", phases)
+	}
+}
+
+func TestResolveTarget_Extends(t *testing.T) {
+	base := PhaseConfig{Type: "apt", Apt: &AptConfig{Packages: []string{"base-pkg"}}}
+	extra := PhaseConfig{Type: "cmd", Cmd: &CmdConfig{Run: "extra"}}
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"base": {Phases: []PhaseConfig{base}},
+			"web":  {Extends: "base", Phases: []PhaseConfig{extra}},
+		},
+	}
+	phases, err := cfg.ResolveTarget("web")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 2 {
+		t.Fatalf("got %d phases, want 2", len(phases))
+	}
+	if phases[0].Type != "apt" {
+		t.Errorf("phases[0].type: got %q, want apt", phases[0].Type)
+	}
+	if phases[1].Type != "cmd" {
+		t.Errorf("phases[1].type: got %q, want cmd", phases[1].Type)
+	}
+}
+
+func TestResolveTarget_DefaultFallback(t *testing.T) {
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"default": {Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	phases, err := cfg.ResolveTarget("")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(phases) != 1 {
+		t.Errorf("got %d phases, want 1", len(phases))
+	}
+}
+
+func TestResolveTarget_MissingTarget(t *testing.T) {
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"web": {Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	_, err := cfg.ResolveTarget("ml")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `"ml" not found`) {
+		t.Errorf("error %q does not contain expected substring", err.Error())
+	}
+}
+
+func TestResolveTarget_CycleDetected(t *testing.T) {
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"a": {Extends: "b", Phases: []PhaseConfig{aptPhase()}},
+			"b": {Extends: "a", Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	_, err := cfg.ResolveTarget("a")
+	if err == nil {
+		t.Fatal("expected cycle error, got nil")
+	}
+	if !strings.Contains(err.Error(), "cycle") {
+		t.Errorf("error %q does not mention cycle", err.Error())
+	}
+}
+
+// --- ValidateSprootConfig targets ---
+
+func TestValidateSprootConfig_TargetsValid(t *testing.T) {
+	cfg := &SprootConfig{
+		SchemaVersion: 1,
+		Identity: Identity{
+			GitUserName:      "Test",
+			GitUserEmail:     "t@example.com",
+			GitDefaultBranch: "main",
+			GHUsername:       "tester",
+		},
+		Targets: map[string]*TargetConfig{
+			"base": {Phases: []PhaseConfig{aptPhase()}},
+			"web":  {Extends: "base", Phases: []PhaseConfig{{Type: "cmd", Cmd: &CmdConfig{Run: "echo web"}}}},
+		},
+	}
+	if err := ValidateSprootConfig(cfg); err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateSprootConfig_PhasesPlusTargetsError(t *testing.T) {
+	cfg := &SprootConfig{
+		SchemaVersion: 1,
+		Identity: Identity{
+			GitUserName:      "Test",
+			GitUserEmail:     "t@example.com",
+			GitDefaultBranch: "main",
+			GHUsername:       "tester",
+		},
+		Phases:  []PhaseConfig{aptPhase()},
+		Targets: map[string]*TargetConfig{"web": {Phases: []PhaseConfig{aptPhase()}}},
+	}
+	err := ValidateSprootConfig(cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "phases and targets cannot both be set") {
+		t.Errorf("error %q missing expected message", err.Error())
+	}
+}
+
+func TestValidateSprootConfig_TargetDanglingExtends(t *testing.T) {
+	cfg := &SprootConfig{
+		SchemaVersion: 1,
+		Identity: Identity{
+			GitUserName:      "Test",
+			GitUserEmail:     "t@example.com",
+			GitDefaultBranch: "main",
+			GHUsername:       "tester",
+		},
+		Targets: map[string]*TargetConfig{
+			"web": {Extends: "nonexistent", Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	err := ValidateSprootConfig(cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `extends "nonexistent" not found`) {
+		t.Errorf("error %q missing expected message", err.Error())
+	}
+}
+
+// --- ValidateHostConfig with config_source ---
+
+func TestValidateHostConfig_LocalSource(t *testing.T) {
+	cfg := &HostConfig{
+		ConfigSource:    "local",
+		ConfigLocalPath: "~/my-config",
+		TokenEnv:        "SPRITE_TOKEN",
+	}
+	if err := ValidateHostConfig(cfg); err != nil {
+		t.Errorf("expected no error for local source: %v", err)
+	}
+}
+
+func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
+	cfg := &HostConfig{
+		ConfigSource: "local",
+		TokenEnv:     "SPRITE_TOKEN",
+	}
+	err := ValidateHostConfig(cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "config_local_path is required") {
+		t.Errorf("error %q missing expected message", err.Error())
+	}
+}
+
+func TestValidateHostConfig_InvalidSource(t *testing.T) {
+	cfg := &HostConfig{
+		ConfigSource: "ftp",
+		TokenEnv:     "SPRITE_TOKEN",
+	}
+	err := ValidateHostConfig(cfg)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), `"ftp" is not valid`) {
+		t.Errorf("error %q missing expected message", err.Error())
 	}
 }
 

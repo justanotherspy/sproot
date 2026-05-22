@@ -40,8 +40,11 @@ jobs:
       - name: build
         run: go build -o sproot ./cmd/sproot
 
-      - name: validate
+      - name: validate flat config
         run: ./sproot validate --path internal/config/testdata/sproot.yaml
+
+      - name: validate multi-target config
+        run: ./sproot validate --path internal/config/testdata/sproot_targets.yaml
 
   lint:
     name: lint
