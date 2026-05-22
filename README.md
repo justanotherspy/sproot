@@ -142,6 +142,7 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output (`--env KEY=val,K2=v2`) |
 | `sproot list` | host | List sproot-managed sprites (`--all` shows every sprite, `--prefix` filters by name, `--watch` refreshes live) |
 | `sproot upgrade <name>` | host | Upgrade the sprite CLI inside a sprite |
+| `sproot self-update` | host | Upgrade the sproot binary itself to the latest release (`--check` reports availability without installing) |
 | `sproot checkpoint <name>` | host | Create a checkpoint (`--comment` adds a label) |
 | `sproot checkpoints <name>` | host | List checkpoints (`--include-auto` shows auto checkpoints) |
 | `sproot restore <name> <id>` | host | Restore a sprite from a checkpoint |
@@ -238,6 +239,27 @@ make install
 ```
 
 Requires Go 1.25+.
+
+## Staying up to date
+
+sproot checks GitHub at most once a day for a newer release and, when one exists, prints a one-line notice (to stderr) after any command:
+
+```
+! a new version of sproot is available: v0.2.0 (you have v0.1.0)
+! run 'sproot self-update' to upgrade
+```
+
+The check result is cached at `~/.sproot/update-check.json`, so only the first command in a 24 hour window touches the network. The notice never blocks or alters the command you ran.
+
+Upgrade in place with:
+
+```sh
+sproot self-update
+```
+
+`self-update` always re-checks upstream (ignoring the daily cache), downloads the release archive for your OS and architecture, verifies its SHA256 checksum, replaces the running binary, and clears the cache. Use `sproot self-update --check` to report whether an update is available without installing it.
+
+To silence the daily notice (for example in CI), set `SPROOT_NO_UPDATE_CHECK` to any value. Self-updating a `dev` build is unsupported; reinstall via the install script instead.
 
 ## Verifying release signatures
 
