@@ -108,11 +108,20 @@ func RunNew(ctx context.Context, opts NewOptions) error {
 		client = NewClient(token)
 	}
 
+	if localConfigDir != "" {
+		l.Debugf("config source: local dir %s (config path %q)", localConfigDir, configPath)
+	} else {
+		l.Debugf("config source: git %s ref %s (config path %q)", cfg.SprootConfigRepo, cfg.SprootConfigRef, configPath)
+	}
+	l.Debugf("resolved config SHA %s; %d env var(s) forwarded", configSHA, len(envBlock))
+
 	l.Infof("creating sprite %s", opts.Name)
+	l.Debugf("calling sprite API to create %q", opts.Name)
 	handle, err := client.CreateSprite(ctx, opts.Name, nil, []string{labelBase})
 	if err != nil {
 		return fmt.Errorf("create sprite: %w", err)
 	}
+	l.Debugf("sprite %q created", opts.Name)
 
 	binarySrc := opts.binarySrcFn
 	if binarySrc == nil {

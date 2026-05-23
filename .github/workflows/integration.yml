@@ -22,12 +22,18 @@ jobs:
           cache: true
 
       - name: build
-        run: GOOS=linux GOARCH=amd64 go build -o sproot ./cmd/sproot
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o sproot ./cmd/sproot
+          # Ship the retry wrapper alongside the binary so jobs that only
+          # download the artifact (no checkout) can still use it.
+          cp .github/scripts/retry.sh retry.sh
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: sproot-linux-amd64
-          path: sproot
+          path: |
+            sproot
+            retry.sh
           retention-days: 1
 
   integration:
@@ -123,11 +129,13 @@ jobs:
           if [ -n "$MATRIX_TARGET" ]; then
             TARGET_FLAG="--target $MATRIX_TARGET"
           fi
-          ./sproot new "spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}" \
-            --only "$MATRIX_ONLY" \
-            $TARGET_FLAG \
-            --skip-console \
-            --debug
+          NAME="spr-${MATRIX_NAME}-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --only "$MATRIX_ONLY" \
+              $TARGET_FLAG \
+              --skip-console \
+              --debug
 
       - name: destroy sprite
         if: always()
@@ -174,20 +182,22 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-push-${RUN_ID}-${RUN_ATTEMPT}" \
-            --only cmd \
-            --skip-console \
-            --debug
+          NAME="spr-push-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --only cmd \
+              --skip-console \
+              --debug
 
       - name: push to sprite
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot push --name "spr-push-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
+          bash retry.sh ./sproot push --name "spr-push-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()
@@ -231,10 +241,12 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-local-${RUN_ID}-${RUN_ATTEMPT}" \
-            --only cmd \
-            --skip-console \
-            --debug
+          NAME="spr-local-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --only cmd \
+              --skip-console \
+              --debug
 
       - name: destroy sprite
         if: always()
@@ -278,20 +290,22 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" \
-            --only cmd \
-            --skip-console \
-            --debug
+          NAME="spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --only cmd \
+              --skip-console \
+              --debug
 
       - name: push to sprite (local config)
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot push --name "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
+          bash retry.sh ./sproot push --name "spr-pushloc-${RUN_ID}-${RUN_ATTEMPT}" --no-checkpoint --only cmd --debug
 
       - name: check outdated (local config)
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()
@@ -339,13 +353,15 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-multi-${RUN_ID}-${RUN_ATTEMPT}" \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-multi-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: verify labels are current
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: verify post-setup context written
         env:
@@ -404,10 +420,12 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-docker-${RUN_ID}-${RUN_ATTEMPT}" \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-docker-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: verify daemon.json merged with overlay2 and dockerd registered
         env:
@@ -465,14 +483,16 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-mttgt-${RUN_ID}-${RUN_ATTEMPT}" \
-            --target web \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-mttgt-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --target web \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: verify labels are current
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()
@@ -517,14 +537,16 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-locmt-${RUN_ID}-${RUN_ATTEMPT}" \
-            --target web \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-locmt-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --target web \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: verify labels are current
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()
@@ -572,18 +594,20 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}" \
-            --target web \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --target web \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: push to sprite (web target)
         env:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot push \
+          bash retry.sh ./sproot push \
             --name "spr-pushtgt-${RUN_ID}-${RUN_ATTEMPT}" \
             --target web \
             --no-checkpoint \
@@ -591,7 +615,7 @@ jobs:
             --debug
 
       - name: verify labels still current after push
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()
@@ -636,13 +660,15 @@ jobs:
           RUN_ID: ${{ github.run_id }}
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
-          ./sproot new "spr-locmp-${RUN_ID}-${RUN_ATTEMPT}" \
-            --skip-console \
-            --skip-verify \
-            --debug
+          NAME="spr-locmp-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --skip-console \
+              --skip-verify \
+              --debug
 
       - name: verify labels are current
-        run: ./sproot outdated | tee /dev/stderr | grep "current"
+        run: bash retry.sh bash -c './sproot outdated | tee /dev/stderr | grep "current"'
 
       - name: destroy sprite
         if: always()

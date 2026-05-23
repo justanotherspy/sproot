@@ -49,6 +49,34 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 - add an update to /.sprite/llm.txt and /.sprite/docs/agent-context.md after setup (DONE: Phase 18a)
 - have a detailed explanation of what scopes are needed on the gh token (DONE: Phase 18b)
 
+## Done (Phase 19 - module gaps to drain cmd blocks)
+
+- binary_release `version`/`{tag}`/`{tag_no_v}` template support (DONE: Phase 19, drains gitleaks/cosign cmd)
+- binary_release `arch_map` + `{arch_alias}` for non-standard arch naming (DONE: Phase 19, hadolint)
+- binary_release `cosign` keyless verify-blob of a signed checksums file (DONE: Phase 19, drains trufflehog cmd)
+- merge `claude upgrade` cmd + `claude_settings` into one `claude` module (settings deep-merge, upgrade, managed CLAUDE.md) (DONE: Phase 19)
+- docker `daemon_json` deep-merge, sprite-env-aware (no systemctl on a sprite) (DONE: Phase 19)
+- apt `symlinks` with ~ expansion + parent mkdir (DONE: Phase 19, drains bat/fd shims)
+- runPrivileged (sudo -n when not root) so apt-get/dpkg work as the unprivileged sprite user (DONE: Phase 19)
+- sprites-artefacts reference snapshot of platform llm.txt/docs (DONE: Phase 19)
+
+## Done (Phase 20 - self-update)
+
+- daily cached release check (~/.sproot/update-check.json) that notifies after any command (DONE: Phase 20)
+- `sproot self-update` (with `--check`) downloads/verifies/replaces the binary and clears the cache (DONE: Phase 20)
+- SPROOT_NO_UPDATE_CHECK opt-out (DONE: Phase 20)
+
+## Done (Phase 14 - Claude plugin marketplace skills)
+
+- create a claude skill to convert a script into a sproot.yaml (DONE: Phase 14c, plugins/sproot script-convert)
+- create a skill for sproot usage / config authoring (DONE: Phase 14b, plugins/sproot author-config)
+- golden fixtures validated in CI via plugins.yml (DONE: Phase 14)
+
+## Done (examples and design notes, post-Phase 20)
+
+- OpenClaw builder example using repo_clone URL+dest, npm, file_template, sprite_service http_port (DONE: #51, examples/openclaw/)
+- design doc for running a Claude agent on a sprite (DONE: #50, plans/claude-agent.md)
+
 ## Dropped / deferred (Phase 18)
 
 - on config init inspect sprite config for an org and offer to select one automatically (DROPPED: Phase 18c, the sprites-go SDK exposes no org-listing method; only CreateSpriteWithOrg and an OrgInfo returned alongside sprite listings)
@@ -57,9 +85,8 @@ Items marked DONE are implemented and merged. Items with a phase reference are t
 ## Deferred
 
 - inter-sproot URL templating to pass connection strings between sprites (Phase 13a future direction)
-- create a claude skill to convert a script into a sproot.yaml (Phase 14c)
-- if we can better align our tool with the sdk, create a skill for sproot usage (Phase 14b)
 - update required checks to have specific CI jobs required before merging so auto-merge works (Phase 15d, GitHub settings change)
 - consider a claude code review workflow (Phase 15g)
 - currentConfigSHA re-clones the git repo on every sproot outdated call (Phase 17i, deferred until users complain)
 - RunNew clones the git config repo twice end-to-end (Phase 17j, deferred until startup time is a complaint)
+- dedicated `claude_agent` module (candidate Phase 21; design in plans/claude-agent.md, deferred per its Q3 until the cmd recipe recurs)

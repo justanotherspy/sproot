@@ -28,6 +28,12 @@ func newRootCmd() *cobra.Command {
 		Version: version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			log.SetDebug(debug)
+			// Flags and args have already been validated by this point, so any
+			// later error is a runtime failure (network, sprite API, etc). Stop
+			// cobra from dumping the usage block after such errors; the error
+			// message alone is what the user needs. Usage is still shown for
+			// flag/arg parse errors, which happen before this hook runs.
+			cmd.SilenceUsage = true
 			return nil
 		},
 		PersistentPostRunE: func(cmd *cobra.Command, args []string) error {
