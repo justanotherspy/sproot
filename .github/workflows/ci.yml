@@ -72,7 +72,8 @@ jobs:
             echo "sproot_config_path: sproot.yaml"
             echo "token_env: SPRITES_TOKEN"
           } > ~/.sproot/config.yaml
-          ./sproot validate | tee /dev/stderr | grep -q "is valid"
+          # validate logs to stderr, so merge it into the pipe before grep.
+          ./sproot validate 2>&1 | tee /dev/stderr | grep -q "is valid"
 
   lint:
     name: lint

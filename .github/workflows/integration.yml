@@ -184,7 +184,7 @@ jobs:
       # repo (over HTTPS, using the SHA cache), exercising the same resolution
       # `sproot new` uses.
       - name: validate from configured repo (no --path)
-        run: bash retry.sh bash -c './sproot validate | tee /dev/stderr | grep -q "is valid"'
+        run: bash retry.sh bash -c './sproot validate 2>&1 | tee /dev/stderr | grep -q "is valid"'
 
       - name: create sprite
         env:
