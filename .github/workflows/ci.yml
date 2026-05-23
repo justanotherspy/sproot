@@ -60,6 +60,20 @@ jobs:
       - name: validate multi-target config
         run: ./sproot validate --path internal/config/testdata/sproot_targets.yaml
 
+      # No --path: validate resolves the sproot.yaml from the configured source
+      # in ~/.sproot/config.yaml. Use a local source pointing at the checked-out
+      # testdata so this stays hermetic (no network).
+      - name: validate from configured source (no --path)
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "sproot_config_source: local"
+            echo "sproot_config_local_path: $GITHUB_WORKSPACE/internal/config/testdata"
+            echo "sproot_config_path: sproot.yaml"
+            echo "token_env: SPRITES_TOKEN"
+          } > ~/.sproot/config.yaml
+          ./sproot validate | tee /dev/stderr | grep -q "is valid"
+
   lint:
     name: lint
     runs-on: ubuntu-latest

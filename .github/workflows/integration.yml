@@ -180,6 +180,12 @@ jobs:
             echo "gh_token_env: GITHUB_TOKEN"
           } > ~/.sproot/config.yaml
 
+      # No --path: validate resolves the sproot.yaml from the configured git
+      # repo (over HTTPS, using the SHA cache), exercising the same resolution
+      # `sproot new` uses.
+      - name: validate from configured repo (no --path)
+        run: bash retry.sh bash -c './sproot validate | tee /dev/stderr | grep -q "is valid"'
+
       - name: create sprite
         env:
           RUN_ID: ${{ github.run_id }}

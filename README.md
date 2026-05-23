@@ -158,7 +158,7 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot outdated` | host | Show which sproot-managed sprites have a stale config SHA |
 | `sproot config init` | host | Interactive `~/.sproot/config.yaml` setup (`--non-interactive` for scripting) |
 | `sproot config validate` | host | Validate `~/.sproot/config.yaml` only |
-| `sproot validate [--path PATH]` | host | Validate a sproot.yaml (also validates `~/.sproot/config.yaml`); missing file is a warning unless `--strict` is passed |
+| `sproot validate [--path PATH]` | host | Validate the sproot.yaml from the configured source (the git config repo or local config dir) plus `~/.sproot/config.yaml`; `--path` validates a specific local file instead; missing file is a warning unless `--strict` is passed |
 | `sproot setup` | sprite | Clone config repo and run phases |
 | `sproot setup --status` | sprite | Print phase state table |
 
