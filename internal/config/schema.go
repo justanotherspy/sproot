@@ -411,6 +411,7 @@ type GoInstallConfig struct {
 // CargoTool is one entry in a cargo_install phase.
 type CargoTool struct {
 	Name     string   `yaml:"name"`
+	Bin      string   `yaml:"bin"`      // optional; binary name when it differs from the crate name
 	Version  string   `yaml:"version"`  // optional; omit for latest
 	Locked   bool     `yaml:"locked"`   // optional; passes --locked
 	Features []string `yaml:"features"` // optional

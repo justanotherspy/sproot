@@ -65,16 +65,41 @@ func (p *ghTokenPhase) Run(ctx *phase.Context) error {
 }
 
 // ghLoginCmd constructs the gh auth login command with token piped via stdin.
+// GH_TOKEN/GITHUB_TOKEN are stripped from the child environment: gh refuses to
+// run `auth login` while either is set (it would use the env value instead of
+// persisting credentials) and exits non-zero. With them cleared, login writes
+// the token to ~/.config/gh/hosts.yml so future sessions authenticate without
+// the env var present.
 func ghLoginCmd(token string) *exec.Cmd {
 	cmd := exec.Command("gh", "auth", "login",
 		"--hostname", "github.com",
 		"--git-protocol", "ssh",
 		"--with-token",
 	)
+	cmd.Env = envWithout(os.Environ(), "GH_TOKEN", "GITHUB_TOKEN")
 	cmd.Stdin = strings.NewReader(token)
 	cmd.Stdout = io.Discard
 	cmd.Stderr = io.Discard
 	return cmd
+}
+
+// envWithout returns env with any "KEY=value" entry whose key matches one of
+// keys removed. Used to clear auth env vars that would otherwise short-circuit
+// commands that need to operate on persisted credentials.
+func envWithout(env []string, keys ...string) []string {
+	drop := make(map[string]bool, len(keys))
+	for _, k := range keys {
+		drop[k] = true
+	}
+	out := env[:0:0]
+	for _, e := range env {
+		name, _, _ := strings.Cut(e, "=")
+		if drop[name] {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }
 
 func (p *ghTokenPhase) Verify(ctx *phase.Context) error {

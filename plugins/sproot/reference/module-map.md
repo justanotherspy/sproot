@@ -14,7 +14,7 @@ specific module. Fall back to `cmd` only when nothing structured fits. Field sha
 | `pipx install X` | `uv_tool` | Same role as pipx; prefer `uv_tool`. |
 | `pip install X` / `pip3 install X` for a CLI tool | `uv_tool` (preferred) | If it is a library (not a CLI), or installs into a project venv, use `cmd`. |
 | `go install pkg@ver` | `go_install` | `tools: [{pkg, version}]`. Default `version: latest` if `@latest` or none given. |
-| `cargo install X` | `cargo_install` | Map `--locked`->`locked: true`, `--features a,b`->`features: [a, b]`, `--version V`->`version: "V"`. |
+| `cargo install X` | `cargo_install` | Map `--locked`->`locked: true`, `--features a,b`->`features: [a, b]`, `--version V`->`version: "V"`. Set `bin:` when the crate's binary name differs from the crate name. |
 | `rustup component add X [Y]` | `rust_components` | `components: [X, Y]`. |
 | `corepack enable` / `corepack prepare pnpm --activate` | `corepack` | `managers:` = the managers enabled (default `[pnpm]` if only `corepack enable`, otherwise list what is activated). |
 | `npm install` / `npm ci` (in a project dir) | `npm` | `dir:` = the directory with `package.json`. |

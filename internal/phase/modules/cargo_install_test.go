@@ -56,3 +56,24 @@ func TestCargoInstall_VerifyFailsWhenBinaryMissing(t *testing.T) {
 		t.Error("expected Verify to fail when binary not on PATH")
 	}
 }
+
+func TestCargoInstall_VerifyUsesBinOverride(t *testing.T) {
+	bin := "sh" // reliably on PATH; stands in for a crate's differently-named binary
+	if _, err := exec.LookPath(bin); err != nil {
+		t.Skipf("%s not on PATH", bin)
+	}
+	// Crate name is bogus but bin resolves: Verify must check bin, so it passes.
+	pass := &cargoInstallPhase{cfg: &config.CargoInstallConfig{
+		Tools: []config.CargoTool{{Name: "sproot-nonexistent-xyzzy-crate", Bin: bin}},
+	}}
+	if err := pass.Verify(testCtx(t)); err != nil {
+		t.Errorf("expected Verify to pass using bin override %q, got: %v", bin, err)
+	}
+	// Crate name resolves but bin is bogus: Verify must check bin, so it fails.
+	fail := &cargoInstallPhase{cfg: &config.CargoInstallConfig{
+		Tools: []config.CargoTool{{Name: bin, Bin: "sproot-nonexistent-xyzzy-bin"}},
+	}}
+	if err := fail.Verify(testCtx(t)); err == nil {
+		t.Error("expected Verify to fail when bin override not on PATH")
+	}
+}

@@ -69,7 +69,8 @@ Ubuntu name quirks: `bat` installs as `batcat`, `fd-find` as `fdfind`: add `syml
 ```yaml
 - type: cargo_install
   tools:                     # (req) non-empty
-    - name: ripgrep          # (req)
+    - name: ripgrep          # (req) crate name
+      bin: rg                # optional, binary name when it differs from the crate
       version: "0.9.72"      # optional
       locked: true           # optional, passes --locked
       features: [foo]        # optional
