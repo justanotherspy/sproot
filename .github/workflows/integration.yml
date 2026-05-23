@@ -681,3 +681,59 @@ jobs:
           RUN_ATTEMPT: ${{ github.run_attempt }}
         run: |
           ./sproot destroy --force "spr-locmp-${RUN_ID}-${RUN_ATTEMPT}"
+
+  config-ssh-url:
+    name: test config-repo SSH URL rewrite
+    needs: build
+    if: github.event.pull_request.user.login == 'justanotherspy'
+    runs-on: ubuntu-latest
+    env:
+      SPRITES_TOKEN: ${{ secrets.SPRITES_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: sproot-linux-amd64
+
+      - name: chmod binary
+        run: chmod +x sproot
+
+      # Configure the public config repo with its SSH URL. This runner has no SSH
+      # key (so the host falls back to HTTPS) and a fresh sprite has none either
+      # (so the in-sprite clone rewrites to HTTPS). Bootstrap must still succeed.
+      - name: write host config (ssh url)
+        env:
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mkdir -p ~/.sproot
+          {
+            echo "sproot_config_repo: git@github.com:$REPO.git"
+            echo "sproot_config_ref: $HEAD_REF"
+            echo "sproot_config_path: testdata/integration/sproot.yaml"
+            echo "token_env: SPRITES_TOKEN"
+            echo "gh_token_env: GITHUB_TOKEN"
+          } > ~/.sproot/config.yaml
+
+      - name: create sprite (ssh url rewritten to https)
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          NAME="spr-sshurl-${RUN_ID}-${RUN_ATTEMPT}"
+          RETRY_CLEANUP="./sproot destroy --force $NAME" bash retry.sh \
+            ./sproot new "$NAME" \
+              --only cmd \
+              --skip-console \
+              --debug 2>&1 | tee /tmp/sshurl.log
+          # The rewrite warning must appear, proving the SSH->HTTPS path ran.
+          grep -q "HTTPS URL" /tmp/sshurl.log
+
+      - name: destroy sprite
+        if: always()
+        continue-on-error: true
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          ./sproot destroy --force "spr-sshurl-${RUN_ID}-${RUN_ATTEMPT}"

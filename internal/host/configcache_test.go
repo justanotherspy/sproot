@@ -202,3 +202,67 @@ func TestLoadConfigBytes_RefetchesWhenRefChanges(t *testing.T) {
 		t.Errorf("expected refreshed v2 content, got %q", raw)
 	}
 }
+
+func TestEffectiveCloneURL(t *testing.T) {
+	const ssh = "git@github.com:owner/repo.git"
+	const https = "https://github.com/owner/repo.git"
+
+	t.Run("non-github url returned unchanged without probing", func(t *testing.T) {
+		called := false
+		swapLsRemote(t, func(string, string) (string, error) {
+			called = true
+			return "", nil
+		})
+		if got := effectiveCloneURL("file:///tmp/repo", "main", log.New(io.Discard)); got != "file:///tmp/repo" {
+			t.Errorf("got %q; want unchanged", got)
+		}
+		if called {
+			t.Error("ls-remote should not be probed for a non-github-ssh URL")
+		}
+	})
+
+	t.Run("keeps ssh when ssh works", func(t *testing.T) {
+		swapLsRemote(t, func(repo, _ string) (string, error) {
+			if repo != ssh {
+				t.Errorf("expected ssh probe first, got %q", repo)
+			}
+			return "sha", nil
+		})
+		if got := effectiveCloneURL(ssh, "main", log.New(io.Discard)); got != ssh {
+			t.Errorf("got %q; want ssh kept (private-repo access preserved)", got)
+		}
+	})
+
+	t.Run("falls back to https when ssh fails", func(t *testing.T) {
+		swapLsRemote(t, func(repo, _ string) (string, error) {
+			if repo == ssh {
+				return "", errProbe
+			}
+			return "sha", nil
+		})
+		if got := effectiveCloneURL(ssh, "main", log.New(io.Discard)); got != https {
+			t.Errorf("got %q; want https fallback", got)
+		}
+	})
+
+	t.Run("keeps ssh when both fail so the error names the configured URL", func(t *testing.T) {
+		swapLsRemote(t, func(string, string) (string, error) { return "", errProbe })
+		if got := effectiveCloneURL(ssh, "main", log.New(io.Discard)); got != ssh {
+			t.Errorf("got %q; want original ssh URL", got)
+		}
+	})
+}
+
+var errProbe = errProbeT("ls-remote failed")
+
+type errProbeT string
+
+func (e errProbeT) Error() string { return string(e) }
+
+// swapLsRemote replaces lsRemoteFn for the duration of the test.
+func swapLsRemote(t *testing.T, fn func(string, string) (string, error)) {
+	t.Helper()
+	orig := lsRemoteFn
+	lsRemoteFn = fn
+	t.Cleanup(func() { lsRemoteFn = orig })
+}

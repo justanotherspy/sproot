@@ -184,6 +184,36 @@ func TestCloneOrPull_UpdatesRemoteURL(t *testing.T) {
 	}
 }
 
+func TestRewriteConfigRepoURL(t *testing.T) {
+	l := newTestLogger()
+	if got := rewriteConfigRepoURL(l, "git@github.com:owner/repo.git"); got != "https://github.com/owner/repo.git" {
+		t.Errorf("ssh url not rewritten: got %q", got)
+	}
+	if got := rewriteConfigRepoURL(l, "https://github.com/owner/repo.git"); got != "https://github.com/owner/repo.git" {
+		t.Errorf("https url should be unchanged: got %q", got)
+	}
+	if got := rewriteConfigRepoURL(l, "file:///tmp/repo"); got != "file:///tmp/repo" {
+		t.Errorf("local url should be unchanged: got %q", got)
+	}
+}
+
+func TestRedactGitArgs(t *testing.T) {
+	args := []string{
+		"-c", "http.https://github.com/.extraheader=AUTHORIZATION: basic eC1hY2Nlc3MtdG9rZW46czNjcmV0",
+		"clone", "--branch", "main", "https://github.com/owner/repo.git", "/dest",
+	}
+	got := redactGitArgs(args)
+	if strings.Contains(got, "eC1hY2Nlc3MtdG9rZW46czNjcmV0") {
+		t.Errorf("credential not redacted: %q", got)
+	}
+	if !strings.Contains(got, "basic REDACTED") {
+		t.Errorf("expected redacted header, got %q", got)
+	}
+	if !strings.Contains(got, "clone --branch main") {
+		t.Errorf("non-credential args should be preserved, got %q", got)
+	}
+}
+
 func TestRunSetup_SkipVerify(t *testing.T) {
 	// Create a minimal local config dir (no rc_block, so verify will always fail the
 	// sentinel check when the phase runs against a fresh HOME).

@@ -124,7 +124,7 @@ func RunConfigInitInteractive(path string) error {
 			localPath, configPathLine, tokenEnv, ghTokenEnv, defaultOrg,
 		)
 	} else {
-		configRepo, rerr := promptField(r, "sproot_config_repo (e.g. git@github.com:you/sprite.git)", "")
+		configRepo, rerr := promptField(r, "sproot_config_repo (e.g. https://github.com/you/sprite.git)", "")
 		if rerr != nil {
 			return rerr
 		}

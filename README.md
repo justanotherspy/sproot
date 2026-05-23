@@ -110,7 +110,7 @@ The [`examples/`](examples/) directory holds complete, ready-to-adapt configs.
 `~/.sproot/config.yaml` format:
 
 ```yaml
-sproot_config_repo: git@github.com:yourname/sprite.git
+sproot_config_repo: https://github.com/yourname/sprite.git
 sproot_config_ref: main
 sproot_config_path: ""             # optional; path to sproot.yaml within the config repo
 token_env: SPRITES_TOKEN     # name of env var holding your sprites API token
@@ -119,6 +119,8 @@ default_org: ""
 # sproot_config_source: local      # set to "local" to use a directory instead of a git repo
 # sproot_config_local_path: ~/my-sprite-config
 ```
+
+Prefer the **HTTPS** URL (`https://github.com/...`) for `sproot_config_repo`. The config repo is cloned again inside each freshly created sprite, which has no SSH key registered with GitHub and no `github.com` in `known_hosts`, so an SSH URL (`git@github.com:...`) cannot be cloned there during bootstrap. A public repo clones anonymously over HTTPS; a private repo clones with the `gh_token_env` token. If you do configure an SSH URL, sproot rewrites it to HTTPS for the clone and logs a warning so you can update your config.
 
 The config stores environment variable **names**, not token values. Tokens stay in your shell environment (e.g. exported from your password manager or `.profile`). Each sprite generates its own SSH keypair; `sproot destroy` removes it from GitHub automatically.
 

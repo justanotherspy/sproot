@@ -120,7 +120,16 @@ func RunSetup(opts SetupOptions) error {
 // cloneOrPull clones repoURL at ref into dest. If dest already contains a git
 // repository it fetches and checks out the requested ref instead.
 // If the recorded remote URL differs from repoURL, the remote is updated first.
+//
+// A GitHub SSH config-repo URL is rewritten to HTTPS first: a fresh sprite has
+// no SSH key registered with GitHub and no known_hosts entry, so the SSH form
+// cannot be cloned here (the ssh_setup phase that would provision them runs
+// later, from inside this very repo). GH_TOKEN, when forwarded, authenticates
+// the HTTPS clone of a private repo without persisting the token to disk.
 func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
+	repoURL = rewriteConfigRepoURL(l, repoURL)
+	auth := config.GitHubHTTPSAuthArgs(os.Getenv("GH_TOKEN"), repoURL)
+
 	if _, err := os.Stat(filepath.Join(dest, ".git")); err == nil {
 		l.Debugf("existing repo found at %s; will fetch and checkout", dest)
 		if current, err := gitOutput("-C", dest, "remote", "get-url", "origin"); err == nil {
@@ -132,7 +141,7 @@ func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 			}
 		}
 		l.Infof("updating config repo at %s", dest)
-		if err := runGit("-C", dest, "fetch", "--prune", "origin"); err != nil {
+		if err := runGit(append(auth, "-C", dest, "fetch", "--prune", "origin")...); err != nil {
 			return err
 		}
 		l.Debugf("checking out ref %s", ref)
@@ -140,11 +149,22 @@ func cloneOrPull(l *log.Logger, repoURL, ref, dest string) error {
 			return err
 		}
 		// Fast-forward pull; silently ignored for detached HEAD (SHA or tag).
-		_ = runGit("-C", dest, "merge", "--ff-only")
+		_ = runGit(append(auth, "-C", dest, "merge", "--ff-only")...)
 		return nil
 	}
 	l.Infof("cloning %s (ref %s)", repoURL, ref)
-	return runGit("clone", "--branch", ref, repoURL, dest)
+	return runGit(append(auth, "clone", "--branch", ref, repoURL, dest)...)
+}
+
+// rewriteConfigRepoURL rewrites a GitHub SSH config-repo URL to HTTPS for the
+// in-sprite bootstrap clone, warning the user (once) so they can update their
+// host config. Non-rewritten URLs are returned unchanged with no log output.
+func rewriteConfigRepoURL(l *log.Logger, url string) string {
+	normalized, rewritten := config.NormalizeGitHubCloneURL(url)
+	if rewritten {
+		l.Warnf("config repo SSH URL %q rewritten to %q for the in-sprite clone (a fresh sprite has no SSH key registered with GitHub); set sproot_config_repo to the HTTPS URL to silence this", url, normalized)
+	}
+	return normalized
 }
 
 // runGit runs git with the given arguments, streaming stdout and stderr directly
@@ -158,11 +178,26 @@ func runGit(args ...string) error {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return fmt.Errorf("git %s timed out after %s: %w", strings.Join(args, " "), config.GitOpTimeout, ctx.Err())
+			return fmt.Errorf("git %s timed out after %s: %w", redactGitArgs(args), config.GitOpTimeout, ctx.Err())
 		}
 		return err
 	}
 	return nil
+}
+
+// redactGitArgs joins git args for display, masking the credential value in any
+// http.*.extraheader argument so a forwarded token never reaches logs.
+func redactGitArgs(args []string) string {
+	out := make([]string, len(args))
+	for i, a := range args {
+		if strings.Contains(a, "extraheader=") {
+			if idx := strings.Index(a, "basic "); idx != -1 {
+				a = a[:idx+len("basic ")] + "REDACTED"
+			}
+		}
+		out[i] = a
+	}
+	return strings.Join(out, " ")
 }
 
 // gitOutput runs git and returns its trimmed stdout, bounded by config.GitOpTimeout.
@@ -175,7 +210,7 @@ func gitOutput(args ...string) (string, error) {
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			return "", fmt.Errorf("git %s timed out after %s: %w", strings.Join(args, " "), config.GitOpTimeout, ctx.Err())
+			return "", fmt.Errorf("git %s timed out after %s: %w", redactGitArgs(args), config.GitOpTimeout, ctx.Err())
 		}
 		return "", err
 	}
