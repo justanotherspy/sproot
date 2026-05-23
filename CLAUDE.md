@@ -89,7 +89,18 @@ Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `s
 
 `integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs include module-type matrix entries (apt, git_identity, file_template, rc_block, claude, cmd, binary-release), tooling matrix entries against `sproot_tooling.yaml` (uv_tool, corepack, rust_components, go_install, cargo_install, npm, sprite_service), a docker-daemon job (docker daemon.json merge + sprite_service dockerd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path). `gh_token` and `ssh_setup` are not in the matrix: they need a user-scoped GitHub PAT and mutate the GitHub account, so they cannot run unattended with the default Actions token. The `cargo_install` job uses a small, dependency-light crate (`hexyl`, ~25s to compile on the base image) to keep it fast; avoid swapping in crates with heavy dependency trees.
 
-When a CI job fails, always fetch the full logs using the gh CLI before diagnosing:
+When a CI job fails, the fastest way to see the errors is the `shuck` CLI (from `justanotherspy/shuck`), which extracts only the failing step logs from a PR's CI runs:
+
+```
+shuck                       # failing logs for the current branch's open PR
+shuck <pr>                  # PR number, inferred from local repo origin
+shuck <owner>/<repo> <pr>   # explicit PR reference
+shuck <pr-url>              # from a GitHub PR URL
+```
+
+Install with `go install github.com/justanotherspy/shuck@latest` (or the install script in that repo). Useful flags: `--full` (complete logs, not just errors), `--context N` (lines around each error), `--refresh` (rebuild cache).
+
+If `shuck` is unavailable, fall back to the gh CLI:
 
 ```
 gh run view <run-id> --log-failed
