@@ -48,3 +48,10 @@ phases:
     service: sproot-test-svc
     cmd: /bin/sleep
     args: ["86400"]
+
+  # sproot itself is injected at /usr/local/bin/sproot and is cobra-based, so it
+  # is a self-contained completion target (no extra tool install needed).
+  - type: shell_completion
+    completions:
+      - command: sproot
+        shells: [bash, zsh, fish]

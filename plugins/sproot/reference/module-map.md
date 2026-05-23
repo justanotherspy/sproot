@@ -29,6 +29,7 @@ specific module. Fall back to `cmd` only when nothing structured fits. Field sha
 | install docker (`get.docker.com`, `apt install docker-ce`) | `docker` | If the script writes `/etc/docker/daemon.json`, fold that JSON into `daemon_json:`. |
 | start a long-running daemon/service (`dockerd &`, `systemctl start`, `nohup ... &`, a `start.sh`) | `sprite_service` | `cmd:` = the executable; `args:`/`http_port:`/`needs:` as applicable. Sprites have no systemd. |
 | configure Claude Code (`claude upgrade`, write `~/.claude/settings.json`, write a global `CLAUDE.md`) | `claude` | `upgrade: true`, `settings:` (the JSON), `claude_md:` (companion file). |
+| generate/install shell completions (`tool completion bash > ...`, `tool completion zsh`, writing to bash-completion/zsh fpath/fish dirs) | `shell_completion` | One entry per command: `command` + `shells: [...]`. Add `gen:` only for non-cobra tools. Order after the phase that installs the command. |
 | `gh auth login` with a token | `gh_token` + an `env` entry for the token | Never inline the token. |
 | generate/register an SSH key with GitHub | `ssh_setup` + an `env` entry for the PAT | |
 | anything unrecognized | `cmd` | `run:` verbatim; add a best-effort `check:`; set a short `name:`. Flag for review. |

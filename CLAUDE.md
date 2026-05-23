@@ -67,9 +67,10 @@ plugins/sproot/       - the sproot Claude plugin: script-convert + author-config
 | 14 | Intelligence: Claude plugin marketplace with two skills (`script-convert` bash->sproot.yaml converter, `author-config` usage assistant); golden fixtures validated in CI (done) |
 | 15-16 | Operational improvements, integration depth, make e2e (done) |
 | 17 | Code quality and bug fixes: push env forwarding, HTTP timeouts, label/SHA cleanup, MIGRATION.md; module additions (repo_clone URLs, npm, sprite_service http_port/needs) (done) |
-| 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d deferred) |
+| 18 | Intelligence and completion: llm.txt/agent-context.md after setup (18a done), token scope docs (18b done); config init org auto-select (18c dropped, no SDK org-listing method); release workflow test (18d done, validated by the v0.1.0 release: all 5 archives + checksums + sigstore bundle) |
 | 19 | Module gaps to drain cmd blocks: binary_release `version`/`arch_map`/cosign; merge `claude upgrade`+`claude_settings` into a `claude` module (settings/upgrade/CLAUDE.md); sprite-env-aware docker daemon.json merge; apt symlink ~ expansion + mkdir; sprites-artefacts reference snapshot (done) |
 | 20 | Self-update: daily cached release check (`~/.sproot/update-check.json`) that notifies after any command; `sproot self-update` (with `--check`) downloads/verifies/replaces the binary and clears the cache; `SPROOT_NO_UPDATE_CHECK` opt-out (done) |
+| 21 | Config SHA cache (`~/.sproot/config-cache.json`): `git ls-remote` short-circuits the host-side clone in `sproot new`/`push`/`outdated` when the ref has not moved (17i/17j); new `shell_completion` module (generate + install bash/zsh/fish completions, zsh fpath auto-wire). 19 module types (done) |
 
 ## Workflow
 

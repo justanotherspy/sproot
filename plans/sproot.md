@@ -303,6 +303,67 @@ no sprite interaction), wired through a new `sproot self-update` command and the
 
 ---
 
+### Phase 21: Config SHA cache + shell_completion module — DONE
+
+Two independent improvements drained from the open-items list.
+
+#### Config SHA cache (17i + 17j host-side clone)
+
+`sproot new`, `push`, and `outdated` previously did a full `git clone --depth 1` of the
+config repo host-side on every invocation just to read `sproot.yaml` (resolve the env block and
+compute the config SHA). Now a cache at `~/.sproot/config-cache.json` keyed by
+`(repo, ref, configPath)` stores the last-cloned `sproot.yaml` content alongside the git commit
+SHA the ref pointed at. `loadConfigBytes` (in `internal/host/configcache.go`) first runs a cheap
+`git ls-remote <repo> <ref>`; on a cache hit (the ref still points at the cached commit) it returns
+the cached content and skips the clone entirely. A cache miss, or any `ls-remote` failure, falls
+back to the full clone and refreshes the cache, so behavior is never worse than before.
+
+- Only the public `sproot.yaml` content is cached. The env block (which resolves to secret values)
+  is re-resolved from the host environment on every call via `parseAndResolveEnv`; secrets never
+  touch disk.
+- `parseLsRemote` prefers `refs/heads/<ref>` over a same-named tag (mirroring `git clone --branch`)
+  and the dereferenced `^{}` commit for annotated tags (so it matches `git rev-parse HEAD`).
+- `readEnvBlock` is now a thin wrapper over `loadConfigBytes` + `parseAndResolveEnv`;
+  `currentConfigSHA` benefits automatically. The cache write is atomic (temp+rename), mirroring the
+  Phase 20 update-check cache.
+- Tests: `internal/host/configcache_test.go` covers ls-remote ref selection, cache round-trip, a
+  cache-hit-skips-clone path (overwrites the cached body with a sentinel and asserts it is returned
+  without a re-clone), and cache invalidation when the ref advances (real local git repos).
+
+This is the resolution of deferred items 17i and 17j (the in-sprite clone in `sproot new` is still
+unavoidable; only the host-side clone is cached).
+
+#### shell_completion module
+
+New module (the 19th) that generates and installs shell completion scripts and wires the shell to
+load them, draining a common `cmd` recipe (the `justanotherspy/sprite` config's completion block).
+
+```yaml
+- type: shell_completion
+  completions:
+    - command: sproot
+      shells: [bash, zsh, fish]
+    - command: gh
+      shells: [bash, zsh]
+      gen: "{command} completion {shell}"   # optional; this is the default
+```
+
+- Generation defaults to the cobra convention `{command} completion {shell}` (works for sproot, gh,
+  kubectl, ...), with an optional per-entry `gen` template (tokens `{command}`/`{shell}`, split on
+  whitespace and exec'd directly, no shell) for tools that emit completions differently.
+- Installs to per-user dirs (no root): bash `~/.local/share/bash-completion/completions/<cmd>`,
+  zsh `~/.zfunc/_<cmd>`, fish `~/.config/fish/completions/<cmd>.fish`. bash/fish auto-load; for zsh
+  the module appends a managed `fpath`+`compinit` block to `~/.zshrc` (sentinels
+  `# BEGIN/END SPROOT COMPLETIONS`, replaced not duplicated), reusing rc_block's `applyManagedBlock`.
+- Idempotency: skips when all target files exist and (if zsh) the rc block is current.
+- Files: `internal/config/schema.go` (`ShellCompletionConfig`/`ShellCompletionEntry`), `validate.go`,
+  `internal/phase/modules/shell_completion.go` + test, dry-run entry in `integration_test.go`,
+  `docs/modules.md`, plugin `reference/module-map.md` + `module-schema.md`, a `shell-completion`
+  matrix job in `integration.yml` (generates sproot's own completions on a sprite), and a phase in
+  `testdata/integration/sproot_tooling.yaml`.
+
+---
+
 ### Examples and design notes (post-Phase 20)
 
 These shipped after Phase 20 as docs/examples, not as new code phases.
@@ -345,17 +406,16 @@ All Q1-Q7 resolved.
 
 ## Status and remaining work
 
-All numbered phases (0-20) plus the Phase 14 skills work are done and merged. Nothing in the
-core roadmap is outstanding. The only open items are deferrals and a design that has not been
-committed to code:
+All numbered phases (0-21) plus the Phase 14 skills work are done and merged. Nothing in the
+core roadmap is outstanding. The only open item is a design that has not been committed to code:
 
-- **17i** (deferred): `currentConfigSHA` re-clones the git repo on every `sproot outdated`.
-  Cache or `git ls-remote` if it becomes a complaint.
-- **17j** (deferred): `sproot new` clones the git config repo twice. Unavoidable without
-  `git archive` support; defer unless startup time is a complaint.
-- **18d** (deferred): release workflow end-to-end test, needs a real tag push to the public repo.
+- **17i / 17j** (DONE in Phase 21): the host-side config clone is now cached via `git ls-remote`
+  (`~/.sproot/config-cache.json`). The in-sprite clone in `sproot new` remains (unavoidable).
+- **18d** (DONE): validated by the published `v0.1.0` release, which carries all 5 platform
+  archives, `sproot_0.1.0_checksums.txt`, and the `..._checksums.txt.sigstore.json` cosign bundle.
+  (Housekeeping: a stale untagged `v0.1.1` release-drafter *draft* exists and can be cleaned up.)
 - **claude_agent module** (deferred): the agent-on-sprite design (`plans/claude-agent.md`).
-  Candidate Phase 21 if/when the `cmd` recipe recurs enough to justify a module.
+  A candidate future phase if/when the `cmd` recipe recurs enough to justify a module.
 
 After each PR: `make check` and `./sproot validate --path internal/config/testdata/sproot.yaml`.
 
