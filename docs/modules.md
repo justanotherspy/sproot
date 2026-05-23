@@ -45,6 +45,8 @@ Installs system packages via `apt-get` and optionally creates post-install symli
 
 **Idempotency:** checks `dpkg -s <pkg>` for each package and `stat <to>` for each symlink; skips the phase if all are satisfied.
 
+**Index refresh:** when any package needs installing, the phase runs `apt-get update` first so a stale base-image index does not request `.deb` versions the mirror has rotated out (a `404` then aborts the whole install).
+
 **Privilege:** `apt-get install` requires root. When sproot runs as a non-root user (the usual case inside a sprite, where setup runs as the unprivileged sprite user), it prepends `sudo -n`. Symlink creation runs as the current user.
 
 **Platform:** Linux with apt.
@@ -106,6 +108,8 @@ Installs Rust tools via `cargo install`.
 - type: cargo_install
   tools:
     - name: ripgrep
+    - name: garlic-ward
+      bin: garlic         # crate installs a binary named garlic
     - name: cargo-edit
       version: "0.12.2"
       locked: true
@@ -116,11 +120,12 @@ Installs Rust tools via `cargo install`.
 
 **Fields:**
 - `name`: crate name
+- `bin`: optional; binary name when it differs from the crate name (used for the post-install PATH check)
 - `version`: optional; omit for latest
 - `locked`: optional; passes `--locked`
 - `features`: optional list of Cargo features to enable
 
-**Idempotency:** checks `cargo install --list` (scoped to the install root) for `<name> v<version>`.
+**Idempotency:** checks `cargo install --list` (scoped to the install root) for `<name> v<version>` (keyed by crate name, not `bin`).
 
 **Install location:** crates are installed into `~/.local/bin` (via `cargo install --root ~/.local`) so they are on the default PATH inside a sprite, rather than cargo's default `CARGO_HOME/bin`.
 

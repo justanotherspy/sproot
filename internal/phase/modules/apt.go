@@ -53,6 +53,12 @@ func (p *aptPhase) ShouldRun(_ *phase.Context) (bool, error) {
 
 func (p *aptPhase) Run(ctx *phase.Context) error {
 	if len(p.cfg.Packages) > 0 {
+		// Refresh the package index first. Sprite base images carry a snapshot
+		// that goes stale as the mirror rotates package versions, so a bare
+		// install can request .deb versions that 404. update self-heals that.
+		if err := runPrivileged(ctx.Log, "apt-get", "update"); err != nil {
+			return err
+		}
 		args := append([]string{"install", "-y"}, p.cfg.Packages...)
 		if err := runPrivileged(ctx.Log, "apt-get", args...); err != nil {
 			return err

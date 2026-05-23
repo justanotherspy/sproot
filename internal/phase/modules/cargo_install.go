@@ -5,6 +5,8 @@ package modules
 //	- type: cargo_install
 //	  tools:
 //	    - name: ripgrep
+//	    - name: garlic-ward
+//	      bin: garlic          # optional; binary name when it differs from the crate
 //	    - name: cargo-nextest
 //	      version: "0.9.72"   # optional; omit for latest
 //	      locked: true         # optional; passes --locked
@@ -83,8 +85,15 @@ func (p *cargoInstallPhase) Run(ctx *phase.Context) error {
 
 func (p *cargoInstallPhase) Verify(_ *phase.Context) error {
 	for _, t := range p.cfg.Tools {
-		if _, err := exec.LookPath(t.Name); err != nil {
-			return fmt.Errorf("cargo_install: %q not on PATH after install", t.Name)
+		// Verify the installed binary, which can differ from the crate name
+		// (e.g. crate garlic-ward installs a binary named garlic). Install and
+		// the --list idempotency check still key off the crate name (t.Name).
+		bin := t.Bin
+		if bin == "" {
+			bin = t.Name
+		}
+		if _, err := exec.LookPath(bin); err != nil {
+			return fmt.Errorf("cargo_install: %q not on PATH after install", bin)
 		}
 	}
 	return nil
