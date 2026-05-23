@@ -411,6 +411,14 @@ core roadmap is outstanding. The only open item is a design that has not been co
 
 - **17i / 17j** (DONE in Phase 21): the host-side config clone is now cached via `git ls-remote`
   (`~/.sproot/config-cache.json`). The in-sprite clone in `sproot new` remains (unavoidable).
+- **Config-repo SSH bootstrap** (DONE): the in-sprite clone always rewrites a GitHub SSH
+  config-repo URL (`git@github.com:...`) to HTTPS, because a freshly created sprite has no SSH key
+  registered with GitHub and no `github.com` in `known_hosts` (the `ssh_setup` phase that would
+  provision both lives *inside* the config repo, so it cannot gate the clone of that repo). Public
+  repos clone anonymously; private repos use the forwarded `GH_TOKEN` via a transient `-c
+  http.<url>.extraheader` arg (never persisted to `.git/config`). The host side keeps SSH when SSH
+  works and only falls back to HTTPS when SSH is unreachable, so private-repo access via a real
+  laptop's key is preserved. Both paths warn so the user can switch `sproot_config_repo` to HTTPS.
 - **18d** (DONE): validated by the published `v0.1.0` release, which carries all 5 platform
   archives, `sproot_0.1.0_checksums.txt`, and the `..._checksums.txt.sigstore.json` cosign bundle.
   (Housekeeping: a stale untagged `v0.1.1` release-drafter *draft* exists and can be cleaned up.)

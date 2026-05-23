@@ -96,6 +96,34 @@ func writeConfigCache(c configCache) {
 	}
 }
 
+// lsRemoteFn probes a remote with git ls-remote. It is a package variable so
+// tests can stub the network call in effectiveCloneURL.
+var lsRemoteFn = gitLsRemote
+
+// effectiveCloneURL returns the URL to use for host-side resolution of repo at
+// ref. For a GitHub SSH URL it keeps SSH when SSH works (preserving private-repo
+// access via the host's own key), and falls back to the HTTPS form only when SSH
+// is unreachable (e.g. no SSH key on this host), so a public config repo still
+// resolves. Non-GitHub-SSH URLs are returned unchanged with no probing.
+//
+// This mirrors the in-sprite bootstrap rewrite (see cloneOrPull): the in-sprite
+// clone always rewrites to HTTPS, so passing along the original SSH URL stays
+// correct regardless of which form resolves here.
+func effectiveCloneURL(repo, ref string, l *log.Logger) string {
+	alt, rewritten := config.NormalizeGitHubCloneURL(repo)
+	if !rewritten {
+		return repo
+	}
+	if _, err := lsRemoteFn(repo, ref); err == nil {
+		return repo
+	}
+	if _, err := lsRemoteFn(alt, ref); err == nil {
+		l.Warnf("config repo %q is not reachable over SSH from this host; resolving %q over HTTPS instead; set sproot_config_repo to the HTTPS URL to silence this", repo, alt)
+		return alt
+	}
+	return repo
+}
+
 // gitLsRemote returns the commit SHA that ref resolves to in repo using a single
 // lightweight `git ls-remote` (no clone, no checkout).
 func gitLsRemote(repo, ref string) (string, error) {
@@ -157,6 +185,7 @@ func parseLsRemote(out, ref string) (string, error) {
 // read bytes. An ls-remote failure is non-fatal: the function falls back to a
 // clone so behavior is never worse than before the cache existed.
 func loadConfigBytes(repo, ref, configPath string, l *log.Logger) ([]byte, error) {
+	repo = effectiveCloneURL(repo, ref, l)
 	key := configCacheKey(repo, ref, configPath)
 
 	if remoteSHA, err := gitLsRemote(repo, ref); err == nil {
