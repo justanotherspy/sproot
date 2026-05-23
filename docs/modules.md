@@ -1,6 +1,6 @@
 # Module Reference
 
-Each phase in `sproot.yaml` is driven by a module type. This document describes all 18 types.
+Each phase in `sproot.yaml` is driven by a module type. This document describes all 19 types.
 
 ---
 
@@ -470,6 +470,50 @@ Runs `npm install` in a project directory.
 - `dir`: directory containing `package.json` (`~` is expanded)
 
 **Idempotency:** skips when `node_modules` already exists in `dir`.
+
+---
+
+## shell_completion
+
+Generates and installs shell completion scripts for one or more commands into per-user completion directories, and wires zsh's `fpath` so it loads them.
+
+```yaml
+- type: shell_completion
+  completions:
+    - command: sproot
+      shells: [bash, zsh, fish]
+    - command: gh
+      shells: [bash, zsh]
+    - command: weirdtool
+      shells: [bash]
+      gen: "{command} --completion {shell}"   # optional override
+```
+
+**Fields:**
+- `completions`: list of entries (required, non-empty)
+  - `command`: the command to generate completions for (required)
+  - `shells`: list of shells, each one of `bash`, `zsh`, `fish` (required, non-empty)
+  - `gen`: optional command template producing the completion script on stdout. Tokens `{command}` and `{shell}` are substituted; the rendered string is split on whitespace and executed directly (no shell). Defaults to `{command} completion {shell}`, the cobra convention used by `sproot`, `gh`, `kubectl`, and most modern CLIs.
+
+**Install locations** (all user-writable, no root needed):
+- `bash`: `~/.local/share/bash-completion/completions/<command>`
+- `zsh`: `~/.zfunc/_<command>`
+- `fish`: `~/.config/fish/completions/<command>.fish`
+
+`bash` (with bash-completion installed) and `fish` auto-load from these directories. For `zsh`, the module also appends a managed block to `~/.zshrc` that adds `~/.zfunc` to `fpath` and runs `compinit`:
+
+```
+# BEGIN SPROOT COMPLETIONS
+fpath=(~/.zfunc $fpath)
+autoload -Uz compinit && compinit
+# END SPROOT COMPLETIONS
+```
+
+The block is added only when at least one entry targets `zsh`, and is replaced (not duplicated) on re-run.
+
+**Idempotency:** skips when every target completion file already exists and (when zsh is used) the `~/.zshrc` block is present and current.
+
+**Requires:** each `command` on PATH at setup time, supporting the configured generation form. Order this phase after whatever installs the commands.
 
 ---
 

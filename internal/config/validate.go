@@ -9,24 +9,25 @@ import (
 
 // knownPhaseTypes is the full set of module types defined in Phase 3.
 var knownPhaseTypes = map[string]bool{
-	"apt":             true,
-	"uv_tool":         true,
-	"go_install":      true,
-	"cargo_install":   true,
-	"binary_release":  true,
-	"corepack":        true,
-	"rust_components": true,
-	"docker":          true,
-	"sprite_service":  true,
-	"git_identity":    true,
-	"ssh_setup":       true,
-	"gh_token":        true,
-	"file_template":   true,
-	"rc_block":        true,
-	"repo_clone":      true,
-	"claude":          true,
-	"npm":             true,
-	"cmd":             true,
+	"apt":              true,
+	"uv_tool":          true,
+	"go_install":       true,
+	"cargo_install":    true,
+	"binary_release":   true,
+	"corepack":         true,
+	"rust_components":  true,
+	"docker":           true,
+	"sprite_service":   true,
+	"git_identity":     true,
+	"ssh_setup":        true,
+	"gh_token":         true,
+	"file_template":    true,
+	"rc_block":         true,
+	"repo_clone":       true,
+	"claude":           true,
+	"npm":              true,
+	"shell_completion": true,
+	"cmd":              true,
 }
 
 // ValidateSprootConfig validates a parsed SprootConfig. It collects all
@@ -225,6 +226,27 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 			}
 			if len(rc.Repos) == 0 {
 				errs = append(errs, fmt.Errorf("%s (repo_clone): repos must not be empty", prefix))
+			}
+		}
+	case "shell_completion":
+		if sc := phase.ShellCompletion; sc != nil {
+			if len(sc.Completions) == 0 {
+				errs = append(errs, fmt.Errorf("%s (shell_completion): completions must not be empty", prefix))
+			}
+			for i, e := range sc.Completions {
+				if e.Command == "" {
+					errs = append(errs, fmt.Errorf("%s (shell_completion): completions[%d].command is required", prefix, i))
+				}
+				if len(e.Shells) == 0 {
+					errs = append(errs, fmt.Errorf("%s (shell_completion): completions[%d].shells must not be empty", prefix, i))
+				}
+				for _, sh := range e.Shells {
+					switch sh {
+					case "bash", "zsh", "fish":
+					default:
+						errs = append(errs, fmt.Errorf("%s (shell_completion): completions[%d] shell %q is not supported (use bash, zsh, or fish)", prefix, i, sh))
+					}
+				}
 			}
 		}
 	case "cmd":

@@ -245,13 +245,11 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 	return nil
 }
 
-// currentConfigSHA clones/reads the current config and returns its SHA plus
-// base metadata (source, repo, ref). Used by RunPush to compute the target SHA.
-//
-// TODO(perf): for git sources this does a full `git clone --depth 1` into a temp
-// dir on every `sproot outdated` and `sproot push`. If that becomes a complaint,
-// use `git ls-remote` for a cheap HEAD-SHA check, or cache the SHA in
-// ~/.cache/sproot keyed by repo+ref. See plans/sproot.md item 17i.
+// currentConfigSHA reads the current config and returns its SHA plus base
+// metadata (source, repo, ref). Used by RunPush and RunOutdated to compute the
+// target SHA. For git sources it goes through readEnvBlock -> loadConfigBytes,
+// which uses a `git ls-remote` cache to skip the clone when the ref has not moved
+// (see configcache.go), so a no-op `sproot outdated` no longer re-clones.
 func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta, error) {
 	if cfg.SprootConfigSource == "local" {
 		dir, err := config.ExpandTilde(cfg.SprootConfigLocalPath)

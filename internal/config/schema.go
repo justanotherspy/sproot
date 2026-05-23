@@ -27,12 +27,12 @@ type TargetConfig struct {
 // When Targets is used, sproot new --target <name> selects which target to run.
 // A flat Phases list (no Targets) is treated as a single implicit default target.
 type SprootConfig struct {
-	SchemaVersion        int                       `yaml:"schema_version"`
-	Identity             Identity                  `yaml:"identity"`
-	Env                  []EnvVar                  `yaml:"env"`
-	Phases               []PhaseConfig             `yaml:"phases"`
-	Targets              map[string]*TargetConfig  `yaml:"targets"`
-	CheckpointAfterSetup bool                      `yaml:"checkpoint_after_setup"`
+	SchemaVersion        int                      `yaml:"schema_version"`
+	Identity             Identity                 `yaml:"identity"`
+	Env                  []EnvVar                 `yaml:"env"`
+	Phases               []PhaseConfig            `yaml:"phases"`
+	Targets              map[string]*TargetConfig `yaml:"targets"`
+	CheckpointAfterSetup bool                     `yaml:"checkpoint_after_setup"`
 }
 
 // ResolveTarget returns the phases for the named target, applying extends inheritance.
@@ -89,9 +89,9 @@ type Identity struct {
 type HostConfig struct {
 	SprootConfigRepo      string `yaml:"sproot_config_repo"`
 	SprootConfigRef       string `yaml:"sproot_config_ref"`
-	SprootConfigPath      string `yaml:"sproot_config_path"`       // path to config file within the repo; defaults to "sproot.yaml"
-	TokenEnv              string `yaml:"token_env"`                // env var name holding the sprites API token
-	GHTokenEnv            string `yaml:"gh_token_env"`             // env var name holding the GitHub PAT
+	SprootConfigPath      string `yaml:"sproot_config_path"` // path to config file within the repo; defaults to "sproot.yaml"
+	TokenEnv              string `yaml:"token_env"`          // env var name holding the sprites API token
+	GHTokenEnv            string `yaml:"gh_token_env"`       // env var name holding the GitHub PAT
 	DefaultOrg            string `yaml:"default_org"`
 	SprootConfigSource    string `yaml:"sproot_config_source"`     // "git" (default/empty) or "local"
 	SprootConfigLocalPath string `yaml:"sproot_config_local_path"` // host directory path when sproot_config_source=local
@@ -100,25 +100,26 @@ type HostConfig struct {
 // PhaseConfig represents one entry in the phases list. Type is always set.
 // Exactly one typed config pointer is non-nil after unmarshaling.
 type PhaseConfig struct {
-	Type           string                `yaml:"type"`
-	Apt            *AptConfig            `yaml:"-"`
-	UVTool         *UVToolConfig         `yaml:"-"`
-	GoInstall      *GoInstallConfig      `yaml:"-"`
-	CargoInstall   *CargoInstallConfig   `yaml:"-"`
-	BinaryRelease  *BinaryReleaseConfig  `yaml:"-"`
-	Corepack       *CorepackConfig       `yaml:"-"`
-	RustComponents *RustComponentsConfig `yaml:"-"`
-	Docker         *DockerConfig         `yaml:"-"`
-	SpriteService  *SpriteServiceConfig  `yaml:"-"`
-	GitIdentity    *GitIdentityConfig    `yaml:"-"`
-	SSHSetup       *SSHSetupConfig       `yaml:"-"`
-	GHToken        *GHTokenConfig        `yaml:"-"`
-	FileTemplate   *FileTemplateConfig   `yaml:"-"`
-	RCBlock        *RCBlockConfig        `yaml:"-"`
-	RepoClone      *RepoCloneConfig      `yaml:"-"`
-	Claude         *ClaudeConfig         `yaml:"-"`
-	Npm            *NpmConfig            `yaml:"-"`
-	Cmd            *CmdConfig            `yaml:"-"`
+	Type            string                 `yaml:"type"`
+	Apt             *AptConfig             `yaml:"-"`
+	UVTool          *UVToolConfig          `yaml:"-"`
+	GoInstall       *GoInstallConfig       `yaml:"-"`
+	CargoInstall    *CargoInstallConfig    `yaml:"-"`
+	BinaryRelease   *BinaryReleaseConfig   `yaml:"-"`
+	Corepack        *CorepackConfig        `yaml:"-"`
+	RustComponents  *RustComponentsConfig  `yaml:"-"`
+	Docker          *DockerConfig          `yaml:"-"`
+	SpriteService   *SpriteServiceConfig   `yaml:"-"`
+	GitIdentity     *GitIdentityConfig     `yaml:"-"`
+	SSHSetup        *SSHSetupConfig        `yaml:"-"`
+	GHToken         *GHTokenConfig         `yaml:"-"`
+	FileTemplate    *FileTemplateConfig    `yaml:"-"`
+	RCBlock         *RCBlockConfig         `yaml:"-"`
+	RepoClone       *RepoCloneConfig       `yaml:"-"`
+	Claude          *ClaudeConfig          `yaml:"-"`
+	Npm             *NpmConfig             `yaml:"-"`
+	ShellCompletion *ShellCompletionConfig `yaml:"-"`
+	Cmd             *CmdConfig             `yaml:"-"`
 }
 
 // UnmarshalYAML decodes a phase entry using a two-pass approach: first reads
@@ -184,6 +185,9 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "npm":
 		p.Npm = &NpmConfig{}
 		return value.Decode(p.Npm)
+	case "shell_completion":
+		p.ShellCompletion = &ShellCompletionConfig{}
+		return value.Decode(p.ShellCompletion)
 	case "cmd":
 		p.Cmd = &CmdConfig{}
 		return value.Decode(p.Cmd)
@@ -352,6 +356,24 @@ type RepoCloneConfig struct {
 // NpmConfig runs npm install in a target directory.
 type NpmConfig struct {
 	Dir string `yaml:"dir"`
+}
+
+// ShellCompletionEntry registers completions for one command across one or more
+// shells. Gen is an optional command template (tokens {command} and {shell})
+// that produces the completion script on stdout; it defaults to
+// "{command} completion {shell}" (the cobra convention). The rendered template
+// is split on whitespace and executed directly (no shell).
+type ShellCompletionEntry struct {
+	Command string   `yaml:"command"`
+	Shells  []string `yaml:"shells"`
+	Gen     string   `yaml:"gen"`
+}
+
+// ShellCompletionConfig generates and installs shell completion scripts for the
+// listed commands into per-user completion directories (bash, zsh, fish) and
+// wires zsh's fpath so it loads them.
+type ShellCompletionConfig struct {
+	Completions []ShellCompletionEntry `yaml:"completions"`
 }
 
 // ClaudeConfig configures Claude Code: an optional deep-merge into

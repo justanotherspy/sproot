@@ -175,6 +175,18 @@ Needs `GH_TOKEN` in the sprite via the `env` block.
   dir: ~/my-project          # (req)
 ```
 
+### shell_completion: generate + install shell completions
+```yaml
+- type: shell_completion
+  completions:               # (req) non-empty
+    - command: sproot        # (req)
+      shells: [bash, zsh, fish]  # (req) non-empty; each one of bash|zsh|fish
+    - command: weird
+      shells: [bash]
+      gen: "{command} --completion {shell}"  # optional; default "{command} completion {shell}"
+```
+Installs to per-user dirs (bash: `~/.local/share/bash-completion/completions/`, zsh: `~/.zfunc/`, fish: `~/.config/fish/completions/`) and adds a managed zsh `fpath`+`compinit` block to `~/.zshrc` when any entry targets zsh. Order after whatever installs the commands.
+
 ### claude: configure Claude Code
 ```yaml
 - type: claude               # set at least one of settings/upgrade/claude_md

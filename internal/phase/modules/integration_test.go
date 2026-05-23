@@ -13,7 +13,7 @@ import (
 
 // TestDryRunAllModules builds a runner covering every registered module type
 // with minimal valid config, runs it under DryRun=true, and asserts no errors.
-// It verifies that all 18 module types are registered and parse without panic.
+// It verifies that all 19 module types are registered and parse without panic.
 func TestDryRunAllModules(t *testing.T) {
 	// Provide files that file_template and rc_block need from the config repo.
 	repoDir := t.TempDir()
@@ -85,6 +85,12 @@ func TestDryRunAllModules(t *testing.T) {
 		}},
 		// npm: installs node_modules in a project dir
 		{Type: "npm", Npm: &config.NpmConfig{Dir: npmDir}},
+		// shell_completion: generate + install completions (dry-run skips Run)
+		{Type: "shell_completion", ShellCompletion: &config.ShellCompletionConfig{
+			Completions: []config.ShellCompletionEntry{
+				{Command: "sproot", Shells: []string{"bash", "zsh", "fish"}},
+			},
+		}},
 		{Type: "cmd", Cmd: &config.CmdConfig{Run: "true"}},
 	}
 

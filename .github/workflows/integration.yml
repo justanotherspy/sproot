@@ -87,6 +87,9 @@ jobs:
           - name: sprite-service
             only: sprite_service
             config_path: testdata/integration/sproot_tooling.yaml
+          - name: shell-completion
+            only: shell_completion
+            config_path: testdata/integration/sproot_tooling.yaml
           - name: target
             only: cmd
             config_path: testdata/integration/sproot_targets.yaml
