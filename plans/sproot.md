@@ -419,6 +419,11 @@ core roadmap is outstanding. The only open item is a design that has not been co
   http.<url>.extraheader` arg (never persisted to `.git/config`). The host side keeps SSH when SSH
   works and only falls back to HTTPS when SSH is unreachable, so private-repo access via a real
   laptop's key is preserved. Both paths warn so the user can switch `sproot_config_repo` to HTTPS.
+- **`validate` resolves the configured source** (DONE): `sproot validate` with no `--path` now
+  resolves the sproot.yaml from the configured source (the git config repo via the cached
+  `loadConfigBytes`, or the local config dir) instead of looking for `./sproot.yaml`, so it checks
+  the same file `sproot new`/`push` use. `--path` still validates a specific local file, and a bare
+  `validate` with no host config falls back to `./sproot.yaml`.
 - **18d** (DONE): validated by the published `v0.1.0` release, which carries all 5 platform
   archives, `sproot_0.1.0_checksums.txt`, and the `..._checksums.txt.sigstore.json` cosign bundle.
   (Housekeeping: a stale untagged `v0.1.1` release-drafter *draft* exists and can be cleaned up.)
