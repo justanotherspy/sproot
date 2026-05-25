@@ -415,6 +415,45 @@ PATH), so the module mirrors the existing pattern:
 
 ---
 
+### Phase 23: `sproot rc` Remote Control command — DONE
+
+Host command that runs Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control)
+on a sprite so a session is drivable from claude.ai/code and the Claude mobile app, started on
+demand and kept alive until closed.
+
+```
+sproot rc <name> [--dir PATH] [--spawn same-dir|worktree|session] [--session-name TITLE]
+sproot rc <name> --close
+```
+
+Two facts from the Claude Code docs shaped it:
+
+- **Auth must be a real interactive `claude auth login` on the sprite.** The inference tokens sproot
+  forwards (`CLAUDE_CODE_OAUTH_TOKEN`, `setup-token`, API keys) are explicitly rejected by Remote
+  Control, so a fully unattended boot service is impossible for the *first* launch. After one login,
+  the credential is cached at `/root/.claude/.credentials.json` and persists across pause/reboot, so
+  later starts are automatic. `rc` start guards on that file and, when absent, points the operator at
+  `sproot console` + `claude auth login`.
+- **Outbound only.** Remote Control dials Anthropic; no `http_port`/sprite-URL exposure is involved.
+  The web/mobile UI reaches the session through the operator's account (discoverable by name, no
+  pairing code), not via `https://<sprite>.sprites.dev`.
+
+A sprite-env **service** (`claude-rc`) is the right primitive: services keep the sprite awake, persist
+across reboots, and auto-restart. `rc` writes a launcher script (`/root/.sproot/claude-rc.sh`: source
+login profiles so `claude` is on PATH, `cd` to the dir, `exec claude remote-control --name ... --spawn
+...`) and registers it with the same `sprite-env curl -X PUT /v1/services/<name>` mechanism the
+`sprite_service` module uses; `--close` issues a `DELETE`, letting the sprite pause once idle. No config
+module change was needed — install/config (`claude`) and repo cloning (`repo_clone`, `base_dir:
+~/repos`) already happen at `sproot new` time.
+
+`--dir` defaults to the home dir; `--spawn` defaults to `same-dir` (the default dir is not a git repo,
+and `worktree` requires one). Files: `internal/host/rc.go` + `rc_test.go`, `cmd/sproot/rc.go`, wired in
+`cmd/sproot/main.go`; docs in `README.md` (command table + "Remote Control sessions") and `CLAUDE.md`
+(phase table + CI note). Not in the integration matrix for the same reason as `gh_token`/`ssh_setup`:
+it needs interactive OAuth; unit tests cover the auth guard and the register/delete plumbing.
+
+---
+
 ### Examples and design notes (post-Phase 20)
 
 These shipped after Phase 20 as docs/examples, not as new code phases.

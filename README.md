@@ -148,6 +148,7 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot status <name>` | host | Show setup state (exec into sprite); `--host` reads state without exec |
 | `sproot console <name>` | host | Open an interactive shell in a sprite |
 | `sproot exec <name> <cmd> [args...]` | host | Run a one-off command in a sprite and stream output (`--env KEY=val,K2=v2`) |
+| `sproot rc <name>` | host | Start a Claude Code [Remote Control](https://code.claude.com/docs/en/remote-control) session as a sprite service, reachable from claude.ai/code and the Claude mobile app (`--dir` sets the working directory, `--spawn same-dir\|worktree\|session`, `--session-name` titles it, `--close` stops it). See [Remote Control sessions](#remote-control-sessions) |
 | `sproot list` | host | List sproot-managed sprites in a colored table (name, status, URL, created, last running) sized to the terminal (`--all` shows every sprite, `--prefix` filters by name, `--watch` refreshes live). Output falls back to plain tab-separated rows when piped or when `NO_COLOR` is set |
 | `sproot upgrade <name>` | host | Upgrade the sprite CLI inside a sprite |
 | `sproot self-update` | host | Upgrade the sproot binary itself to the latest release (`--check` reports availability without installing) |
@@ -163,6 +164,22 @@ If you use both phases, the union of these scopes is required. See [docs/modules
 | `sproot setup --status` | sprite | Print phase state table |
 
 Tabular commands (`list`, `status`, `checkpoints`, `outdated`) render a colored, terminal-fitted box table on an interactive terminal and fall back to plain tab-separated rows when piped, redirected, or when `NO_COLOR` is set. Log messages color their `+`/`!`/`x` symbols under the same rules.
+
+### Remote Control sessions
+
+`sproot rc` runs Claude Code's [Remote Control](https://code.claude.com/docs/en/remote-control) on a sprite so you can drive a session from claude.ai/code and the Claude mobile app. It registers `claude remote-control` as a sprite service, which keeps the sprite awake and restarts it across reboots until you close it. Remote Control dials out to Anthropic (no inbound port), so the session is reached through your Claude account, not the sprite URL.
+
+One-time setup per sprite: Remote Control requires a real `claude auth login` and does **not** accept the inference tokens sproot forwards (`CLAUDE_CODE_OAUTH_TOKEN`, API keys). Log in once, then the cached credential is reused on later starts.
+
+```bash
+sproot new sproot-claude-rc                 # provision (e.g. with a repo_clone into ~/repos)
+sproot console sproot-claude-rc             # then run: claude auth login  (complete OAuth, exit)
+sproot rc sproot-claude-rc --dir ~/repos/yourrepo --spawn worktree
+# open claude.ai/code or the mobile app and pick the session named "sproot-claude-rc"
+sproot rc sproot-claude-rc --close          # stop it; the sprite pauses once idle
+```
+
+`--dir` defaults to the home directory; `--spawn worktree` (a git worktree per connection) requires the directory to be a git repo, while the default `same-dir` does not.
 
 ## Skills (Claude plugin)
 
