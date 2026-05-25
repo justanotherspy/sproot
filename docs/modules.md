@@ -1,6 +1,6 @@
 # Module Reference
 
-Each phase in `sproot.yaml` is driven by a module type. This document describes all 19 types.
+Each phase in `sproot.yaml` is driven by a module type. This document describes all 20 types.
 
 ---
 
@@ -541,6 +541,36 @@ Runs an arbitrary shell command.
 **Idempotency:** if `check` is provided, skips when it exits 0. Without `check`, always runs.
 
 Use this as an escape hatch for one-off operations not covered by other module types.
+
+---
+
+## nix
+
+Installs the [Determinate Nix](https://docs.determinate.systems/) distribution, runs `nix-daemon` as a sprite service, declaratively installs packages into the user profile, wires the nix profile into the login shells, and optionally runs a setup script.
+
+```yaml
+- type: nix
+  packages:
+    - hello                  # short form: installs nixpkgs#hello, symlinks "hello"
+    - name: ripgrep          # long form
+      bin: rg                # binary name differs from the package name
+    - name: nixfmt
+      flake: "nixpkgs#nixfmt-rfc-style"   # explicit flake reference
+      bin: nixfmt
+  setup_script: files/nix-setup.sh        # optional; runs with the nix profile sourced
+  daemon_service: true                    # optional, default true
+```
+
+**Fields:**
+- `packages`: optional list of packages to install into the user profile. Each entry is either a string (`hello`, installed as `nixpkgs#hello`) or a map with `name`, an optional `flake` reference (defaults to `nixpkgs#<name>`), and an optional `bin` (the binary name to expose, when it differs from the package name, e.g. ripgrep ships `rg`).
+- `setup_script`: optional config-repo-relative path to a shell script, run after install with the nix profile sourced. An escape hatch for flakes, `home-manager`, channels, or any imperative nix setup.
+- `daemon_service`: register `nix-daemon` as a sprite service so it restarts on boot (default `true`). Set to `false` to manage the daemon yourself with a separate `sprite_service` phase. Note that `nix-daemon` must run as root (it writes the store db), and sprite services run as the unprivileged `sprite` user, so the managed service runs it as `sudo -n /nix/var/nix/profiles/default/bin/nix-daemon`. If you roll your own, do the same (`cmd: sudo`, `args: ["-n", "/nix/var/nix/profiles/default/bin/nix-daemon"]`).
+
+**Why the symlinks and the daemon service:** on a sprite the nix store lives under `/nix` and nix-installed tools land in `~/.nix-profile/bin`, neither of which is on the base PATH that `sprite exec` and sprite services inherit (that PATH is set on PID 1 and includes `~/.local/bin`). The module therefore symlinks the `nix` CLI and each declared package binary into `~/.local/bin`, and sources the full nix profile from `~/.bashrc` and `~/.zshrc` for interactive login shells. Sprites also have no systemd, so the daemon is run as a sprite service rather than a systemd unit (the same pattern `docker` + `sprite_service` use for `dockerd`).
+
+**Idempotency:** skips when nix is installed, the `nix` CLI and every declared package binary are linked into `~/.local/bin`, and the managed profile block is present in the rc files. Individual packages already present in the profile are not reinstalled. A `setup_script` runs whenever the phase runs, so it should be written to be idempotent.
+
+**Requirements:** the Determinate installer needs root (it self-escalates via `sudo`, available on sprites). The network policy must allow `install.determinate.systems`, `cache.nixos.org`, and `*.nixos.org` (covered by the `defaults` include).
 
 ---
 

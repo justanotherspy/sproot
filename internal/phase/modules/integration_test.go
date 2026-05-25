@@ -13,7 +13,7 @@ import (
 
 // TestDryRunAllModules builds a runner covering every registered module type
 // with minimal valid config, runs it under DryRun=true, and asserts no errors.
-// It verifies that all 19 module types are registered and parse without panic.
+// It verifies that all 20 module types are registered and parse without panic.
 func TestDryRunAllModules(t *testing.T) {
 	// Provide files that file_template and rc_block need from the config repo.
 	repoDir := t.TempDir()
@@ -92,6 +92,14 @@ func TestDryRunAllModules(t *testing.T) {
 			},
 		}},
 		{Type: "cmd", Cmd: &config.CmdConfig{Run: "true"}},
+		// nix: short + long package forms, daemon service, and a setup script.
+		{Type: "nix", Nix: &config.NixConfig{
+			Packages: []config.NixPackage{
+				{Name: "hello"},
+				{Name: "ripgrep", Bin: "rg"},
+				{Flake: "nixpkgs#nixfmt-rfc-style", Bin: "nixfmt"},
+			},
+		}},
 	}
 
 	r, err := phase.NewRunner(cfgs, phase.RunnerOptions{

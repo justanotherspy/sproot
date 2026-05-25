@@ -32,8 +32,8 @@ func TestLoadSprootConfig_HappyPath(t *testing.T) {
 	if cfg.Identity.GHUsername != "justanotherspy" {
 		t.Errorf("gh_username: got %q", cfg.Identity.GHUsername)
 	}
-	if len(cfg.Phases) != 17 {
-		t.Fatalf("phases: got %d, want 17", len(cfg.Phases))
+	if len(cfg.Phases) != 18 {
+		t.Fatalf("phases: got %d, want 18", len(cfg.Phases))
 	}
 	if cfg.Phases[0].Type != "apt" {
 		t.Errorf("phases[0].type: got %q, want apt", cfg.Phases[0].Type)
@@ -301,6 +301,38 @@ func TestPhaseConfig_CmdFields(t *testing.T) {
 	}
 	if p.Cmd.Check != "true" {
 		t.Errorf("check: got %q", p.Cmd.Check)
+	}
+}
+
+func TestPhaseConfig_NixFields(t *testing.T) {
+	cfg, err := LoadSprootConfig(testdataPath("sproot.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := cfg.Phases[17]
+	if p.Nix == nil {
+		t.Fatal("Nix is nil")
+	}
+	if len(p.Nix.Packages) != 3 {
+		t.Fatalf("packages: got %d, want 3", len(p.Nix.Packages))
+	}
+	// Short string form.
+	if got := p.Nix.Packages[0]; got.Name != "hello" || got.FlakeRef() != "nixpkgs#hello" || got.BinName() != "hello" {
+		t.Errorf("packages[0]: got %+v", got)
+	}
+	// Long form with bin override.
+	if got := p.Nix.Packages[1]; got.Name != "ripgrep" || got.BinName() != "rg" {
+		t.Errorf("packages[1]: got %+v", got)
+	}
+	// Long form with explicit flake ref.
+	if got := p.Nix.Packages[2]; got.FlakeRef() != "nixpkgs#nixfmt-rfc-style" || got.BinName() != "nixfmt" {
+		t.Errorf("packages[2]: got %+v", got)
+	}
+	if p.Nix.SetupScript != "files/nix-setup.sh" {
+		t.Errorf("setup_script: got %q", p.Nix.SetupScript)
+	}
+	if !p.Nix.DaemonServiceEnabled() {
+		t.Error("daemon_service: got disabled, want enabled")
 	}
 }
 

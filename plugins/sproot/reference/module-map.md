@@ -20,7 +20,8 @@ specific module. Fall back to `cmd` only when nothing structured fits. Field sha
 | `npm install` / `npm ci` (in a project dir) | `npm` | `dir:` = the directory with `package.json`. |
 | `npm install -g X` (global) | `cmd` | No structured global-npm module. `run: "npm install -g X"`, `check: "command -v X"`. |
 | download a GitHub release asset (curl/wget of `github.com/<o>/<r>/releases/...`, or `gh release download`) | `binary_release` | Parse `repo`, `asset` (template the version/arch), `install` (`dpkg` for `.deb`, `tar+install` for tarballs, `raw` for a single binary). See arch tokens in module-schema. |
-| `curl ... \| sh` / `wget ... \| bash` installer (NOT a GitHub release asset) | `cmd` | `run:` the pipeline verbatim; add a `check:` on the resulting binary. Flag for review (network installers are opaque). |
+| install nix / install nix packages (`install.determinate.systems/nix`, `nixos.org/nix/install`, `nix profile install X`, `nix-env -iA nixpkgs.X`) | `nix` | `packages:` = the nix packages (`nix profile install nixpkgs#X` -> `{name: X}`); set `bin:` when the installed binary differs. Use `setup_script:` for flakes/home-manager. nix-daemon is registered as a sprite service automatically. |
+| `curl ... \| sh` / `wget ... \| bash` installer (NOT a GitHub release asset or nix) | `cmd` | `run:` the pipeline verbatim; add a `check:` on the resulting binary. Flag for review (network installers are opaque). |
 | `git clone URL [DIR]` | `repo_clone` | `github.com/o/r` -> short form `o/r` under `base_dir`. Other hosts or explicit dirs -> long form `{url, dest}`. Group all clones into one phase. |
 | `git config --global user.name/user.email/init.defaultBranch` | top-level `identity` (drop the command) | These come from the `identity` block; do not emit a phase for them. |
 | other `git config --global K V` | `git_identity` with `config: {K: "V"}` | Quote values as strings. |

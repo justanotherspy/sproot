@@ -205,3 +205,18 @@ Installs to per-user dirs (bash: `~/.local/share/bash-completion/completions/`, 
   check: "command -v example"  # optional; exits 0 -> skip run (idempotency)
   name: install-example      # optional display name
 ```
+
+### nix: install Determinate Nix, run nix-daemon, install packages
+```yaml
+- type: nix
+  packages:                  # optional
+    - hello                  # short form: nixpkgs#hello, symlinked as "hello"
+    - name: ripgrep          # long form (needs name or flake)
+      bin: rg                # optional; binary name when it differs from the package
+    - name: nixfmt
+      flake: "nixpkgs#nixfmt-rfc-style"  # optional; default nixpkgs#<name>
+      bin: nixfmt
+  setup_script: files/nix-setup.sh  # optional; config-repo path, run with the nix profile sourced
+  daemon_service: true       # optional, default true; register nix-daemon as a sprite service
+```
+Symlinks the `nix` CLI and each package binary into `~/.local/bin` (on the base PATH for `sprite exec`/services) and sources the nix profile from the login shells. nix-daemon runs as a sprite service (sprites have no systemd), like `docker` + `sprite_service`. Needs root (the installer self-escalates) and network access to `install.determinate.systems` + `*.nixos.org`.

@@ -120,6 +120,7 @@ type PhaseConfig struct {
 	Npm             *NpmConfig             `yaml:"-"`
 	ShellCompletion *ShellCompletionConfig `yaml:"-"`
 	Cmd             *CmdConfig             `yaml:"-"`
+	Nix             *NixConfig             `yaml:"-"`
 }
 
 // UnmarshalYAML decodes a phase entry using a two-pass approach: first reads
@@ -191,6 +192,9 @@ func (p *PhaseConfig) UnmarshalYAML(value *yaml.Node) error {
 	case "cmd":
 		p.Cmd = &CmdConfig{}
 		return value.Decode(p.Cmd)
+	case "nix":
+		p.Nix = &NixConfig{}
+		return value.Decode(p.Nix)
 	default:
 		return fmt.Errorf("unknown phase type %q", raw.Type)
 	}
@@ -420,4 +424,77 @@ type CargoTool struct {
 // CargoInstallConfig installs Rust crates via cargo install.
 type CargoInstallConfig struct {
 	Tools []CargoTool `yaml:"tools"`
+}
+
+// NixPackage is one entry in a nix module packages list.
+// Short form (string): "ripgrep" — installed as flake ref nixpkgs#ripgrep and
+// symlinked into ~/.local/bin as "ripgrep".
+// Long form (map): {name, flake, bin}. Flake overrides the default nixpkgs#<name>
+// ref; bin overrides the symlinked binary name when it differs from name
+// (e.g. name: ripgrep, bin: rg).
+type NixPackage struct {
+	Name  string `yaml:"name"`
+	Flake string `yaml:"flake"`
+	Bin   string `yaml:"bin"`
+}
+
+// UnmarshalYAML accepts both a plain string and a {name, flake, bin} map.
+func (e *NixPackage) UnmarshalYAML(value *yaml.Node) error {
+	if value.Kind == yaml.ScalarNode {
+		e.Name = value.Value
+		return nil
+	}
+	var s struct {
+		Name  string `yaml:"name"`
+		Flake string `yaml:"flake"`
+		Bin   string `yaml:"bin"`
+	}
+	if err := value.Decode(&s); err != nil {
+		return err
+	}
+	e.Name = s.Name
+	e.Flake = s.Flake
+	e.Bin = s.Bin
+	return nil
+}
+
+// FlakeRef returns the flake reference to install: the explicit Flake when set,
+// otherwise nixpkgs#<name>.
+func (e NixPackage) FlakeRef() string {
+	if e.Flake != "" {
+		return e.Flake
+	}
+	return "nixpkgs#" + e.Name
+}
+
+// BinName returns the binary name to symlink into ~/.local/bin: the explicit
+// Bin when set, otherwise the package Name.
+func (e NixPackage) BinName() string {
+	if e.Bin != "" {
+		return e.Bin
+	}
+	return e.Name
+}
+
+// NixConfig installs the Determinate Nix distribution (no init system, suited to
+// sprites), runs nix-daemon as a sprite service, declaratively installs packages
+// into the user profile (symlinking their binaries into ~/.local/bin so they are
+// on the base PATH for non-login shells and services), wires the nix profile into
+// the login shells, and optionally runs a setup script.
+//
+// DaemonService controls whether nix-daemon is registered as a sprite service for
+// persistence across reboots. It defaults to true; set it to false to manage the
+// daemon yourself with a separate sprite_service phase. SetupScript is a
+// config-repo-relative path to a shell script run after install with the nix
+// profile sourced (an escape hatch for flakes, home-manager, channels, etc.).
+type NixConfig struct {
+	Packages      []NixPackage `yaml:"packages"`
+	SetupScript   string       `yaml:"setup_script"`
+	DaemonService *bool        `yaml:"daemon_service"`
+}
+
+// DaemonServiceEnabled reports whether nix-daemon should be registered as a
+// sprite service. Absence (nil) means enabled.
+func (c NixConfig) DaemonServiceEnabled() bool {
+	return c.DaemonService == nil || *c.DaemonService
 }

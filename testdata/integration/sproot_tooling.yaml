@@ -55,3 +55,11 @@ phases:
     completions:
       - command: sproot
         shells: [bash, zsh, fish]
+
+  # nix: install Determinate Nix, run nix-daemon as a sprite service, and install
+  # one tiny package (hello, ~36 KiB) to exercise the full path end-to-end: store
+  # bootstrap, daemon readiness, profile install, and the ~/.local/bin symlink +
+  # rc-block PATH wiring that Verify checks.
+  - type: nix
+    packages:
+      - hello

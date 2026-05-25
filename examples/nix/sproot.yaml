@@ -1,0 +1,44 @@
+schema_version: 1
+
+# Minimal example of the `nix` module.
+#
+# This stands up the Determinate Nix distribution on a sprite, runs nix-daemon as
+# a sprite-env managed service (sprites have no systemd), installs a few packages
+# into the user profile, and runs a setup script for anything that does not fit
+# the declarative `packages` list (flakes, channels, home-manager, etc).
+#
+# Why the module does extra work beyond "install nix": on a sprite the nix store
+# lives under /nix and nix-installed tools land in ~/.nix-profile/bin, neither of
+# which is on the base PATH that `sprite exec` and sprite services inherit. The
+# module symlinks the `nix` CLI and each declared package binary into ~/.local/bin
+# (which IS on that PATH) and sources the full nix profile from the login shells,
+# so nix tools work both interactively and from `sprite exec`.
+
+identity:
+  git_user_name: "CHANGE ME"
+  git_user_email: "changeme@example.com"
+  git_default_branch: main
+  gh_username: CHANGE_ME
+
+phases:
+  - type: nix
+    packages:
+      # Short form: installs nixpkgs#hello, symlinked into ~/.local/bin as "hello".
+      - hello
+      # Long form with a bin override: the ripgrep package ships the `rg` binary.
+      - name: ripgrep
+        bin: rg
+      # Explicit flake reference (the package attr name differs from the binary).
+      - name: nixfmt
+        flake: "nixpkgs#nixfmt-rfc-style"
+        bin: nixfmt
+    # Escape hatch for imperative / flake-based setup. Runs after install with the
+    # nix profile sourced. Keep it idempotent: it runs whenever the phase runs.
+    setup_script: files/nix-setup.sh
+    # daemon_service defaults to true (registers nix-daemon as a sprite service so
+    # it restarts on boot). nix-daemon must run as root, and sprite services run as
+    # the unprivileged sprite user, so the module runs it as
+    #   sudo -n /nix/var/nix/profiles/default/bin/nix-daemon
+    # Set to false to manage the daemon with your own sprite_service phase (mirror
+    # the sudo: cmd: sudo, args: ["-n", "/nix/var/nix/profiles/default/bin/nix-daemon"]).
+    daemon_service: true
