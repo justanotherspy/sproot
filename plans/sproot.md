@@ -454,6 +454,31 @@ it needs interactive OAuth; unit tests cover the auth guard and the register/del
 
 ---
 
+### Phase 24: Homebrew cask + prerelease-then-latest release flow — DONE
+
+Two release-pipeline changes, both in `.goreleaser.yaml` + `.github/workflows/release.yml`, no Go code.
+
+- **Homebrew cask.** A `homebrew_casks` block makes GoReleaser generate `Casks/sproot.rb` and push it
+  to `justanotherspy/homebrew-tap` (`brew install --cask justanotherspy/tap/sproot`). Casks were chosen
+  over a formula because we ship prebuilt binaries, not source; the generated cask covers darwin and
+  linux (Homebrew on Linux) amd64/arm64, computing SHA256s locally from the archives. The binary is
+  unsigned, so a `postflight` hook strips the `com.apple.quarantine` xattr, guarded by `OS.mac?` since
+  the same cask serves Linux. Pushing to the tap needs a PAT (`HOMEBREW_TAP_GITHUB_TOKEN`) because the
+  default Actions `GITHUB_TOKEN` is scoped to this repo only; the tap repo and secret are a one-time
+  manual setup (documented in README "Releasing"). `skip_upload: "false"` forces the cask upload that
+  GoReleaser would otherwise skip given the (now always-prerelease) release.
+
+- **Prerelease then promote.** `release.prerelease` flipped from `auto` to `true`, so the GitHub release
+  is created as a prerelease and every artifact (binaries, checksums, sigstore bundle, cask) is attached
+  while it is *not* the "Latest" release. A final workflow step (`gh release edit <tag> --draft=false
+  --prerelease=false --latest`) promotes it only after GoReleaser finishes, so the "Latest" badge never
+  points at a half-uploaded release. Verified locally with `goreleaser check` and a `--snapshot` build
+  that emits the expected `Casks/sproot.rb`. Also drained three pre-existing GoReleaser deprecations
+  (`archives.builds` -> `archives.ids`, `homebrew_casks.binary` -> `binaries`, dropped the deprecated
+  `conflicts.formula`).
+
+---
+
 ### Examples and design notes (post-Phase 20)
 
 These shipped after Phase 20 as docs/examples, not as new code phases.
