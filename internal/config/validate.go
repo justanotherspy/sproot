@@ -28,6 +28,7 @@ var knownPhaseTypes = map[string]bool{
 	"npm":              true,
 	"shell_completion": true,
 	"cmd":              true,
+	"nix":              true,
 }
 
 // ValidateSprootConfig validates a parsed SprootConfig. It collects all
@@ -252,6 +253,17 @@ func validatePhase(prefix string, phase PhaseConfig) []error {
 	case "cmd":
 		if c := phase.Cmd; c != nil && c.Run == "" {
 			errs = append(errs, fmt.Errorf("%s (cmd): run is required", prefix))
+		}
+	case "nix":
+		if n := phase.Nix; n != nil {
+			for i, pkg := range n.Packages {
+				if pkg.Name == "" && pkg.Flake == "" {
+					errs = append(errs, fmt.Errorf("%s (nix): packages[%d] needs a name or flake", prefix, i))
+				}
+				if pkg.Flake != "" && pkg.Bin == "" && pkg.Name == "" {
+					errs = append(errs, fmt.Errorf("%s (nix): packages[%d] with a flake ref needs a bin (binary name to symlink)", prefix, i))
+				}
+			}
 		}
 	}
 	return errs

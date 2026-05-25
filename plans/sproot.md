@@ -32,7 +32,7 @@ sproot new my-sprite
 
 ---
 
-## Completed phases (0-20)
+## Completed phases (0-22)
 
 All phases through 20 are done and merged. Phases 0-16 (foundation and hardening) are
 summarized in the two tables below; phases 17-20 (and the late-shipping Phase 14 skills work)
@@ -361,6 +361,57 @@ load them, draining a common `cmd` recipe (the `justanotherspy/sprite` config's 
   `docs/modules.md`, plugin `reference/module-map.md` + `module-schema.md`, a `shell-completion`
   matrix job in `integration.yml` (generates sproot's own completions on a sprite), and a phase in
   `testdata/integration/sproot_tooling.yaml`.
+
+---
+
+### Phase 22: nix module — DONE
+
+New module (the 20th) that installs the [Determinate Nix](https://docs.determinate.systems/)
+distribution and makes nix-installed tooling work on a sprite the way the rest of sproot does.
+
+```yaml
+- type: nix
+  packages:
+    - hello
+    - name: ripgrep
+      bin: rg
+    - name: nixfmt
+      flake: "nixpkgs#nixfmt-rfc-style"
+      bin: nixfmt
+  setup_script: files/nix-setup.sh   # optional
+  daemon_service: true               # optional, default true
+```
+
+PATH recon (on a live sprite) drove the design. The session PATH is set on PID 1 by the sprite
+runtime (`~/.local/bin:/.sprite/bin:...`) and inherited by everything, including `sprite exec` and
+sprite services; `/etc/environment` and `/etc/profile.d` do not feed it. So `~/.local/bin` is the
+only user-writable dir guaranteed on PATH everywhere, which is exactly why corepack/cargo/go
+force-install there. nix stores binaries under `/nix` and `~/.nix-profile/bin` (neither on that
+PATH), so the module mirrors the existing pattern:
+
+- **Install** via the Determinate installer with `--init none` (sprites have no init system).
+- **Daemon as a sprite service.** nix-daemon must run as root (it writes `/nix/var/nix/db`), but
+  sprite services run as the unprivileged `sprite` user, so the service cmd is
+  `sudo -n /nix/var/nix/profiles/default/bin/nix-daemon`. Registering it both starts it immediately
+  (socket up in ~1s) and restarts it on boot, same as `docker` + `sprite_service` for dockerd.
+  `daemon_service: false` opts out (manage it with your own sprite_service phase). The socket file
+  appears before the daemon accepts connections, so readiness is polled with `nix store info`.
+- **Packages** are installed with `nix profile install` (short form `nixpkgs#<name>`, or an explicit
+  `flake` ref); each declared `bin` is symlinked from `~/.nix-profile/bin` into `~/.local/bin`, and
+  the `nix` CLI itself is symlinked too, so they are on PATH for non-login shells and services.
+- **Login shells** get the full nix env via a managed `# BEGIN/END SPROOT NIX BLOCK` in the rc files
+  that sources `nix-daemon.sh` (reusing rc_block's `applyManagedBlock`).
+- **setup_script** is the escape hatch (flakes, home-manager, channels), run with the profile sourced.
+- Idempotency: skips when nix is installed, the `nix` CLI + every declared package binary are linked
+  into `~/.local/bin`, and the rc block is current; already-installed packages are not reinstalled.
+- Validated end-to-end on a fresh sprite: install, sudo daemon service, `hello`/`rg`/`nix` resolving
+  via `sprite exec` (non-login), rc block present once, setup_script run, and a clean skip on re-run.
+- Files: `internal/config/schema.go` (`NixConfig`/`NixPackage` + `FlakeRef`/`BinName`/
+  `DaemonServiceEnabled`), `validate.go`, `internal/phase/modules/nix.go` + test, dry-run entry in
+  `integration_test.go`, a phase in `testdata/integration/sproot.yaml` and a `nix` phase +
+  `nix` matrix job in `sproot_tooling.yaml`/`integration.yml`, `docs/modules.md`, plugin
+  `reference/module-map.md` + `module-schema.md`, and an `examples/nix/` worked example. The
+  `justanotherspy/sprite` config grew a `nix` target (`extends: default`).
 
 ---
 

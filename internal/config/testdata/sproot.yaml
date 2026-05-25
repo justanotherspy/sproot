@@ -62,3 +62,13 @@ phases:
     run: "echo hello"
     check: "true"
     name: "echo-hello"
+  - type: nix
+    packages:
+      - hello
+      - name: ripgrep
+        bin: rg
+      - name: nixfmt
+        flake: "nixpkgs#nixfmt-rfc-style"
+        bin: nixfmt
+    setup_script: files/nix-setup.sh
+    daemon_service: true
