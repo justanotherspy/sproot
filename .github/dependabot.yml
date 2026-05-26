@@ -7,6 +7,12 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    cooldown:
+      default-days: 7
+    groups:
+      gomod:
+        patterns:
+          - "*"
 
   - package-ecosystem: github-actions
     directory: /
@@ -14,3 +20,9 @@ updates:
       interval: weekly
     labels:
       - dependencies
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"
