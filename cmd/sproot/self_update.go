@@ -14,9 +14,10 @@ func newSelfUpdateCmd() *cobra.Command {
 		Long: "self-update downloads the latest sproot release for your OS and " +
 			"architecture, verifies its checksum, and replaces the running binary. " +
 			"It always checks upstream (ignoring the daily update cache) and clears " +
-			"that cache after upgrading. Pass --check to report whether an update is " +
-			"available without installing it. To upgrade the sprite CLI inside a " +
-			"sprite, use 'sproot upgrade <name>' instead.",
+			"that cache after upgrading. If sproot was installed with Homebrew, it " +
+			"runs 'brew upgrade --cask sproot' instead so brew stays in sync. Pass " +
+			"--check to report whether an update is available without installing it. " +
+			"To upgrade the sprite CLI inside a sprite, use 'sproot upgrade <name>' instead.",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return host.RunSelfUpdate(cmd.Context(), host.SelfUpdateOptions{

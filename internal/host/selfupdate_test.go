@@ -294,6 +294,60 @@ func TestRunSelfUpdate_ReplacesBinaryAndClearsCache(t *testing.T) {
 	}
 }
 
+func TestIsHomebrewManaged(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/opt/homebrew/Caskroom/sproot/0.1.0/sproot", true},
+		{"/home/linuxbrew/.linuxbrew/Caskroom/sproot/0.1.0/sproot", true},
+		{"/usr/local/Cellar/sproot/0.1.0/bin/sproot", true},
+		{"/usr/local/bin/sproot", false},
+		{"/home/user/.local/bin/sproot", false},
+	}
+	for _, c := range cases {
+		if got := isHomebrewManaged(c.path); got != c.want {
+			t.Errorf("isHomebrewManaged(%q) = %v, want %v", c.path, got, c.want)
+		}
+	}
+}
+
+func TestRunSelfUpdate_HomebrewDelegates(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	called := false
+	err := RunSelfUpdate(context.Background(), SelfUpdateOptions{
+		CurrentVersion: "v1.0.0",
+		execPath:       "/opt/homebrew/Caskroom/sproot/0.1.0/sproot",
+		latestFn:       failingLatestFn(t), // a brew install must not query GitHub
+		fetchFn:        failingFetchFn(t),  // ...nor download a release archive
+		brewUpgradeFn:  func(context.Context) error { called = true; return nil },
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !called {
+		t.Error("expected brew upgrade to be invoked for a Homebrew-managed install")
+	}
+}
+
+func TestRunSelfUpdate_HomebrewCheckOnlyDoesNotDelegate(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	err := RunSelfUpdate(context.Background(), SelfUpdateOptions{
+		CurrentVersion: "v1.0.0",
+		CheckOnly:      true,
+		execPath:       "/opt/homebrew/Caskroom/sproot/0.1.0/sproot",
+		latestFn:       func(context.Context) (string, error) { return "v2.0.0", nil },
+		fetchFn:        failingFetchFn(t),
+		brewUpgradeFn: func(context.Context) error {
+			t.Fatal("brew upgrade must not run for --check")
+			return nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestRunSelfUpdate_DownloadErrorPropagates(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	exe := filepath.Join(t.TempDir(), "sproot")

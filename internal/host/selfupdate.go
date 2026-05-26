@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -236,9 +237,10 @@ type SelfUpdateOptions struct {
 	CurrentVersion string
 	CheckOnly      bool
 
-	latestFn func(context.Context) (string, error)                     // nil: query GitHub
-	fetchFn  func(ctx context.Context, version string) ([]byte, error) // nil: download+extract for this OS/arch
-	execPath string                                                    // empty: resolve via os.Executable
+	latestFn      func(context.Context) (string, error)                     // nil: query GitHub
+	fetchFn       func(ctx context.Context, version string) ([]byte, error) // nil: download+extract for this OS/arch
+	execPath      string                                                    // empty: resolve via os.Executable
+	brewUpgradeFn func(ctx context.Context) error                           // nil: run real `brew upgrade`
 }
 
 // RunSelfUpdate upgrades the running sproot binary to the latest GitHub release.
@@ -254,6 +256,36 @@ func RunSelfUpdate(ctx context.Context, opts SelfUpdateOptions) error {
 			"self-update is not supported for dev builds; install a release with the install script: " +
 				"https://github.com/justanotherspy/sproot#installation",
 		)
+	}
+
+	// Resolve the binary we would replace up front so a Homebrew-managed install
+	// can be detected before any network access.
+	dest := opts.execPath
+	if dest == "" {
+		exe, err := os.Executable()
+		if err != nil {
+			return fmt.Errorf("locate running binary: %w", err)
+		}
+		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = resolved
+		}
+		dest = exe
+	}
+
+	// A Homebrew cask install must be upgraded through brew: overwriting the
+	// Caskroom binary in place would leave brew's version tracking out of sync.
+	// --check still uses the normal GitHub check below.
+	if !opts.CheckOnly && isHomebrewManaged(dest) {
+		brewUpgrade := opts.brewUpgradeFn
+		if brewUpgrade == nil {
+			brewUpgrade = runBrewUpgrade
+		}
+		l.Info("sproot was installed with Homebrew; upgrading via 'brew upgrade --cask sproot'")
+		if err := brewUpgrade(ctx); err != nil {
+			return err
+		}
+		clearUpdateCache()
+		return nil
 	}
 
 	latestFn := opts.latestFn
@@ -300,18 +332,6 @@ func RunSelfUpdate(ctx context.Context, opts SelfUpdateOptions) error {
 		return fmt.Errorf("download release: %w", err)
 	}
 
-	dest := opts.execPath
-	if dest == "" {
-		exe, err := os.Executable()
-		if err != nil {
-			return fmt.Errorf("locate running binary: %w", err)
-		}
-		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
-			exe = resolved
-		}
-		dest = exe
-	}
-
 	if err := replaceExecutable(dest, binaryData); err != nil {
 		return err
 	}
@@ -319,6 +339,39 @@ func RunSelfUpdate(ctx context.Context, opts SelfUpdateOptions) error {
 	// Clear the cache so the next command re-checks against the new version.
 	clearUpdateCache()
 	l.Successf("upgraded sproot to %s (%s)", displayVersion(latest), dest)
+	return nil
+}
+
+// isHomebrewManaged reports whether the resolved binary path lives inside a
+// Homebrew prefix (a cask under .../Caskroom/... or a formula under
+// .../Cellar/...), in which case self-update defers to `brew upgrade`.
+func isHomebrewManaged(execPath string) bool {
+	resolved := execPath
+	if r, err := filepath.EvalSymlinks(execPath); err == nil {
+		resolved = r
+	}
+	sep := string(os.PathSeparator)
+	return strings.Contains(resolved, sep+"Caskroom"+sep) ||
+		strings.Contains(resolved, sep+"Cellar"+sep)
+}
+
+// runBrewUpgrade upgrades the sproot cask through Homebrew, streaming brew's
+// output to the user's terminal.
+func runBrewUpgrade(ctx context.Context) error {
+	brew, err := exec.LookPath("brew")
+	if err != nil {
+		return fmt.Errorf(
+			"sproot was installed with Homebrew but 'brew' is not on PATH; " +
+				"upgrade manually with 'brew upgrade --cask sproot'",
+		)
+	}
+	cmd := exec.CommandContext(ctx, brew, "upgrade", "--cask", "sproot")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("brew upgrade --cask sproot: %w", err)
+	}
 	return nil
 }
 

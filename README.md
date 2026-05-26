@@ -2,6 +2,49 @@
 
 sproot bootstraps [sprite.dev](https://sprite.dev) sprites from a user-owned config repo. It replaces bash-based setup scripts with a single, versioned Go binary driven by a `sproot.yaml` file you control.
 
+## Installation
+
+Binaries are available on the [releases page](https://github.com/justanotherspy/sproot/releases).
+
+**Homebrew (macOS and Linux):**
+
+```sh
+brew install --cask justanotherspy/tap/sproot
+```
+
+Or tap once, then install by short name:
+
+```sh
+brew tap justanotherspy/tap
+brew install --cask sproot
+```
+
+Upgrade with `brew upgrade --cask sproot`. The cask is republished to [`justanotherspy/homebrew-tap`](https://github.com/justanotherspy/homebrew-tap) automatically on every release.
+
+**One-line install (Linux and macOS):**
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
+```
+
+The installer detects your OS and architecture, downloads the correct archive, verifies the SHA256 checksum, and places the binary in `/usr/local/bin` (if writable) or `~/.local/bin`.
+
+To install a specific version, set `SPROOT_VERSION`:
+
+```sh
+SPROOT_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
+```
+
+**From source:**
+
+```sh
+git clone https://github.com/justanotherspy/sproot
+cd sproot
+make install
+```
+
+Requires Go 1.25+.
+
 ## How it works
 
 ```
@@ -239,49 +282,6 @@ sproot status my-sprite
 sproot destroy my-sprite
 ```
 
-## Installation
-
-Binaries are available on the [releases page](https://github.com/justanotherspy/sproot/releases).
-
-**Homebrew (macOS and Linux):**
-
-```sh
-brew install --cask justanotherspy/tap/sproot
-```
-
-Or tap once, then install by short name:
-
-```sh
-brew tap justanotherspy/tap
-brew install --cask sproot
-```
-
-Upgrade with `brew upgrade --cask sproot`. The cask is republished to [`justanotherspy/homebrew-tap`](https://github.com/justanotherspy/homebrew-tap) automatically on every release.
-
-**One-line install (Linux and macOS):**
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
-```
-
-The installer detects your OS and architecture, downloads the correct archive, verifies the SHA256 checksum, and places the binary in `/usr/local/bin` (if writable) or `~/.local/bin`.
-
-To install a specific version, set `SPROOT_VERSION`:
-
-```sh
-SPROOT_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/justanotherspy/sproot/main/install.sh | sh
-```
-
-**From source:**
-
-```sh
-git clone https://github.com/justanotherspy/sproot
-cd sproot
-make install
-```
-
-Requires Go 1.25+.
-
 ## Staying up to date
 
 sproot checks GitHub at most once a day for a newer release and, when one exists, prints a one-line notice (to stderr) after any command:
@@ -300,6 +300,8 @@ sproot self-update
 ```
 
 `self-update` always re-checks upstream (ignoring the daily cache), downloads the release archive for your OS and architecture, verifies its SHA256 checksum, replaces the running binary, and clears the cache. Use `sproot self-update --check` to report whether an update is available without installing it.
+
+If sproot was installed with Homebrew, `self-update` detects the Caskroom-managed binary and runs `brew upgrade --cask sproot` instead, so brew's version tracking stays in sync.
 
 To silence the daily notice (for example in CI), set `SPROOT_NO_UPDATE_CHECK` to any value. Self-updating a `dev` build is unsupported; reinstall via the install script instead.
 
