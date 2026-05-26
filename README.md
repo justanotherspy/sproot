@@ -243,6 +243,21 @@ sproot destroy my-sprite
 
 Binaries are available on the [releases page](https://github.com/justanotherspy/sproot/releases).
 
+**Homebrew (macOS and Linux):**
+
+```sh
+brew install --cask justanotherspy/tap/sproot
+```
+
+Or tap once, then install by short name:
+
+```sh
+brew tap justanotherspy/tap
+brew install --cask sproot
+```
+
+Upgrade with `brew upgrade --cask sproot`. The cask is republished to [`justanotherspy/homebrew-tap`](https://github.com/justanotherspy/homebrew-tap) automatically on every release.
+
 **One-line install (Linux and macOS):**
 
 ```sh
@@ -315,6 +330,17 @@ make e2e                # end-to-end tests against real sprites (requires SPRITE
 `make e2e` creates real sprites using `testdata/integration` configs, verifies labels, tests push, and destroys everything. All sprites are destroyed in cleanup even if a step fails.
 
 Requires Go 1.25+.
+
+## Releasing
+
+Releases are cut by pushing a `vX.Y.Z` tag, which triggers `.github/workflows/release.yml` (GoReleaser). Each run:
+
+1. Builds the cross-platform binaries, archives, checksums, and cosign signatures.
+2. Publishes a GitHub release as a **prerelease** and uploads all artifacts to it.
+3. Generates the Homebrew cask and pushes it to [`justanotherspy/homebrew-tap`](https://github.com/justanotherspy/homebrew-tap) (`Casks/sproot.rb`).
+4. Promotes the release: clears the prerelease flag and marks it **Latest**, so the "Latest" badge and the cask only point at a release once every artifact is attached.
+
+The cask push requires a `HOMEBREW_TAP_GITHUB_TOKEN` repository secret — a token with `contents:write` on `justanotherspy/homebrew-tap`. The default `GITHUB_TOKEN` only reaches this repo, so GoReleaser needs a separate token to push to the tap.
 
 ## License
 

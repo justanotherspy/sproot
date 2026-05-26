@@ -28,7 +28,7 @@ builds:
 
 archives:
   - id: sproot
-    builds:
+    ids:
       - sproot
     formats:
       - tar.gz
@@ -58,11 +58,52 @@ signs:
     env:
       - COSIGN_EXPERIMENTAL=1
 
+# Generate a Homebrew cask and push it to the shared tap at
+# justanotherspy/homebrew-tap, so `brew install --cask justanotherspy/tap/sproot`
+# always tracks the latest release. Pushing to the tap needs a PAT
+# (HOMEBREW_TAP_GITHUB_TOKEN) since the default GITHUB_TOKEN only reaches this repo.
+homebrew_casks:
+  - name: sproot
+    ids:
+      - sproot
+    binaries:
+      - sproot
+    repository:
+      owner: justanotherspy
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Casks
+    homepage: "https://github.com/justanotherspy/sproot"
+    description: "Bootstrap sprite.dev sprites from a user-owned config repo"
+    license: MIT
+    url:
+      verified: "github.com/justanotherspy/sproot/"
+    commit_author:
+      name: github-actions[bot]
+      email: 41898282+github-actions[bot]@users.noreply.github.com
+    commit_msg_template: "chore(cask): sproot {{ .Tag }}"
+    # The release is created as a prerelease (see release.prerelease) and only
+    # promoted to latest by the workflow after artifacts attach, so force the
+    # cask push that goreleaser would otherwise skip for a prerelease.
+    skip_upload: "false"
+    # The binary is unsigned, so strip the Gatekeeper quarantine flag on install
+    # (macOS only; the cask also serves Homebrew on Linux, which has no xattr).
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/sproot"]
+          end
+
 release:
   github:
     owner: justanotherspy
     name: sproot
-  prerelease: auto
+  # Created as a prerelease so the "Latest" badge (and the Homebrew cask) never
+  # point at a release before its artifacts are attached. The release workflow
+  # promotes it to latest once goreleaser has finished uploading everything.
+  prerelease: true
   draft: false
   replace_existing_draft: true
   header: |
