@@ -93,6 +93,9 @@ jobs:
           # binaries are built with go1.24, whose staticcheck cannot read the
           # go1.25 testing-package facts and emits false-positive SA5011.
           install-mode: goinstall
+          # Don't reuse a stale analysis cache: facts computed by an older
+          # go1.24 binary would otherwise be served to the go1.25 binary.
+          skip-cache: true
 
   semgrep:
     name: Semgrep Security Scan
