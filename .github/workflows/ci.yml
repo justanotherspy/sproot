@@ -88,13 +88,9 @@ jobs:
 
       - uses: golangci/golangci-lint-action@82606bf257cbaff209d206a39f5134f0cfbfd2ee # v9.2.1
         with:
-          version: v2.12.2
-          # Build from source with the repo's go1.25 toolchain. The prebuilt
-          # binaries are built with go1.24, whose staticcheck cannot read the
-          # go1.25 testing-package facts and emits false-positive SA5011.
-          install-mode: goinstall
-          # Don't reuse a stale analysis cache: facts computed by an older
-          # go1.24 binary would otherwise be served to the go1.25 binary.
+          version: latest
+          install-mode: binary
+          # Don't reuse a stale analysis cache across binary/toolchain changes.
           skip-cache: true
 
   semgrep:
