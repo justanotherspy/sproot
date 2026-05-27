@@ -7,6 +7,7 @@
 # Environment variables:
 #   SPROOT_VERSION      - specific version to install (default: latest release)
 #   SPROOT_INSTALL_DIR  - override install directory (default: auto-detect)
+#   GITHUB_TOKEN        - lifts the GitHub API rate limit for version lookup
 #
 # Supports: Linux (amd64, arm64), macOS (amd64, arm64)
 
@@ -71,6 +72,63 @@ download() {
     fi
 }
 
+# Fetch a URL to stdout (used for the GitHub API). Honors GITHUB_TOKEN/GH_TOKEN
+# to lift the unauthenticated rate limit. Prints nothing and returns non-zero on
+# failure so callers can fall back.
+fetch_stdout() {
+    _url="$1"
+    _token="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+    if command -v curl >/dev/null 2>&1; then
+        if [ -n "${_token}" ]; then
+            curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 -H "Authorization: Bearer ${_token}" "${_url}"
+        else
+            curl -fsSL --connect-timeout 10 --max-time 60 --retry 3 "${_url}"
+        fi
+    elif command -v wget >/dev/null 2>&1; then
+        if [ -n "${_token}" ]; then
+            wget -q --timeout=60 --header="Authorization: Bearer ${_token}" -O - "${_url}"
+        else
+            wget -q --timeout=60 -O - "${_url}"
+        fi
+    else
+        fail "Neither curl nor wget found. Install one and retry."
+    fi
+}
+
+# Latest tag via the REST API (authenticated when a token is present). Prints
+# the tag on success, nothing on failure, so callers can fall back.
+tag_from_api() {
+    fetch_stdout "${API_URL}" 2>/dev/null \
+        | grep '"tag_name"' | head -1 \
+        | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/'
+}
+
+# Latest tag via the github.com /releases/latest redirect. This is a plain web
+# request (not api.github.com), so it is NOT subject to the unauthenticated
+# 60/hr REST API rate limit that returns 403 on shared/CI egress IPs. The
+# endpoint 302-redirects to .../releases/tag/<tag>; we read the Location header
+# without following it.
+tag_from_latest_redirect() {
+    _url="${RELEASES_URL}/latest"
+    _loc=""
+    if command -v curl >/dev/null 2>&1; then
+        _loc="$(curl -fsS -o /dev/null -w '%{redirect_url}' --connect-timeout 10 --max-time 30 --retry 2 "${_url}" 2>/dev/null)" || return 1
+    elif command -v wget >/dev/null 2>&1; then
+        # --max-redirect=0 makes wget treat the 302 as an error, but -S still
+        # prints the response headers (incl. Location) to stderr, which we parse.
+        _loc="$(wget -S --max-redirect=0 --timeout=30 -O /dev/null "${_url}" 2>&1 | sed -n 's/.*[Ll]ocation:[[:space:]]*//p' | head -1)" || true
+    else
+        return 1
+    fi
+    _cr="$(printf '\r')"
+    _loc="${_loc%"${_cr}"}"
+    _loc="${_loc%/}"
+    case "${_loc}" in
+        */releases/tag/*) printf '%s\n' "${_loc##*/releases/tag/}" ;;
+        *) return 1 ;;
+    esac
+}
+
 OS="$(detect_os)"
 ARCH="$(detect_arch)"
 
@@ -79,12 +137,12 @@ if [ -n "${SPROOT_VERSION:-}" ]; then
     log "Using requested version: ${VERSION}"
 else
     log "Fetching latest release version..."
-    if command -v curl >/dev/null 2>&1; then
-        VERSION="$(curl -fsSL "${API_URL}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
-    else
-        VERSION="$(wget -qO- "${API_URL}" | grep '"tag_name"' | head -1 | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+    VERSION="$(tag_from_api || true)"
+    if [ -z "${VERSION}" ]; then
+        log "GitHub API did not return a release tag (rate-limited?); trying the releases redirect..."
+        VERSION="$(tag_from_latest_redirect || true)"
     fi
-    [ -n "${VERSION}" ] || fail "Could not determine latest version. Set SPROOT_VERSION and retry."
+    [ -n "${VERSION}" ] || fail "Could not determine latest version. Set SPROOT_VERSION or GITHUB_TOKEN and retry."
     log "Latest version: ${VERSION}"
 fi
 
