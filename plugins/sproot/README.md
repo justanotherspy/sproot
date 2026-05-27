@@ -18,8 +18,8 @@ configs.
 ## Install
 
 ```
-/plugin marketplace add justanotherspy/sproot
-/plugin install sproot@sproot
+/plugin marketplace add justanotherspy/claude-plugins
+/plugin install sproot@justanotherspy
 ```
 
 Then invoke a skill with `/sproot:script-convert <path-to-script>` or `/sproot:author-config`.
