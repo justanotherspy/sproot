@@ -91,7 +91,7 @@ func (p *claudePhase) Verify(ctx *phase.Context) error {
 		}
 		for k, want := range p.cfg.Settings {
 			got, ok := existing[k]
-			if !ok || jsonStr(got) != jsonStr(want) {
+			if !ok || !settingsSatisfied(got, want) {
 				return fmt.Errorf("claude: settings key %q not set correctly", k)
 			}
 		}
@@ -125,15 +125,35 @@ func (p *claudePhase) settingsNeedWork() bool {
 	}
 	for k, want := range p.cfg.Settings {
 		got, ok := existing[k]
-		if !ok {
-			return true
-		}
-		// Compare via JSON to handle int/float/bool mismatches from YAML decode.
-		if jsonStr(got) != jsonStr(want) {
+		if !ok || !settingsSatisfied(got, want) {
 			return true
 		}
 	}
 	return false
+}
+
+// settingsSatisfied reports whether want is already reflected in got, mirroring
+// deepMerge: nested maps are satisfied key-by-key (got may carry extra keys that
+// the merge preserves), while non-map values must match exactly. An exact
+// top-level comparison would wrongly flag a merged superset as out of date and
+// re-run (and fail Verify) on every invocation.
+func settingsSatisfied(got, want any) bool {
+	wantMap, ok := want.(map[string]any)
+	if !ok {
+		// Compare via JSON to handle int/float/bool mismatches from YAML decode.
+		return jsonStr(got) == jsonStr(want)
+	}
+	gotMap, ok := got.(map[string]any)
+	if !ok {
+		return false
+	}
+	for k, wv := range wantMap {
+		gv, ok := gotMap[k]
+		if !ok || !settingsSatisfied(gv, wv) {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *claudePhase) applySettings(ctx *phase.Context) error {

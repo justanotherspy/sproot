@@ -60,6 +60,26 @@ func TestRenderLLMContext_NoWork(t *testing.T) {
 	}
 }
 
+// TestRenderLLMContext_DryRunRecordsDoNotInflateTally covers dry-run records,
+// which are neither skipped nor failed but did no work. The did-work tally must
+// match the listed modules (zero here), not count the "would run" entries.
+func TestRenderLLMContext_DryRunRecordsDoNotInflateTally(t *testing.T) {
+	state := &phase.State{
+		UpdatedAt: time.Now().UTC(),
+		Phases: []phase.PhaseRecord{
+			{Type: "apt", Name: "apt", DidWork: false},
+			{Type: "npm", Name: "npm", DidWork: false},
+		},
+	}
+	out := renderLLMContext(state)
+	if !strings.Contains(out, "Nothing changed on this run") {
+		t.Errorf("expected no-work message for dry-run records:\n%s", out)
+	}
+	if !strings.Contains(out, "0 phase(s) did work") {
+		t.Errorf("did-work tally should be 0 for dry-run records, got:\n%s", out)
+	}
+}
+
 func TestWriteLLMContext_WritesSummaryAndPointer(t *testing.T) {
 	dir := t.TempDir()
 	if err := writeLLMContext(log.Stderr(), sampleState(), dir); err != nil {

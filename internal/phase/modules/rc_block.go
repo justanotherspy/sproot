@@ -48,7 +48,7 @@ func (p *rcBlockPhase) ShouldRun(ctx *phase.Context) (bool, error) {
 	if err != nil {
 		return true, nil
 	}
-	wantHash := blockHash(src)
+	wantHash := blockHash(ensureTrailingNewline(src))
 	for _, rc := range []string{".bashrc", ".zshrc"} {
 		existing, err := os.ReadFile(filepath.Join(home, rc))
 		if err != nil {
@@ -89,7 +89,7 @@ func (p *rcBlockPhase) Verify(ctx *phase.Context) error {
 	if err != nil {
 		return err
 	}
-	want := blockHash(src)
+	want := blockHash(ensureTrailingNewline(src))
 	for _, rc := range []string{".bashrc", ".zshrc"} {
 		path := filepath.Join(home, rc)
 		content, err := os.ReadFile(path)

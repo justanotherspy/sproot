@@ -24,18 +24,7 @@ func fetchLinuxAmd64Binary(version string) ([]byte, error) {
 		)
 	}
 
-	// Normalize version: goreleaser sets main.version without leading "v",
-	// but the GitHub release tag includes it.
-	tag := version
-	if !strings.HasPrefix(version, "v") {
-		tag = "v" + version
-	}
-
-	archiveName := fmt.Sprintf("sproot_%s_linux_amd64.tar.gz", version)
-	url := fmt.Sprintf(
-		"https://github.com/justanotherspy/sproot/releases/download/%s/%s",
-		tag, archiveName,
-	)
+	archiveName, url := linuxAmd64ReleaseURL(version)
 
 	resp, err := binaryDownloadClient.Get(url) //nolint:noctx
 	if err != nil {
@@ -52,6 +41,21 @@ func fetchLinuxAmd64Binary(version string) ([]byte, error) {
 		return nil, fmt.Errorf("extract from %s: %w", archiveName, err)
 	}
 	return data, nil
+}
+
+// linuxAmd64ReleaseURL returns the release asset name and download URL for the
+// Linux/amd64 archive of version. version may carry a leading "v": the release
+// tag always includes it, while the asset name (goreleaser's {{ .Version }})
+// never does, so the "v" must be stripped from the asset name to avoid a 404.
+func linuxAmd64ReleaseURL(version string) (archiveName, url string) {
+	bare := strings.TrimPrefix(version, "v")
+	tag := "v" + bare
+	archiveName = fmt.Sprintf("sproot_%s_linux_amd64.tar.gz", bare)
+	url = fmt.Sprintf(
+		"https://github.com/justanotherspy/sproot/releases/download/%s/%s",
+		tag, archiveName,
+	)
+	return archiveName, url
 }
 
 // extractSprootFromTarGz reads a .tar.gz stream and returns the bytes of the

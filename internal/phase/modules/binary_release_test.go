@@ -14,6 +14,40 @@ import (
 	"github.com/justanotherspy/sproot/internal/config"
 )
 
+func TestCopyCapped(t *testing.T) {
+	// Under and at the limit succeed; over the limit fails rather than
+	// silently truncating (as a bare io.CopyN at the cap would).
+	cases := []struct {
+		name    string
+		size    int64
+		limit   int64
+		wantErr bool
+	}{
+		{"under limit", 5, 10, false},
+		{"exactly at limit", 10, 10, false},
+		{"over limit", 11, 10, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			src := strings.NewReader(strings.Repeat("x", int(c.size)))
+			var dst strings.Builder
+			err := copyCapped(&dst, src, c.limit)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for size %d over limit %d", c.size, c.limit)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if int64(dst.Len()) != c.size {
+				t.Errorf("copied %d bytes, want %d", dst.Len(), c.size)
+			}
+		})
+	}
+}
+
 func TestTemplateAsset(t *testing.T) {
 	version := "v2.4.0"
 	tag := "v2.4.0"

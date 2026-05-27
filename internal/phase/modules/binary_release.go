@@ -353,7 +353,7 @@ func installFromTar(l *log.Logger, tarPath, name string) error {
 			return fmt.Errorf("create %s: %w", dest, err)
 		}
 		const maxBinarySize = 500 << 20 // 500 MB; guards against decompression bombs
-		if _, err := io.CopyN(out, tr, maxBinarySize); err != nil && err != io.EOF {
+		if err := copyCapped(out, tr, maxBinarySize); err != nil {
 			_ = out.Close()
 			return fmt.Errorf("write %s: %w", dest, err)
 		}
@@ -364,6 +364,21 @@ func installFromTar(l *log.Logger, tarPath, name string) error {
 		return nil
 	}
 	return fmt.Errorf("binary %q not found in tarball", name)
+}
+
+// copyCapped copies src to dst, failing if src holds more than limit bytes (a
+// decompression-bomb guard). A source of exactly limit bytes is allowed. Unlike
+// a bare io.CopyN, this returns an error rather than silently truncating when
+// the source exceeds the cap.
+func copyCapped(dst io.Writer, src io.Reader, limit int64) error {
+	n, err := io.CopyN(dst, src, limit+1)
+	if err != nil && err != io.EOF {
+		return err
+	}
+	if n > limit {
+		return fmt.Errorf("exceeds %d byte limit", limit)
+	}
+	return nil
 }
 
 // verifyChecksum computes the sha256 of the file at path and compares it to
