@@ -180,7 +180,11 @@ func RunPush(ctx context.Context, opts PushOptions) error {
 // the host config (always available). labelMeta is sourced from shaFn (may be
 // zero value when SHA computation failed); it is used only for label updates,
 // not for setup args.
-func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource, ghToken string, envBlock []string, outMu *sync.Mutex, l *log.Logger) error {
+func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOptions, sha string, labelMeta ConfigMeta, setupLocalDir, setupRepo, setupRef, configPath, configSource, ghToken string, envBlock []string, outMu *sync.Mutex, logger *log.Logger) error {
+	// Serialize this goroutine's log lines against the shared output mutex so
+	// they do not interleave with each other or with the streamed command output
+	// when pushing to several sprites in parallel.
+	l := syncLogger{l: logger, mu: outMu}
 	handle := client.GetHandle(name)
 
 	if !opts.NoCheckpoint && !opts.DryRun {
@@ -276,6 +280,33 @@ func currentConfigSHA(cfg *config.HostConfig, l *log.Logger) (string, ConfigMeta
 	}
 	meta := ConfigMeta{Source: "git", Repo: cfg.SprootConfigRepo, Ref: cfg.SprootConfigRef}
 	return sha, meta, nil
+}
+
+// syncLogger serializes a Logger's writes against a shared mutex. log.Logger is
+// not safe for concurrent use, and during a parallel push each goroutine logs
+// status lines; routing them through the same mutex that guards command output
+// keeps lines from interleaving on the shared stderr.
+type syncLogger struct {
+	l  *log.Logger
+	mu *sync.Mutex
+}
+
+func (s syncLogger) Infof(format string, args ...any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.l.Infof(format, args...)
+}
+
+func (s syncLogger) Warnf(format string, args ...any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.l.Warnf(format, args...)
+}
+
+func (s syncLogger) Debugf(format string, args ...any) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.l.Debugf(format, args...)
 }
 
 // prefixWriter wraps an io.Writer and prepends a prefix to each line of output.

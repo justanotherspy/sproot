@@ -32,24 +32,26 @@ const (
 // provisions. Used to render the post-setup summary. Unknown types fall back
 // to the phase name.
 var moduleDescriptions = map[string]string{
-	"apt":             "Installed system packages via apt.",
-	"uv_tool":         "Installed Python CLI tools via uv.",
-	"go_install":      "Installed Go binaries via go install.",
-	"cargo_install":   "Installed Rust binaries via cargo install.",
-	"binary_release":  "Installed binaries from GitHub release assets.",
-	"corepack":        "Enabled corepack package managers (yarn, pnpm).",
-	"rust_components": "Installed Rust toolchain components via rustup.",
-	"docker":          "Installed and configured Docker.",
-	"sprite_service":  "Registered a long-running sprite service.",
-	"git_identity":    "Configured git user identity.",
-	"ssh_setup":       "Generated an SSH key and registered it with GitHub.",
-	"gh_token":        "Exported GH_TOKEN and authenticated gh.",
-	"file_template":   "Rendered files into place from the config repo.",
-	"rc_block":        "Added a managed block to shell rc files.",
-	"repo_clone":      "Cloned repositories.",
-	"claude":          "Configured Claude Code (settings, upgrade, CLAUDE.md).",
-	"npm":             "Installed Node.js dependencies via npm install.",
-	"cmd":             "Ran custom setup commands.",
+	"apt":              "Installed system packages via apt.",
+	"uv_tool":          "Installed Python CLI tools via uv.",
+	"go_install":       "Installed Go binaries via go install.",
+	"cargo_install":    "Installed Rust binaries via cargo install.",
+	"binary_release":   "Installed binaries from GitHub release assets.",
+	"corepack":         "Enabled corepack package managers (yarn, pnpm).",
+	"rust_components":  "Installed Rust toolchain components via rustup.",
+	"docker":           "Installed and configured Docker.",
+	"sprite_service":   "Registered a long-running sprite service.",
+	"git_identity":     "Configured git user identity.",
+	"ssh_setup":        "Generated an SSH key and registered it with GitHub.",
+	"gh_token":         "Exported GH_TOKEN and authenticated gh.",
+	"file_template":    "Rendered files into place from the config repo.",
+	"rc_block":         "Added a managed block to shell rc files.",
+	"repo_clone":       "Cloned repositories.",
+	"claude":           "Configured Claude Code (settings, upgrade, CLAUDE.md).",
+	"npm":              "Installed Node.js dependencies via npm install.",
+	"cmd":              "Ran custom setup commands.",
+	"shell_completion": "Installed shell completion scripts (bash, zsh, fish).",
+	"nix":              "Installed Nix and declarative profile packages.",
 }
 
 // renderLLMContext builds a markdown summary of a completed setup run. It lists
@@ -70,8 +72,11 @@ func renderLLMContext(state *phase.State) string {
 		case rec.Skipped:
 			skipped++
 		default:
-			didWork++
+			// A non-skipped, non-failed record that did no work is a dry-run
+			// "would run" entry; it must not inflate the did-work tally (which
+			// would then disagree with the listed modules below).
 			if rec.DidWork {
+				didWork++
 				worked = append(worked, rec)
 			}
 		}

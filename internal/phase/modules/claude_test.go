@@ -99,6 +99,48 @@ func TestClaude_SettingsMergesIntoExisting(t *testing.T) {
 	}
 }
 
+// TestClaude_NestedSettingsIdempotentWithExistingKeys guards against an exact
+// top-level comparison of a deep-merged setting: when settings.json already has
+// extra keys under a nested object, deepMerge preserves them, so the stored
+// value is a superset of the configured value. ShouldRun and Verify must treat
+// the configured nested map as a subset (present), not require exact equality,
+// or the phase re-runs forever and Verify always fails.
+func TestClaude_NestedSettingsIdempotentWithExistingKeys(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	claudeDir := filepath.Join(home, ".claude")
+	_ = os.MkdirAll(claudeDir, 0o755)
+	existing, _ := json.Marshal(map[string]any{
+		"permissions": map[string]any{"defaultMode": "acceptEdits"},
+	})
+	_ = os.WriteFile(filepath.Join(claudeDir, "settings.json"), existing, 0o644)
+
+	p := &claudePhase{cfg: &config.ClaudeConfig{Settings: map[string]any{
+		"permissions": map[string]any{"allow": []any{"Bash"}},
+	}}}
+	if err := p.Run(claudeCtx(t.TempDir())); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// Pre-existing nested key must be preserved by the deep merge.
+	result, _ := readClaudeSettings()
+	perms, _ := result["permissions"].(map[string]any)
+	if perms["defaultMode"] != "acceptEdits" {
+		t.Errorf("existing nested key lost after merge: %v", result["permissions"])
+	}
+
+	should, err := p.ShouldRun(claudeCtx(t.TempDir()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if should {
+		t.Error("expected ShouldRun=false after nested settings merged with pre-existing keys")
+	}
+	if err := p.Verify(claudeCtx(t.TempDir())); err != nil {
+		t.Errorf("Verify should pass for a merged nested-settings superset: %v", err)
+	}
+}
+
 func TestClaude_UpgradeAlwaysShouldRun(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

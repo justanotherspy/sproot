@@ -129,6 +129,34 @@ func TestRCBlock_TrailingNewlineNormalized(t *testing.T) {
 	}
 }
 
+// TestRCBlock_IdempotentWithoutTrailingNewline guards against hashing the raw
+// src while Run writes a newline-normalized body: ShouldRun and Verify must hash
+// the same normalized body, so a source file with no trailing newline is still
+// recognized as already applied (and not re-run forever).
+func TestRCBlock_IdempotentWithoutTrailingNewline(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	ctx := testCtx(t)
+	// Deliberate: no trailing newline.
+	_ = os.WriteFile(filepath.Join(ctx.ConfigRepoPath, "rc.sh"), []byte("export BAR=baz"), 0o644)
+
+	p := newRCBlockPhase("rc.sh")
+	if err := p.Run(ctx); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	should, err := p.ShouldRun(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if should {
+		t.Error("expected ShouldRun=false after run even when src lacks a trailing newline")
+	}
+	if err := p.Verify(ctx); err != nil {
+		t.Errorf("Verify should pass after run even when src lacks a trailing newline: %v", err)
+	}
+}
+
 func TestRCBlock_ReplacesExistingBlock(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

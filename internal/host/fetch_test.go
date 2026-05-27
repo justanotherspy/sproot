@@ -71,6 +71,22 @@ func TestExtractSprootFromTarGz_NotFound(t *testing.T) {
 	}
 }
 
+func TestLinuxAmd64ReleaseURL(t *testing.T) {
+	// A "v"-prefixed and bare version must yield the same asset name (goreleaser
+	// {{ .Version }} has no "v") while the release tag always carries the "v".
+	const wantName = "sproot_1.2.3_linux_amd64.tar.gz"
+	const wantURL = "https://github.com/justanotherspy/sproot/releases/download/v1.2.3/sproot_1.2.3_linux_amd64.tar.gz"
+	for _, version := range []string{"1.2.3", "v1.2.3"} {
+		name, url := linuxAmd64ReleaseURL(version)
+		if name != wantName {
+			t.Errorf("linuxAmd64ReleaseURL(%q) name = %q, want %q", version, name, wantName)
+		}
+		if url != wantURL {
+			t.Errorf("linuxAmd64ReleaseURL(%q) url = %q, want %q", version, url, wantURL)
+		}
+	}
+}
+
 func TestFetchLinuxAmd64Binary_DevVersion(t *testing.T) {
 	_, err := fetchLinuxAmd64Binary("dev")
 	if err == nil {
