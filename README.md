@@ -226,8 +226,10 @@ sproot rc sproot-claude-rc --close          # stop it; the sprite pauses once id
 
 ## Skills (Claude plugin)
 
-This repo doubles as a Claude Code plugin marketplace. The `sproot` plugin (under `plugins/`)
-ships two skills that help you author sproot configs:
+The `sproot` plugin (under `plugins/`) is published through the central
+[`justanotherspy/claude-plugins`](https://github.com/justanotherspy/claude-plugins)
+marketplace, which sources it straight from this repo. It ships two skills that help you
+author sproot configs:
 
 - **`/sproot:script-convert <path>`** turns an existing setup bash script into a `sproot.yaml`
   plus its companion files, mapping each command to the right module (`apt-get install` -> `apt`,
@@ -240,11 +242,13 @@ ships two skills that help you author sproot configs:
 Install from inside Claude Code:
 
 ```sh
-/plugin marketplace add justanotherspy/sproot
-/plugin install sproot@sproot
+/plugin marketplace add justanotherspy/claude-plugins
+/plugin install sproot@justanotherspy
 ```
 
-See [`plugins/sproot/README.md`](plugins/sproot/README.md) for details.
+This repo already enables the plugin for its own Claude Code sessions via
+[`.claude/settings.json`](.claude/settings.json) (alongside `shuck`). See
+[`plugins/sproot/README.md`](plugins/sproot/README.md) for details.
 
 ## Quickstart
 

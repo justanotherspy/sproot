@@ -40,8 +40,8 @@ pkg/tty/              - terminal/color detection shared by log, table consumers
 docs/                 - user-facing docs (modules.md)
 testdata/integration/ - integration test config used by integration.yml
 plans/                - design docs, not shipped
-.claude-plugin/       - marketplace.json (this repo is a Claude plugin marketplace)
-plugins/sproot/       - the sproot Claude plugin: script-convert + author-config skills, shared reference/
+.claude/              - settings.json (enables the shuck + sproot plugins from the justanotherspy marketplace)
+plugins/sproot/       - the sproot Claude plugin: script-convert + author-config skills, shared reference/ (published via the central justanotherspy/claude-plugins marketplace)
 ```
 
 ## Conventions
@@ -88,7 +88,7 @@ plugins/sproot/       - the sproot Claude plugin: script-convert + author-config
 
 Three jobs run on every push via `ci.yml`: `build-and-test`, `validate` (runs `sproot validate` against `internal/config/testdata/sproot.yaml` and `sproot_targets.yaml`), and `lint`. All three must pass before merging. golangci-lint uses `.golangci.yml` (standard preset).
 
-`plugins.yml` runs on every push/PR and gates the Claude plugin marketplace: `validate-plugin` installs the `claude` CLI and runs `claude plugin validate --strict` on `.claude-plugin/marketplace.json` and `plugins/sproot`; `validate-fixtures` builds the binary and runs `sproot validate` on every `plugins/sproot/skills/script-convert/examples/*/expected/sproot.yaml` golden fixture.
+`plugins.yml` runs on every push/PR and gates the `sproot` Claude plugin (published through the central `justanotherspy/claude-plugins` marketplace, which sources it from this repo): `validate-plugin` installs the `claude` CLI and runs `claude plugin validate --strict` on `plugins/sproot`; `validate-fixtures` builds the binary and runs `sproot validate` on every `plugins/sproot/skills/script-convert/examples/*/expected/sproot.yaml` golden fixture.
 
 `integration.yml` runs on owner-triggered pushes: builds the binary and runs matrix integration tests against real sprites. Current jobs include module-type matrix entries (apt, git_identity, file_template, rc_block, claude, cmd, binary-release), tooling matrix entries against `sproot_tooling.yaml` (uv_tool, corepack, rust_components, go_install, cargo_install, npm, sprite_service), a docker-daemon job (docker daemon.json merge + sprite_service dockerd), a multi-target entry (target=web with sproot_targets.yaml), push-and-outdated (creates a sprite, pushes to it, and runs sproot outdated), and local-config (config_source: local using testdata/integration as the local path). `gh_token` and `ssh_setup` are not in the matrix: they need a user-scoped GitHub PAT and mutate the GitHub account, so they cannot run unattended with the default Actions token. `sproot rc` (Remote Control) is likewise not exercised end-to-end: it needs an interactive `claude auth login` (full claude.ai OAuth, not the forwarded inference token), so CI only covers the auth-free paths (the "not authenticated" guard and service register/delete plumbing) via unit tests. The `cargo_install` job uses a small, dependency-light crate (`hexyl`, ~25s to compile on the base image) to keep it fast; avoid swapping in crates with heavy dependency trees.
 
