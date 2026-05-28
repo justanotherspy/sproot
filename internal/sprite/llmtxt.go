@@ -130,7 +130,13 @@ var pointerRe = regexp.MustCompile(`(?s)\n?` + regexp.QuoteMeta(pointerBegin) + 
 // platform's llm.txt) may not exist yet; in that case the block becomes its
 // whole content.
 func appendPointerBlock(path, summaryPath string) error {
-	existing, _ := os.ReadFile(path)
+	existing, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		// A genuine read error (not just an absent file) must not be treated as
+		// an empty file, or we would overwrite the platform's llm.txt with only
+		// our pointer block.
+		return fmt.Errorf("read %s: %w", path, err)
+	}
 	stripped := strings.TrimRight(pointerRe.ReplaceAllString(string(existing), ""), "\n")
 
 	block := fmt.Sprintf("%s\n## sproot\n\nThis sprite was provisioned by sproot. See %s for a summary of what setup installed.\n%s\n",

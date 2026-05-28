@@ -797,8 +797,8 @@ func TestValidateHostConfig_Errors(t *testing.T) {
 		return &HostConfig{
 			SprootConfigRepo: "git@github.com:user/repo.git",
 			SprootConfigRef:  "main",
-			TokenEnv:   "SPRITES_TOKEN",
-			GHTokenEnv: "GITHUB_TOKEN",
+			TokenEnv:         "SPRITES_TOKEN",
+			GHTokenEnv:       "GITHUB_TOKEN",
 		}
 	}
 
@@ -831,8 +831,8 @@ func TestValidateHostConfig_EmptyGHTokenEnvIsValid(t *testing.T) {
 	cfg := &HostConfig{
 		SprootConfigRepo: "git@github.com:user/repo.git",
 		SprootConfigRef:  "main",
-		TokenEnv:   "SPRITES_TOKEN",
-		GHTokenEnv: "",
+		TokenEnv:         "SPRITES_TOKEN",
+		GHTokenEnv:       "",
 	}
 	if err := ValidateHostConfig(cfg); err != nil {
 		t.Errorf("expected no error with empty gh_token_env, got: %v", err)
@@ -1002,6 +1002,21 @@ func TestResolveTarget_DefaultFallback(t *testing.T) {
 	}
 }
 
+func TestResolveTarget_EmptyNameNoDefault(t *testing.T) {
+	cfg := &SprootConfig{
+		Targets: map[string]*TargetConfig{
+			"web": {Phases: []PhaseConfig{aptPhase()}},
+		},
+	}
+	_, err := cfg.ResolveTarget("")
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "--target") {
+		t.Errorf("error %q should direct the user to pass --target", err.Error())
+	}
+}
+
 func TestResolveTarget_MissingTarget(t *testing.T) {
 	cfg := &SprootConfig{
 		Targets: map[string]*TargetConfig{
@@ -1103,7 +1118,7 @@ func TestValidateHostConfig_LocalSource(t *testing.T) {
 	cfg := &HostConfig{
 		SprootConfigSource:    "local",
 		SprootConfigLocalPath: "~/my-config",
-		TokenEnv:        "SPRITES_TOKEN",
+		TokenEnv:              "SPRITES_TOKEN",
 	}
 	if err := ValidateHostConfig(cfg); err != nil {
 		t.Errorf("expected no error for local source: %v", err)
@@ -1113,7 +1128,7 @@ func TestValidateHostConfig_LocalSource(t *testing.T) {
 func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
 	cfg := &HostConfig{
 		SprootConfigSource: "local",
-		TokenEnv:     "SPRITES_TOKEN",
+		TokenEnv:           "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)
 	if err == nil {
@@ -1127,7 +1142,7 @@ func TestValidateHostConfig_LocalSourceMissingPath(t *testing.T) {
 func TestValidateHostConfig_InvalidSource(t *testing.T) {
 	cfg := &HostConfig{
 		SprootConfigSource: "ftp",
-		TokenEnv:     "SPRITES_TOKEN",
+		TokenEnv:           "SPRITES_TOKEN",
 	}
 	err := ValidateHostConfig(cfg)
 	if err == nil {

@@ -32,9 +32,9 @@ func (m *mockClient) CreateSprite(_ context.Context, _ string, _ *sprites.Sprite
 	return m.handle, nil
 }
 
-func (m *mockClient) GetHandle(_ string) SpriteHandle                           { return m.handle }
-func (m *mockClient) DestroySprite(_ context.Context, _ string) error           { return m.destroyErr }
-func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error)  { return nil, nil }
+func (m *mockClient) GetHandle(_ string) SpriteHandle                          { return m.handle }
+func (m *mockClient) DestroySprite(_ context.Context, _ string) error          { return m.destroyErr }
+func (m *mockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error) { return nil, nil }
 
 // mockHandle records calls for assertions. RunPush updates sprites in parallel
 // and shares one handle across goroutines, so mu guards the recorded state.
@@ -581,4 +581,57 @@ token_env: MY_TOKEN
 	if handle.checkpointDone {
 		t.Error("expected no checkpoint when checkpoint_after_setup is false")
 	}
+}
+
+// TestUploadDirectory_DotfileRoot verifies that a config directory whose own
+// basename starts with "." (e.g. ~/.config/sprite) still uploads its files,
+// rather than the walk aborting on the root and uploading nothing.
+func TestUploadDirectory_DotfileRoot(t *testing.T) {
+	root := filepath.Join(t.TempDir(), ".sproot-config")
+	if err := os.MkdirAll(filepath.Join(root, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "sproot.yaml"), []byte("a"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "sub", "extra.txt"), []byte("b"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A nested dotfile/.git must still be skipped.
+	if err := os.WriteFile(filepath.Join(root, ".hidden"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(root, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, ".git", "config"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	handle := newMockHandle()
+	if err := uploadDirectory(handle, root, "/tmp/dest"); err != nil {
+		t.Fatalf("uploadDirectory: %v", err)
+	}
+	if _, ok := handle.writtenFiles["/tmp/dest/sproot.yaml"]; !ok {
+		t.Errorf("expected sproot.yaml to be uploaded; got %v", keysOf(handle.writtenFiles))
+	}
+	if _, ok := handle.writtenFiles["/tmp/dest/sub/extra.txt"]; !ok {
+		t.Errorf("expected sub/extra.txt to be uploaded; got %v", keysOf(handle.writtenFiles))
+	}
+	if _, ok := handle.writtenFiles["/tmp/dest/.hidden"]; ok {
+		t.Error("nested dotfile should be skipped")
+	}
+	for k := range handle.writtenFiles {
+		if strings.Contains(k, ".git") {
+			t.Errorf(".git contents should be skipped, got %q", k)
+		}
+	}
+}
+
+func keysOf(m map[string][]byte) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
 }

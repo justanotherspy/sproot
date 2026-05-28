@@ -30,7 +30,7 @@ func (m *pushMockClient) CreateSprite(_ context.Context, _ string, _ *sprites.Sp
 	}
 	return m.handle, nil
 }
-func (m *pushMockClient) GetHandle(_ string) SpriteHandle { return m.handle }
+func (m *pushMockClient) GetHandle(_ string) SpriteHandle                 { return m.handle }
 func (m *pushMockClient) DestroySprite(_ context.Context, _ string) error { return m.destroyErr }
 func (m *pushMockClient) ListSprites(_ context.Context) ([]SpriteListEntry, error) {
 	return m.sprites, m.listErr
@@ -472,5 +472,30 @@ func TestPrefixWriter_ConcurrentNoInterleave(t *testing.T) {
 	}
 	if want := len(prefixes) * linesPer; count != want {
 		t.Errorf("got %d lines, want %d", count, want)
+	}
+}
+
+func TestPrefixWriter_Flush(t *testing.T) {
+	var buf bytes.Buffer
+	var mu sync.Mutex
+	pw := &prefixWriter{prefix: "[x] ", w: &buf, mu: &mu}
+
+	// Two complete lines plus a trailing newline-less fragment.
+	if _, err := pw.Write([]byte("line one\nline two\nno newline here")); err != nil {
+		t.Fatal(err)
+	}
+	// Before flush, the trailing fragment is buffered, not emitted.
+	if strings.Contains(buf.String(), "no newline here") {
+		t.Error("trailing fragment should be buffered until Flush")
+	}
+	pw.Flush()
+	want := "[x] line one\n[x] line two\n[x] no newline here"
+	if buf.String() != want {
+		t.Errorf("got %q, want %q", buf.String(), want)
+	}
+	// Flush is idempotent / safe with nothing buffered.
+	pw.Flush()
+	if buf.String() != want {
+		t.Errorf("second Flush changed output: %q", buf.String())
 	}
 }

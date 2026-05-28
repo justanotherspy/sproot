@@ -106,13 +106,19 @@ func cargoInstalledList(root string) (string, error) {
 	return outputOf("cargo", "install", "--list", "--root", root)
 }
 
-// cargoIsInstalled checks whether the crate is present in cargo install --list output.
-// If a version is specified, it checks for "name vversion" prefix. Otherwise checks for name.
+// cargoIsInstalled checks whether the crate is present in cargo install --list
+// output. Each installed crate is listed as a non-indented "name vX.Y.Z:" line
+// (its binaries follow, indented). A specified version must match exactly, so a
+// pinned v1.2.3 is not satisfied by an installed v1.2.30.
 func cargoIsInstalled(list string, t config.CargoTool) bool {
-	if t.Version != "" {
-		return strings.Contains(list, t.Name+" v"+t.Version)
-	}
 	for _, line := range strings.Split(list, "\n") {
+		line = strings.TrimSpace(line)
+		if t.Version != "" {
+			if line == t.Name+" v"+t.Version+":" {
+				return true
+			}
+			continue
+		}
 		if strings.HasPrefix(line, t.Name+" v") {
 			return true
 		}

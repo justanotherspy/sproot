@@ -40,6 +40,32 @@ func TestGoInstall_ShouldRunWhenBinaryMissing(t *testing.T) {
 	}
 }
 
+func TestInstalledModVersion(t *testing.T) {
+	out := "/root/.local/bin/tool: go1.22.0\n" +
+		"\tpath\tgithub.com/owner/tool/cmd/tool\n" +
+		"\tmod\tgithub.com/owner/tool\tv1.2.3\th1:abc=\n" +
+		"\tdep\tgolang.org/x/sys\tv0.1.0\th1:def=\n"
+	if got := installedModVersion(out); got != "v1.2.3" {
+		t.Errorf("installedModVersion: got %q, want v1.2.3", got)
+	}
+	// A pinned v1.2.3 must not be considered satisfied by an installed v1.2.30.
+	if installedModVersion(out) == "v1.2.30" {
+		t.Error("v1.2.3 should not match v1.2.30")
+	}
+	if got := installedModVersion("no mod line here\n"); got != "" {
+		t.Errorf("installedModVersion(no mod): got %q, want empty", got)
+	}
+}
+
+func TestResolveGoVersion(t *testing.T) {
+	if got := resolveGoVersion(""); got != "latest" {
+		t.Errorf("resolveGoVersion(empty): got %q, want latest", got)
+	}
+	if got := resolveGoVersion("v1.0.0"); got != "v1.0.0" {
+		t.Errorf("resolveGoVersion(v1.0.0): got %q, want v1.0.0", got)
+	}
+}
+
 func TestGoInstall_ShouldRunTrueForLatest(t *testing.T) {
 	if _, err := exec.LookPath("go"); err != nil {
 		t.Skip("go not on PATH")

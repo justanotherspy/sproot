@@ -42,20 +42,42 @@ func (p *goInstallPhase) ShouldRun(_ *phase.Context) (bool, error) {
 		if err != nil {
 			return true, nil
 		}
-		if t.Version == "latest" {
-			// Always re-run for latest to pick up newer releases.
+		if resolveGoVersion(t.Version) == "latest" {
+			// Always re-run for latest (the default) to pick up newer releases.
 			return true, nil
 		}
-		// Check installed module path and version match.
+		// Check installed module path and version match exactly.
 		out, err := outputOf("go", "version", "-m", binPath)
 		if err != nil {
 			return true, nil
 		}
-		if !strings.Contains(out, t.Pkg) || !strings.Contains(out, t.Version) {
+		if !strings.Contains(out, t.Pkg) || installedModVersion(out) != t.Version {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+// resolveGoVersion normalizes an empty version to "latest", so ShouldRun and Run
+// agree on the meaning of an unset version.
+func resolveGoVersion(v string) string {
+	if v == "" {
+		return "latest"
+	}
+	return v
+}
+
+// installedModVersion extracts the module version from `go version -m` output.
+// The relevant line is "\tmod\t<module>\t<version>\t<hash>"; an empty string is
+// returned when no mod line is present.
+func installedModVersion(out string) string {
+	for _, line := range strings.Split(out, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) >= 3 && fields[0] == "mod" {
+			return fields[2]
+		}
+	}
+	return ""
 }
 
 func (p *goInstallPhase) Run(ctx *phase.Context) error {
@@ -66,10 +88,7 @@ func (p *goInstallPhase) Run(ctx *phase.Context) error {
 		return fmt.Errorf("go_install: %w", err)
 	}
 	for _, t := range p.cfg.Tools {
-		ver := t.Version
-		if ver == "" {
-			ver = "latest"
-		}
+		ver := resolveGoVersion(t.Version)
 		if err := runCmdEnv([]string{"GOBIN=" + bin}, ctx.Log, "go", "install", t.Pkg+"@"+ver); err != nil {
 			return err
 		}

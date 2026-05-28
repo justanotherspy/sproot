@@ -36,8 +36,10 @@ type SprootConfig struct {
 }
 
 // ResolveTarget returns the phases for the named target, applying extends inheritance.
-// When name is empty and Targets is defined, looks for a "default" target; if absent
-// falls back to Phases. When Targets is not defined, returns Phases regardless of name.
+// When Targets is not defined, returns Phases regardless of name. When Targets is
+// defined and name is empty, resolves the "default" target; if no "default" target
+// exists, returns an error directing the caller to pass --target (validation forbids
+// defining both Targets and top-level Phases, so there is no Phases fallback).
 func (c *SprootConfig) ResolveTarget(name string) ([]PhaseConfig, error) {
 	if len(c.Targets) == 0 {
 		return c.Phases, nil
@@ -45,6 +47,9 @@ func (c *SprootConfig) ResolveTarget(name string) ([]PhaseConfig, error) {
 	lookup := name
 	if lookup == "" {
 		lookup = "default"
+		if _, ok := c.Targets[lookup]; !ok {
+			return nil, fmt.Errorf("no target specified and no \"default\" target defined; pass --target")
+		}
 	}
 	return resolveTargetChain(c.Targets, lookup, nil)
 }

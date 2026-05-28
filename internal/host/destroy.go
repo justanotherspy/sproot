@@ -85,8 +85,8 @@ func RunDestroy(ctx context.Context, opts DestroyOptions) error {
 				if base == "" {
 					base = "https://api.github.com"
 				}
-				deleteGHKey(l, ghToken, base+"/user/keys", ids.AuthKeyID)
-				deleteGHKey(l, ghToken, base+"/user/ssh_signing_keys", ids.SigningKeyID)
+				deleteGHKey(ctx, l, ghToken, base+"/user/keys", ids.AuthKeyID)
+				deleteGHKey(ctx, l, ghToken, base+"/user/ssh_signing_keys", ids.SigningKeyID)
 			}
 		}
 	}
@@ -98,12 +98,12 @@ func RunDestroy(ctx context.Context, opts DestroyOptions) error {
 	return nil
 }
 
-func deleteGHKey(l *log.Logger, token, baseURL string, id int64) {
+func deleteGHKey(ctx context.Context, l *log.Logger, token, baseURL string, id int64) {
 	if id == 0 {
 		return
 	}
 	url := fmt.Sprintf("%s/%d", baseURL, id)
-	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
 	if err != nil {
 		l.Warnf("build delete request for key %d: %v", id, err)
 		return

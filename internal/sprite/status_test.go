@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/justanotherspy/sproot/internal/phase"
 )
@@ -109,5 +110,25 @@ func TestPrintStatus_ErrorTruncation(t *testing.T) {
 	}
 	if !strings.Contains(output, "...") {
 		t.Error("expected truncated error to end with '...'")
+	}
+}
+
+func TestTruncate_RuneSafe(t *testing.T) {
+	// A multibyte string truncated must remain valid UTF-8 (no split rune).
+	s := strings.Repeat("é", 80) // each 'é' is 2 bytes
+	got := truncate(s, 60)
+	if !utf8.ValidString(got) {
+		t.Errorf("truncate produced invalid UTF-8: %q", got)
+	}
+	if !strings.HasSuffix(got, "...") {
+		t.Errorf("expected '...' suffix, got %q", got)
+	}
+	// Short strings are returned unchanged.
+	if got := truncate("hi", 60); got != "hi" {
+		t.Errorf("short string changed: %q", got)
+	}
+	// max < 3 must not panic.
+	if got := truncate("hello", 1); got != "..." {
+		t.Errorf("truncate(_, 1): got %q, want ...", got)
 	}
 }

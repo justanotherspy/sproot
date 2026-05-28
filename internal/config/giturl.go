@@ -27,6 +27,15 @@ func NormalizeGitHubCloneURL(url string) (normalized string, rewritten bool) {
 		return githubHTTPSBase + strings.TrimPrefix(url, githubSCPPrefix), true
 	case strings.HasPrefix(url, githubSSHPrefix):
 		return githubHTTPSBase + strings.TrimPrefix(url, githubSSHPrefix), true
+	case strings.HasPrefix(url, "ssh://git@github.com:"):
+		// ssh://git@github.com:22/owner/repo.git: an explicit port follows the
+		// host, so strip everything up to the first "/" after the host before
+		// rewriting to HTTPS.
+		rest := strings.TrimPrefix(url, "ssh://git@github.com:")
+		if i := strings.IndexByte(rest, '/'); i >= 0 {
+			return githubHTTPSBase + rest[i+1:], true
+		}
+		return url, false
 	default:
 		return url, false
 	}

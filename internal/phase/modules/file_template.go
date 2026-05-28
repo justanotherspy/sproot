@@ -120,9 +120,14 @@ func (p *fileTemplatePhase) render(ctx *phase.Context) ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// expandTilde replaces a leading ~ with the user home directory.
+// expandTilde replaces a leading ~ with the user home directory. Only "~" and
+// "~/..." are home-relative; "~user/..." style paths are returned unchanged
+// (we do not resolve other users' home directories), rather than corrupted.
 func expandTilde(path string) (string, error) {
 	if len(path) == 0 || path[0] != '~' {
+		return path, nil
+	}
+	if len(path) > 1 && path[1] != '/' {
 		return path, nil
 	}
 	home, err := os.UserHomeDir()

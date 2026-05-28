@@ -32,6 +32,12 @@ func TestNormalizeGitHubCloneURL(t *testing.T) {
 			rewritten: true,
 		},
 		{
+			name:      "ssh:// form with explicit port",
+			in:        "ssh://git@github.com:22/owner/repo.git",
+			want:      "https://github.com/owner/repo.git",
+			rewritten: true,
+		},
+		{
 			name:      "already https unchanged",
 			in:        "https://github.com/owner/repo.git",
 			want:      "https://github.com/owner/repo.git",

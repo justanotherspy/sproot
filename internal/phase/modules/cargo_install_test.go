@@ -8,7 +8,7 @@ import (
 )
 
 func TestCargoIsInstalled(t *testing.T) {
-	list := "ripgrep v14.1.0:\n    rg\ncargo-nextest v0.9.72:\n    cargo-nextest\n"
+	list := "ripgrep v14.1.0:\n    rg\ncargo-nextest v0.9.72:\n    cargo-nextest\nhexyl v0.14.0:\n    hexyl\n"
 	cases := []struct {
 		name    string
 		version string
@@ -20,6 +20,10 @@ func TestCargoIsInstalled(t *testing.T) {
 		{"cargo-nextest", "0.9.72", true},
 		{"cargo-nextest", "", true},
 		{"nonexistent", "", false},
+		// A pinned version must match exactly; a prefix (v0.14.0 vs v0.14) or a
+		// superstring (v14.1.0 vs v14.1) must not be considered satisfied.
+		{"hexyl", "0.14", false},
+		{"ripgrep", "14.1", false},
 	}
 	for _, tc := range cases {
 		tool := config.CargoTool{Name: tc.name, Version: tc.version}
