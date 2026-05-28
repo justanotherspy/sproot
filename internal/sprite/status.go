@@ -121,8 +121,12 @@ func phaseStatusLabel(rec phase.PhaseRecord) string {
 }
 
 func truncate(s string, max int) string {
-	if len(s) <= max {
+	if max < 3 {
+		max = 3
+	}
+	r := []rune(s)
+	if len(r) <= max {
 		return s
 	}
-	return s[:max-3] + "..."
+	return string(r[:max-3]) + "..."
 }

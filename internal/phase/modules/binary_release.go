@@ -425,18 +425,21 @@ func verifyChecksumFile(path, assetName, checksumsPath string) error {
 	return verifyChecksumFromReader(path, assetName, f)
 }
 
-// verifyChecksumFromReader scans a checksums stream (lines "<sha256hex>  <filename>")
-// for assetName and verifies the file at path against the listed hash.
+// verifyChecksumFromReader scans a checksums stream for assetName and verifies
+// the file at path against the listed hash. It accepts the common SHA256SUMS
+// line forms: "<hash>  <file>" (goreleaser / coreutils text mode), "<hash> *<file>"
+// (coreutils binary mode), and a single-space separator.
 func verifyChecksumFromReader(path, assetName string, r io.Reader) error {
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "  ", 2)
-		if len(parts) != 2 {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) != 2 {
 			continue
 		}
-		if parts[1] == assetName {
-			return verifyChecksum(path, parts[0])
+		// The filename field may be prefixed with "*" to denote binary mode.
+		name := strings.TrimPrefix(fields[1], "*")
+		if name == assetName {
+			return verifyChecksum(path, fields[0])
 		}
 	}
 	if err := scanner.Err(); err != nil {

@@ -66,10 +66,29 @@ func SaveState(path string, s *State) error {
 	if err != nil {
 		return fmt.Errorf("marshal state: %w", err)
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return fmt.Errorf("create state dir: %w", err)
 	}
-	if err := os.WriteFile(path, data, 0o640); err != nil {
+	// Write to a temp file in the same directory and rename into place, so a
+	// crash mid-write cannot leave a truncated state.json that breaks LoadState.
+	tmp, err := os.CreateTemp(dir, ".state-*.json")
+	if err != nil {
+		return fmt.Errorf("create temp state file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer func() { _ = os.Remove(tmpName) }()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return fmt.Errorf("write temp state file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temp state file: %w", err)
+	}
+	if err := os.Chmod(tmpName, 0o640); err != nil {
+		return fmt.Errorf("chmod temp state file: %w", err)
+	}
+	if err := os.Rename(tmpName, path); err != nil {
 		return fmt.Errorf("write state file: %w", err)
 	}
 	return nil

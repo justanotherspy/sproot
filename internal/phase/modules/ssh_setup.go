@@ -133,20 +133,27 @@ func (p *sshSetupPhase) Run(ctx *phase.Context) error {
 		}
 	}
 
-	keyscanOut, err := outputOf("ssh-keyscan", "-H", "github.com")
-	if err != nil {
-		return fmt.Errorf("ssh_setup: ssh-keyscan: %w", err)
-	}
 	knownHosts := filepath.Join(sshDir, "known_hosts")
-	f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return fmt.Errorf("ssh_setup: open known_hosts: %w", err)
+	// Only scan and append when github.com is not already present, so re-runs
+	// (e.g. when the key exists but was never registered) do not accumulate
+	// duplicate hashed known_hosts entries.
+	if checkCmd("ssh-keygen", "-F", "github.com", "-f", knownHosts) {
+		ctx.Log.Info("github.com already in known_hosts")
+	} else {
+		keyscanOut, err := outputOf("ssh-keyscan", "-H", "github.com")
+		if err != nil {
+			return fmt.Errorf("ssh_setup: ssh-keyscan: %w", err)
+		}
+		f, err := os.OpenFile(knownHosts, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+		if err != nil {
+			return fmt.Errorf("ssh_setup: open known_hosts: %w", err)
+		}
+		defer func() { _ = f.Close() }()
+		if _, err := fmt.Fprintln(f, keyscanOut); err != nil {
+			return fmt.Errorf("ssh_setup: write known_hosts: %w", err)
+		}
+		ctx.Log.Info("appended github.com to known_hosts")
 	}
-	defer func() { _ = f.Close() }()
-	if _, err := fmt.Fprintln(f, keyscanOut); err != nil {
-		return fmt.Errorf("ssh_setup: write known_hosts: %w", err)
-	}
-	ctx.Log.Info("appended github.com to known_hosts")
 
 	return p.writeAllowedSigners(sshDir, pubKey, ctx.Identity.GitUserEmail)
 }

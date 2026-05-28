@@ -212,6 +212,33 @@ func TestVerifyChecksumFile_Match(t *testing.T) {
 	}
 }
 
+func TestVerifyChecksumFromReader_LineForms(t *testing.T) {
+	content := []byte("fake binary content")
+	h := sha256.Sum256(content)
+	checksum := hex.EncodeToString(h[:])
+	assetName := "mytool_1.0.0_linux_amd64.tar.gz"
+
+	dir := t.TempDir()
+	assetPath := dir + "/asset"
+	if err := os.WriteFile(assetPath, content, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := map[string]string{
+		"two-space text mode":  checksum + "  " + assetName,
+		"binary mode asterisk": checksum + " *" + assetName,
+		"single space":         checksum + " " + assetName,
+		"surrounded by noise":  "aabbcc  other.tar.gz\n" + checksum + " *" + assetName + "\nddeeff  more.tar.gz",
+	}
+	for name, line := range cases {
+		t.Run(name, func(t *testing.T) {
+			if err := verifyChecksumFromReader(assetPath, assetName, strings.NewReader(line+"\n")); err != nil {
+				t.Errorf("expected match, got: %v", err)
+			}
+		})
+	}
+}
+
 func TestBinaryRelease_ShouldRunWhenBinaryMissing(t *testing.T) {
 	p := &binaryReleasePhase{cfg: &config.BinaryReleaseConfig{
 		Name:    "sproot-nonexistent-bin",

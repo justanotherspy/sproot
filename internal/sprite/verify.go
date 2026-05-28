@@ -74,7 +74,12 @@ func (v *verifyPhase) Run(ctx *phase.Context) error {
 	}
 
 	home, err := os.UserHomeDir()
-	if err == nil {
+	if err != nil {
+		if phaseRelevant(only, "ssh_setup") || phaseRelevant(only, "rc_block") {
+			ctx.Log.Errorf("verify: cannot resolve home directory: %v", err)
+			errs = append(errs, fmt.Errorf("resolve home directory: %w", err))
+		}
+	} else {
 		if phaseRelevant(only, "ssh_setup") {
 			errs = append(errs, v.checkSSHKey(ctx, home)...)
 		}

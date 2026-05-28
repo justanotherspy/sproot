@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"golang.org/x/term"
 
@@ -261,8 +262,8 @@ func parseAndResolveEnv(raw []byte) (*config.SprootConfig, []string, error) {
 	}
 	var env []string
 	for _, ev := range sprootCfg.Env {
-		val := os.Getenv(ev.From)
-		if val == "" {
+		val, ok := os.LookupEnv(ev.From)
+		if !ok {
 			if ev.Required {
 				return nil, nil, fmt.Errorf("required env var %s (mapped as %s) is not set on host", ev.From, ev.As)
 			}
@@ -281,10 +282,13 @@ func uploadDirectory(handle SpriteHandle, srcDir, destDir string) error {
 			return err
 		}
 		name := info.Name()
-		if name == ".git" || (name[0] == '.' && info.IsDir()) {
-			return filepath.SkipDir
-		}
-		if name[0] == '.' {
+		// Never skip the walk root itself: a config directory whose own basename
+		// starts with "." (e.g. ~/.config/sprite) would otherwise abort the entire
+		// walk and silently upload nothing.
+		if path != srcDir && strings.HasPrefix(name, ".") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		if info.IsDir() {

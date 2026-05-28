@@ -230,8 +230,13 @@ func pushOne(ctx context.Context, client SpritesClient, name string, opts PushOp
 
 	stdout := &prefixWriter{prefix: "[" + name + "] ", w: os.Stdout, mu: outMu}
 	stderr := &prefixWriter{prefix: "[" + name + "] ", w: os.Stderr, mu: outMu}
-	if err := handle.RunCommand("sproot", args, buildSpriteEnv(ghToken, envBlock), stdout, stderr); err != nil {
-		return err
+	runErr := handle.RunCommand("sproot", args, buildSpriteEnv(ghToken, envBlock), stdout, stderr)
+	// Flush any trailing newline-less output before returning, so a final line
+	// without a "\n" (e.g. an error fragment or prompt) is not dropped.
+	stdout.Flush()
+	stderr.Flush()
+	if runErr != nil {
+		return runErr
 	}
 
 	if !opts.DryRun && sha != "" {
@@ -338,4 +343,15 @@ func (pw *prefixWriter) Write(p []byte) (int, error) {
 		}
 		buf = buf[idx+1:]
 	}
+}
+
+// Flush emits any buffered partial line (output not terminated by a newline).
+func (pw *prefixWriter) Flush() {
+	if len(pw.partial) == 0 {
+		return
+	}
+	pw.mu.Lock()
+	defer pw.mu.Unlock()
+	_, _ = fmt.Fprintf(pw.w, "%s%s", pw.prefix, pw.partial)
+	pw.partial = nil
 }
