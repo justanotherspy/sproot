@@ -4,8 +4,8 @@ Reference snapshots of the context files a **fresh** sprite.dev sprite ships wit
 (captured before any `sproot setup` runs). Kept here so we can see the platform
 baseline that `sproot` augments, without spinning up a sprite each time.
 
-Captured from a `sprite create` sprite on 2026-05-22.
-Sprite client/image version (`/.sprite/version.txt`): `0.0.1-rc43`.
+Captured from a `sprite create` sprite on 2026-08-01.
+Sprite client/image version (`/.sprite/version.txt`): `0.0.1-rc47`.
 
 | File | Source on sprite | Notes |
 |------|------------------|-------|

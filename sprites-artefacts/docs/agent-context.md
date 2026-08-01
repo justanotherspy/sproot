@@ -11,9 +11,9 @@
 ## HTTP Access
 
 ### URL Format
-Each sprite has a unique URL: `https://<sprite-name>-<org>.sprites.dev/`
+Each sprite has a unique URL: `https://<sprite-name>-<org>.sprites.app/`
 
-Example: `https://dev-mycompany.sprites.dev/`
+Example: `https://dev-mycompany.sprites.app/`
 
 ### Routing
 - By default, the proxy routes to port 8080
@@ -29,7 +29,7 @@ Sprite URLs support two authentication modes:
 - This is the secure default for development
 - Access with:
   ```bash
-  curl -H "Authorization: Bearer $SPRITE_API_TOKEN" https://mysprite-myorg.sprites.dev/
+  curl -H "Authorization: Bearer $SPRITE_API_TOKEN" https://mysprite-myorg.sprites.app/
   ```
 
 **2. Public**
@@ -160,4 +160,3 @@ Test DNS resolution:
 dig allowed-domain.com    # Should resolve
 dig blocked-domain.com    # Returns REFUSED
 ```
-
