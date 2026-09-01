@@ -44,6 +44,8 @@ github.com/superfly/sprites-go v0.1.0 h1:zbttIv0FaYTbUZNxz/wJD4TjZuYwKSc0VoHdxpN
 github.com/superfly/sprites-go v0.1.0/go.mod h1:fr7GbRS3je+Qc7ONFxidG+V0IBUETPF803LU0gO/x9E=
 github.com/superfly/sprites-go v0.1.1 h1:5+NDHvoxTiYzIT8vzSwi6HYZuq2HWp96V2b3kcn7fP8=
 github.com/superfly/sprites-go v0.1.1/go.mod h1:fr7GbRS3je+Qc7ONFxidG+V0IBUETPF803LU0gO/x9E=
+github.com/superfly/sprites-go v0.2.0 h1:evUObuZVh/4Q4cIr1oDV9042NpzdVBPxvbec2B7tMfM=
+github.com/superfly/sprites-go v0.2.0/go.mod h1:fr7GbRS3je+Qc7ONFxidG+V0IBUETPF803LU0gO/x9E=
 go.yaml.in/yaml/v3 v3.0.4 h1:tfq32ie2Jv2UxXFdLJdh3jXuOzWiL1fo0bu/FbuKpbc=
 go.yaml.in/yaml/v3 v3.0.4/go.mod h1:DhzuOOF2ATzADvBadXxruRBLzYTpT36CKvDb3+aBEFg=
 go.yaml.in/yaml/v3 v3.0.5 h1:N6y/pJk8buWs9NY5ERU2HSMfm+IuD/OtfdAnq6kESPw=
