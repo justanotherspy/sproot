@@ -29,6 +29,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: install sprite CLI
+        # curl-pipe-shell is accepted here: this is sprite.dev's documented
+        # installer for the CLI this repo exists to drive, and the workflow is
+        # owner-triggered only (workflow_dispatch plus a monthly cron), never
+        # from a fork pull request. sprites.dev publishes no stable checksum
+        # for install.sh, so pinning one would break the workflow on every
+        # vendor update without adding real assurance.
+        # nosemgrep: yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell
         run: |
           curl -fsSL https://sprites.dev/install.sh | sh
           # The installer's target dir is not guaranteed, so find the binary and
