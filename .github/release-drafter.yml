@@ -68,7 +68,7 @@ autolabeler:
       - '/^ci(\(.+\))?:/i'
   - label: 'dependencies'
     title:
-      - '/^build\(deps\):/i'
+      - '/^(chore|fix)\(deps\):/i'
 
 template: |
   ## Changes
