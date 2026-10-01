@@ -7,7 +7,7 @@
 ## Quick Reference
 
 ### URL
-- Format: `https://<sprite-name>-<org>.sprites.dev/`
+- Format: `https://<sprite-name>-<org>.sprites.app/`
 - Check yours: `sprite-env info` or `sprite url` (from outside)
 - Auth modes: `sprite` (org members only, default) or `public` (open to internet)
 - Proxy routes HTTP to the service with `--http-port`, or port 8080 by default

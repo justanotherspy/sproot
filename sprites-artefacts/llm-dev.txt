@@ -1,5 +1,9 @@
 Shims directory: /.sprite/bin
 
+CLI agents
+- Installed agent commands, versions, sources, lifecycle-script policy, and native skills directories are listed in /.sprite/etc/agents.catalog.
+- Sprite's shared skills are copied into every skills directory in that catalog.
+
 Shim behavior
 - Shims minimally initialize the language manager only if needed.
 - Shims prepend the active toolchain bin directory to PATH (only if missing) and exec the real binary.
@@ -13,7 +17,8 @@ Node.js
 
 Python
 - Manager: pyenv at /.sprite/languages/python/pyenv
-- Shims: python, python3, pip, pip3, pipenv, poetry, virtualenv, pyenv
+- Shims: python, python3, pip, pip3, pipenv, poetry, virtualenv, pyenv, uv, uvx
+- uv and uvx are installed independently and remain available across pyenv versions
 - Manage versions: pyenv install <version>; pyenv versions; pyenv global <version>; pyenv local <version>
 - Default installed: 3.13.7
 
@@ -64,4 +69,3 @@ Deno
 - Shims: deno
 - Manage versions: not provided by this image
 - Default installed: latest at build time
-
