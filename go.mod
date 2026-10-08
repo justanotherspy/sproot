@@ -2,7 +2,7 @@ module github.com/justanotherspy/sproot
 
 go 1.26.0
 
-toolchain go1.27.1
+toolchain go1.27.2
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
@@ -24,7 +24,6 @@ require (
 	github.com/prometheus/common v0.55.0 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
-	github.com/superfly/client-signals v0.2.1 // indirect
 	github.com/superfly/client-signals/go v0.4.4 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect
