@@ -1,7 +1,11 @@
 name: integration
 
 on:
-  pull_request:
+  # Disabled: these jobs create real sprites. Restore the pull_request trigger
+  # to turn them back on. workflow_dispatch keeps the file valid, and the
+  # sprite jobs still skip on a manual run (they gate on the PR author).
+  # pull_request:
+  workflow_dispatch:
 
 # Integration jobs only run for the repo owner; they create real sprites and
 # require the SPRITES_TOKEN secret which is not available to other contributors.
