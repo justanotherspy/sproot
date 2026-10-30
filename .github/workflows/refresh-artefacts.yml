@@ -6,10 +6,12 @@ name: refresh-artefacts
 # is committed. Runs monthly and on demand.
 
 on:
+  # Scheduled run disabled: it creates a real sprite. Restore the schedule to
+  # turn it back on. Manual runs (workflow_dispatch) still work.
   workflow_dispatch:
-  schedule:
-    # 06:00 UTC on the 1st of every month.
-    - cron: "0 6 1 * *"
+  # schedule:
+  #   # 06:00 UTC on the 1st of every month.
+  #   - cron: "0 6 1 * *"
 
 permissions:
   contents: write
