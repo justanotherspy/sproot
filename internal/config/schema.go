@@ -3,7 +3,7 @@ package config
 import (
 	"fmt"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // EnvVar maps a host environment variable into the sprite under a given name.

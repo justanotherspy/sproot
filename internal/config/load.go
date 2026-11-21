@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"go.yaml.in/yaml/v3"
+	"go.yaml.in/yaml/v4"
 )
 
 // GitOpTimeout bounds a single git network operation (clone, fetch, checkout) so
